@@ -13,9 +13,12 @@ return new class extends Migration
      * MetreLineObserver + queued job (RecalculateMetreTotals) rather than at request time -
      * see section 6.3 of ShakeMetre_Analyse_et_Plan_Migration_Laravel.md.
      *
-     * sum_total_*_summary_stored columns mirror FileMaker's own auto-updating Summary-field
-     * materialization (zsm_*_Stored), kept alongside the script-computed tot_*_stored
-     * columns since both existed as distinct stored fields in the source schema.
+     * The source table's `zsm_*` fields are deliberately absent: FileMaker Summary fields
+     * aggregate over the current found set (portal/list/report totals at display time), so
+     * they are not per-record data and have no place as columns. Where a calculation needed
+     * one - Tot_Sum_TotalFees_Stored reads zsm_SumTotalSales_Stored - the job substitutes the
+     * corresponding per-record tot_*_stored column, which is what that Summary resolves to
+     * inside a single record's calculation. List-level totals are computed by query instead.
      */
     public function up(): void
     {
@@ -74,12 +77,6 @@ return new class extends Migration
             $table->decimal('total_purchase_metl_stored', 15, 4)->nullable();
             $table->decimal('total_sales_metl_stored', 15, 4)->nullable();
             $table->decimal('total_gain_metl_stored', 15, 4)->nullable();
-
-            $table->decimal('sum_total_buy_summary_stored', 15, 4)->nullable();
-            $table->decimal('sum_total_ordered_summary_stored', 15, 4)->nullable();
-            $table->decimal('sum_total_sales_summary_stored', 15, 4)->nullable();
-            $table->decimal('sum_total_gain_summary_stored', 15, 4)->nullable();
-            $table->decimal('sum_gain_on_purchases_summary_stored', 15, 4)->nullable();
 
             $table->uuid('created_by')->nullable();
             $table->uuid('updated_by')->nullable();
