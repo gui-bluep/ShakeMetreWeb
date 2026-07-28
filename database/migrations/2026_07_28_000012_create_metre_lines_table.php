@@ -18,9 +18,18 @@ return new class extends Migration
      *   LOT_AmountNotAssignedBuy reads `IsEmpty ( zkf_LOT )`
      * A line always belongs to a metre, so metre_id stays required.
      *
-     * accounting_code_id is treated as cross-system (ShakeDesign ZVAL_Values) by the same
-     * reasoning as vat_value_id, even though it wasn't in the literal exception list -
-     * flag this inference if it's wrong.
+     * vat_value_id and accounting_code_id do NOT rest on the same evidence:
+     *   vat_value_id (zkf_VAT_ae) is proven - relationship 168 in the export joins
+     *     metl_ZVAL__VAT (ZVAL_Values, external source ShakeDesign) on `zkp = zkf_VAT_ae`.
+     *   accounting_code_id (zkf_AccountingCode_ae) is an INFERENCE. No relationship and no
+     *     calculation in the export mentions the field; it is an auto-enter (`_ae`) whose
+     *     formula the export omits. ZVAL_Values is the likely target because a
+     *     `f_ZVAL_AccountingCode_FromSmarter` value list exists alongside
+     *     `f_ZVAL_VAT_FromSmarter`, ZVAL_Values carries a Print_AccountCode_c field behind a
+     *     `Type` discriminator, and the migration plan describes it as holding "taux de TVA,
+     *     codes comptables". Confirm against FileMaker before relying on it in Phase 4.
+     * Either way the column is a bare uuid: no accounting-code table exists on this side to
+     * constrain against.
      */
     public function up(): void
     {

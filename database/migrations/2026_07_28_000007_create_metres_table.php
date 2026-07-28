@@ -15,10 +15,18 @@ return new class extends Migration
      *
      * The source table's `zsm_*` fields are deliberately absent: FileMaker Summary fields
      * aggregate over the current found set (portal/list/report totals at display time), so
-     * they are not per-record data and have no place as columns. Where a calculation needed
-     * one - Tot_Sum_TotalFees_Stored reads zsm_SumTotalSales_Stored - the job substitutes the
-     * corresponding per-record tot_*_stored column, which is what that Summary resolves to
-     * inside a single record's calculation. List-level totals are computed by query instead.
+     * they are not per-record data and have no place as columns. That argument rests only on
+     * the field's `type` being Summary, which is all the export records - it lists no
+     * aggregation operator and no source field for any of them (`calc` is null throughout).
+     *
+     * Consequently, only two of the five removed columns have a verified meaning:
+     * zsm_SumTotalSales_Stored and zsm_SumTotalOrdered_Stored were confirmed in the XML
+     * export as operation="Total" over Tot_Sum_TotalSales_Stored / Tot_Sum_TotalOrdered_Stored,
+     * which is why the job may substitute those per-record columns in Tot_Sum_TotalFees_Stored
+     * and its percentage/ratio. The aggregation of zsm_SumTotalBuy_Stored,
+     * zsm_SumTotalGain_Stored and zsm_SumGainOnPurchases_Stored is unverified - no calculation
+     * in the export consumes them, so nothing depends on it. List-level totals are computed
+     * by query instead.
      */
     public function up(): void
     {
