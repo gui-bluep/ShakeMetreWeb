@@ -1,0 +1,111 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class MetreLine extends Model
+{
+    use HasUuids;
+
+    public $incrementing = false;
+
+    protected $keyType = 'string';
+
+    protected function casts(): array
+    {
+        return [
+            'is_option_b' => 'boolean',
+            'is_locked_bae' => 'boolean',
+            'is_imported_b' => 'boolean',
+            'is_tender_line_b' => 'boolean',
+            'is_estimated_price_b' => 'boolean',
+            'is_delivered_b' => 'boolean',
+            'metc_is_present_b' => 'boolean',
+            'tender_supp1_omit_b' => 'boolean',
+            'tender_supp2_omit_b' => 'boolean',
+            'tender_supp3_omit_b' => 'boolean',
+            'tender_supp4_omit_b' => 'boolean',
+            'tender_supp5_omit_b' => 'boolean',
+        ];
+    }
+
+    public function metre(): BelongsTo
+    {
+        return $this->belongsTo(Metre::class);
+    }
+
+    public function reference(): BelongsTo
+    {
+        return $this->belongsTo(Reference::class);
+    }
+
+    public function subReference(): BelongsTo
+    {
+        return $this->belongsTo(SubReference::class);
+    }
+
+    public function subReferenceLine(): BelongsTo
+    {
+        return $this->belongsTo(SubReferenceLine::class);
+    }
+
+    public function material(): BelongsTo
+    {
+        return $this->belongsTo(Material::class);
+    }
+
+    public function cartMaterial(): BelongsTo
+    {
+        return $this->belongsTo(CartMaterial::class);
+    }
+
+    public function lot(): BelongsTo
+    {
+        return $this->belongsTo(Lot::class);
+    }
+
+    public function metreLineComponents(): HasMany
+    {
+        return $this->hasMany(MetreLineComponent::class);
+    }
+
+    /**
+     * Cross-system reference: resolved via ShakeDesignClient against ShakeDesign's
+     * SOR_SupplierOrders. Not a local Eloquent relation.
+     */
+    public function supplierOrderId(): ?string
+    {
+        return $this->supplier_order_id;
+    }
+
+    /**
+     * Cross-system reference: resolved via ShakeDesignClient::findCompany() against
+     * ShakeDesign's CPY_Companies. Not a local Eloquent relation.
+     */
+    public function companyId(): ?string
+    {
+        return $this->company_id;
+    }
+
+    /**
+     * Cross-system reference: resolved via ShakeDesignClient::findVatValue() against
+     * ShakeDesign's ZVAL_Values. Not a local Eloquent relation.
+     */
+    public function vatValueId(): ?string
+    {
+        return $this->vat_value_id;
+    }
+
+    /**
+     * Cross-system reference: resolved via ShakeDesignClient against ShakeDesign's
+     * ZVAL_Values (accounting code). Not a local Eloquent relation.
+     */
+    public function accountingCodeId(): ?string
+    {
+        return $this->accounting_code_id;
+    }
+}
