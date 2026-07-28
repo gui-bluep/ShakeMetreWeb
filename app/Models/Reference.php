@@ -10,6 +10,14 @@ class Reference extends Model
 {
     use HasUuids;
 
+    /**
+     * `references` is a reserved SQL keyword, and Laravel's SQLite grammar emits the
+     * referenced table name unquoted when it rebuilds a table (SQLiteGrammar::compileForeign),
+     * so any FK pointing at it breaks the test suite. Hence the explicit table name; the
+     * foreign key columns stay `reference_id`.
+     */
+    protected $table = 'metre_references';
+
     public $incrementing = false;
 
     protected $keyType = 'string';

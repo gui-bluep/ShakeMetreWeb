@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('sub_references', function (Blueprint $table) {
             $table->uuid('id')->primary();
 
-            $table->foreignUuid('reference_id')->constrained('references');
+            $table->foreignUuid('reference_id')->constrained('metre_references');
 
             $table->string('title_en')->nullable();
             $table->string('title_fr')->nullable();

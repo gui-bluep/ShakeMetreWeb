@@ -28,7 +28,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
 
             $table->foreignUuid('metre_id')->constrained('metres');
-            $table->foreignUuid('reference_id')->nullable()->constrained('references');
+            $table->foreignUuid('reference_id')->nullable()->constrained('metre_references');
             $table->foreignUuid('sub_reference_id')->nullable()->constrained('sub_references');
             $table->foreignUuid('sub_reference_line_id')->nullable()->constrained('sub_reference_lines');
             $table->foreignUuid('material_id')->nullable()->constrained('materials');

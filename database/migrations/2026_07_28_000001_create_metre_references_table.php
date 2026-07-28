@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('references', function (Blueprint $table) {
+        Schema::create('metre_references', function (Blueprint $table) {
             $table->uuid('id')->primary();
 
             $table->string('title_en')->nullable();
@@ -28,6 +28,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('references');
+        Schema::dropIfExists('metre_references');
     }
 };

@@ -25,7 +25,7 @@ return new class extends Migration
             // a catalogue entry need not be classified against every axis.
             $table->foreignUuid('category_id')->nullable()->constrained('categories');
             $table->foreignUuid('sub_category_id')->nullable()->constrained('sub_categories');
-            $table->foreignUuid('reference_id')->nullable()->constrained('references');
+            $table->foreignUuid('reference_id')->nullable()->constrained('metre_references');
             $table->foreignUuid('sub_reference_id')->nullable()->constrained('sub_references');
             $table->foreignUuid('sub_reference_line_id')->nullable()->constrained('sub_reference_lines');
             $table->foreignUuid('parent_id')->nullable()->constrained('materials');
