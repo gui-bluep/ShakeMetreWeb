@@ -55,3 +55,21 @@ Standard Laravel 13 structure — no custom architectural layers yet:
 - Tests: PHPUnit via `tests/Unit` and `tests/Feature`, `Tests\TestCase` base class, Pest is not installed.
 
 As the migration progresses, expect the target architecture (per the migration plan) to include: Eloquent models per FileMaker table mapped under `app/Models`, a `MetreLineObserver` recalculating `_Stored` aggregate fields via a queued job (`RecalculateMetreTotals`) rather than at request time, and a `ShakeDesignClient` service (`app/Services/ShakeDesign`) wrapping the FileMaker Data API for cross-system reads/writes (projects, companies, contacts, VAT values, offer/supplier-order creation) — since ShakeDesign remains a separate FileMaker application throughout.
+
+## Database note
+Local skeleton defaults to SQLite, but the target/production database is
+MySQL (OVH-hosted FileMaker Server environment). Since UUID primary-key
+preservation from FileMaker is a hard constraint for this migration
+(see filemaker-reference), switch local dev to MySQL before writing
+migrations for MET_Metre/METL_MetreLines/LOT_Lot/REF_Reference/METC_MetreLineComponent,
+or explicitly test UUID storage/foreign-key behavior on SQLite first.
+
+## Workflow
+Commit to git after each accepted migration/model/logic change, before
+starting the next prompt. Small, reversible steps — not one big commit
+per phase.
+
+## Critical test
+Any migration/seeder touching MET_Metre, METL_MetreLines, LOT_Lot,
+REF_Reference, or METC_MetreLineComponent must have a test asserting
+that a given source zkp round-trips unchanged through the migration.
