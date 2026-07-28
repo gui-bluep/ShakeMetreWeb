@@ -1,0 +1,4358 @@
+{
+ "tables": [
+  {
+   "name": "CTC_Contacts",
+   "field_count": 40,
+   "fields": [
+    {
+     "name": "z_________________________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "//------------------------------- DEVELOPER FIELDS ---------------------------------//"
+    },
+    {
+     "name": "z_RecordIndicator",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "RecordIndicator"
+    },
+    {
+     "name": "zg_QuickFind",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zkk_0",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "0"
+    },
+    {
+     "name": "zkk_1",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "1"
+    },
+    {
+     "name": "zkk_ID",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkk_XXX_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "\"CTC\""
+    },
+    {
+     "name": "zkp",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zSM_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// ------------------------------ SUMMARIES ----------------------------------- //"
+    },
+    {
+     "name": "NameFirst",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "NameLast",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "COM_PhoneMain_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "ctc_COM__CreationPhoneMain::Communication"
+    },
+    {
+     "name": "COM_MobileMain_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "ctc_COM__CreationMobileMain::Communication"
+    },
+    {
+     "name": "COM_EmailMain_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "ctc_COM__CreationMailMain::Communication"
+    },
+    {
+     "name": "Title",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Gender",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zg_CTCList",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zsm_List_zkp",
+     "type": "Summary",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "NameFirstLast_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Trim ( Case ( not IsEmpty ( NameFirst ) ; NameFirst & \" \" & Upper ( NameLast ) ; Upper ( NameLast ) ) )"
+    },
+    {
+     "name": "Comments",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "isActive_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "NameLastUpper_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Trim ( Upper ( NameLast ) )"
+    },
+    {
+     "name": "zLOG_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// --------------------------------- LOG -------------------------------------- //"
+    },
+    {
+     "name": "zlog_creaAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifScriptParameter",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_trigger",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkk_MailMain_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "ctc_COM__CreationMailMain::zkp"
+    },
+    {
+     "name": "Language",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CPY_List_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "List ( jcpyctc__JCPYCTC__::zkf_CPY )"
+    },
+    {
+     "name": "zsm_List_zkfCPY",
+     "type": "Summary",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "z__isImported_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    }
+   ]
+  },
+  {
+   "name": "CPY_Companies",
+   "field_count": 102,
+   "fields": [
+    {
+     "name": "z_________________________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "//------------------------------- DEVELOPER FIELDS ---------------------------------//"
+    },
+    {
+     "name": "z_RecordIndicator",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "RecordIndicator"
+    },
+    {
+     "name": "zg_QuickFind",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zkk_0",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "0"
+    },
+    {
+     "name": "zkk_1",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "1"
+    },
+    {
+     "name": "zkk_ID",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkk_XXX_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "\"CPY\""
+    },
+    {
+     "name": "zkp",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zSM_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// ------------------------------ SUMMARIES ----------------------------------- //"
+    },
+    {
+     "name": "zg_CPYList",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zsm_List_zkp",
+     "type": "Summary",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "isClient_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "isProspect_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "isSupplier_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Name",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VAT",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Comments",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Website",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Phone1",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Phone2",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "isActive_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "AddressBill_Address",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "AddressBill_PostalCode",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "AddressBill_City",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "AddressBill_Country",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "AddressBill_AddressComp",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "AddressBill_Full_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[ \n\t_address1 = AddressBill_Address;\n\t_address2 = AddressBill_AddressComp;\n\t_cp = AddressBill_PostalCode;\n\t_city = AddressBill_City;\n\t_country = AddressBill_Country\n\n];\n\n_address1 &\nCase ( not IsEmpty ( Trim ( _address2 ) ) ; \"¶\"  & _address2 ;"
+    },
+    {
+     "name": "AddressBill_LineFull_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[ \n\t_address1 = AddressBill_Address;\n\t_address2 = AddressBill_AddressComp;\n\t_cp = AddressBill_PostalCode;\n\t_city = AddressBill_City;\n\t_country = AddressBill_Country\n\n];\n\n_address1 &\nCase ( not IsEmpty ( Trim ( _cp ) ) ; \" - \"  & _cp ; \"\" ) & Ca"
+    },
+    {
+     "name": "AddressPost_Address",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "AddressPost_AddressComp",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "AddressPost_City",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "AddressPost_Country",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "AddressPost_Full_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[ \n\t_address1 = AddressPost_Address;\n\t_address2 = AddressPost_AddressComp;\n\t_cp = AddressPost_PostalCode;\n\t_city = AddressPost_City;\n\t_country = AddressPost_Country\n\n];\n\n_address1 &\nCase ( not IsEmpty ( Trim ( _address2 ) ) ; \"¶\"  & _address2 ;"
+    },
+    {
+     "name": "AddressPost_LineFull_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[ \n\t_address1 = AddressPost_Address;\n\t_address2 = AddressPost_AddressComp;\n\t_cp = AddressPost_PostalCode;\n\t_city = AddressPost_City;\n\t_country = AddressPost_Country\n\n];\n\n_address1 &\nCase ( not IsEmpty ( Trim ( _cp ) ) ; \" - \"  & _cp ; \"\" ) & Ca"
+    },
+    {
+     "name": "AddressPost_PostalCode",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "LanguageMain",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "EmailMain_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "cpy_COM__CreationMailGeneral::Communication"
+    },
+    {
+     "name": "EmailInvoice_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "cpy_COM__CreationMailInvoice::Communication"
+    },
+    {
+     "name": "BusinessIntroducer",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "ONSS_Status",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "ONSS_Status_Date",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VAT_Status_Date",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VAT_Status",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zLOG_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// --------------------------------- LOG -------------------------------------- //"
+    },
+    {
+     "name": "zlog_creaAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifScriptParameter",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_trigger",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkk_MailMain_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "cpy_COM__CreationMailGeneral::zkp"
+    },
+    {
+     "name": "NameInternal_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "TIM_Count_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Sum ( cpy_TIM__::zkk_1 )"
+    },
+    {
+     "name": "TIM_Total_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( cpy_TIM__::Total_Time_Stored_c )"
+    },
+    {
+     "name": "TIM_Total_Forfait_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( cpy_TIM__::Total_Time_Forfait_Stored )"
+    },
+    {
+     "name": "TIM_Total_Included_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( cpy_TIM__::Total_Time_Included_Stored )"
+    },
+    {
+     "name": "TIM_Total_Internal_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( cpy_TIM__::Total_Time_Internal_Stored )"
+    },
+    {
+     "name": "TIM_Total_Invoiced_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( cpy_TIM__::Total_Time_Invoiced_Stored )"
+    },
+    {
+     "name": "TIM_Total_Travel_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( cpy_TIM__::Total_Time_Travel_Stored )"
+    },
+    {
+     "name": "TIM_Total_Warranty_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( cpy_TIM__::Total_Time_Warranty_Stored )"
+    },
+    {
+     "name": "INV_CountInvoices_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Sum ( cpy_INV__::isInvoiced_bc ) - Sum ( cpy_INV__::isCreditNote_b )"
+    },
+    {
+     "name": "INV_CountCreditNotes_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Sum ( cpy_INV__::isCreditNote_b )"
+    },
+    {
+     "name": "INV_CountProforma_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Sum ( cpy_INV__::isProforma_bc )"
+    },
+    {
+     "name": "COM_Email_Invoice_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "cpy_COM__CreationMailInvoice::Communication"
+    },
+    {
+     "name": "NameLast",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "NameFirst",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Politeness",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "isCompany_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zvl_CPY_Name_Supplier_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( isSupplier_b ; NameInternal_ae ; \"\" )"
+    },
+    {
+     "name": "VAT_DefaultRate",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "NameDisplay_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_company = Name;\n\t_lastName = NameLast;\n\t_firstName = NameFirst;\n\t_polite = Politeness;\n\t_person = Case ( not IsEmpty ( _polite ) ; _polite & \" \" ; \"\" ) & Case ( not IsEmpty ( _firstName ) ; _firstName & \" \" ; \"\" ) & Case ( not IsEmpty ( _la"
+    },
+    {
+     "name": "VATcheck_LastCheck",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VATcheck_Success_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VATcheck_Valid_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VATcheck_ValidFormat_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VATcheck_Database_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VATcheck_VatProvided",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VATcheck_CountryCode",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VATcheck_CompanyName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VATcheck_CompanyAddress",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "NameInternalDisplay_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_name = Name;\n\t_nameInternal = NameInternal_ae\n\n];\n\nCase ( _name <> _nameInternal ; _nameInternal & \" (\" & _name & \")\" ; _name )\n\n)"
+    },
+    {
+     "name": "zvl_CPY_Name_Client_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( \n\tisClient_b and isActive_b ; NameInternal_ae ;\n\tisClient_b and not isActive_b ; \"--inactif-\" & NameInternal_ae ;\n\"\" )"
+    },
+    {
+     "name": "z__isImported_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VAT_Clean_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_vat = Filter ( VAT ; \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\" )\n];\n\nCase ( Length ( _vat ) < 6 ; \"\" ; _vat )\n)"
+    },
+    {
+     "name": "zg_CopyField",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "SectorType",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Bank.BIC",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Bank.IBAN",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Billit_ID",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Peppol_Identifier",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Peppol_LastCheck",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Peppol_Registered_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Peppol_Status_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_peppolReg = Peppol_Registered_b;\n\t_peppolCheck = Peppol_LastCheck\n];\n\nCase (\n\tIsEmpty ( _peppolCheck ) ; \"Not verified\" ;\n\tnot _peppolReg ; \"Invalid\" ;\n\t_peppolReg ; \"Valid\" ;\n\n)\n\n)"
+    },
+    {
+     "name": "AddressBill_CountryCode_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "AddressPost_CountryCode_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zsm_CreaAccount",
+     "type": "Summary",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    }
+   ]
+  },
+  {
+   "name": "PRJ_Projects",
+   "field_count": 147,
+   "fields": [
+    {
+     "name": "z_________________________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "//------------------------------- DEVELOPER FIELDS ---------------------------------//"
+    },
+    {
+     "name": "z_RecordIndicator",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "RecordIndicator"
+    },
+    {
+     "name": "zg_QuickFind",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zkk_0",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "0"
+    },
+    {
+     "name": "zkk_1",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "1"
+    },
+    {
+     "name": "zkk_ID",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkk_XXX_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "\"PRJ\""
+    },
+    {
+     "name": "zkp",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zLG_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// --------------------------------- LOG -------------------------------------- //"
+    },
+    {
+     "name": "zlg_creaAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlg_creaDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlg_creaTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlg_creaUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlg_modifAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlg_modifDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlg_modifScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlg_modifScriptParameter",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlg_modifTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlg_modifUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlg_trigger",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zSM_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// ------------------------------ SUMMARIES ----------------------------------- //"
+    },
+    {
+     "name": "zlg_creaScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Name",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Description",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Number",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Number_cro",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Number"
+    },
+    {
+     "name": "zsm_List_zkp",
+     "type": "Summary",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "NameNumberFormatted_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Number_cro & \" - \" & Name"
+    },
+    {
+     "name": "zg_PRJList",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "Status",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CPY_Name_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CTC_Name_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_CPY",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_CTC",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Language",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "isActive_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CPY_Name_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "CPY_Name_ae"
+    },
+    {
+     "name": "CTC_Name_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "CTC_Name_ae"
+    },
+    {
+     "name": "NumberInteger_c",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "GetAsNumber ( Filter ( prj__PRJ__::Number ; \"0123456789\" ) )"
+    },
+    {
+     "name": "MET_Count_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Sum ( métré_prj_MET__::zkk_1 )"
+    },
+    {
+     "name": "OFF_Count_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Sum ( prj_OFF__::zkk_1 )"
+    },
+    {
+     "name": "ORD_Count_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Sum ( prj_ORD__::zkk_1 )"
+    },
+    {
+     "name": "INV_Count_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Sum ( prj_INV__::zkk_1 )"
+    },
+    {
+     "name": "SOR_Count_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Sum ( prj_INV__::zkk_1 )"
+    },
+    {
+     "name": "SNL_Count_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Sum ( prj_SNL__::zkk_1 )"
+    },
+    {
+     "name": "TIL_Count_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Sum ( prj_TIL__::zkk_1 )"
+    },
+    {
+     "name": "MAIL_Count_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Sum ( prj_MAIL__::zkk_1 )"
+    },
+    {
+     "name": "DOC_Count_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Sum ( prj_DOC__cd::zkk_1 )"
+    },
+    {
+     "name": "_TBDEL___TIM_Total_Invoiced_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( prj_TIM__::Total_Time_Invoiced_Stored )"
+    },
+    {
+     "name": "_TBDEL___TIM_Total_Internal_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( prj_TIM__::Total_Time_Internal_Stored )"
+    },
+    {
+     "name": "_TBDEL___TIM_Total_Included_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( prj_TIM__::Total_Time_Included_Stored )"
+    },
+    {
+     "name": "_TBDEL___TIM_Total_Forfait_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( prj_TIM__::Total_Time_Forfait_Stored )"
+    },
+    {
+     "name": "_TBDEL___TIM_Total_Warranty_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( prj_TIM__::Total_Time_Warranty_Stored )"
+    },
+    {
+     "name": "_TBDEL___TIM_Total_Travel_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( prj_TIM__::Total_Time_Travel_Stored )"
+    },
+    {
+     "name": "TIL_Total_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( prj_TIL__::TimeTotal_ae )"
+    },
+    {
+     "name": "Comments",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "WORK_Address",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "WORK_AddressComp",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "WORK_AddressPostalCode",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "WORK_AddressCity",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "WORK_AddressCountry",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Total_Diff_ORDINV_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Let (\n[\n\t_ord = Total_ORD_PriceNoTax_cU;\n\t_inv = Total_INV_PriceNoTax_Numbered_cU\n];\nCase ( IsEmpty ( _ord ) or _ord = 0 ; 0 ; _ord - _inv )\n\n)\n\n//[AR] - 18/09/2024\n//prj_ORD__::zsm_Total_PriceNoTax_All_Stored - prj_INV__::zsm_Total_PriceNoTax_Stored"
+    },
+    {
+     "name": "Total_Diff_SORSNL_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Total_SOR_PriceNoTax_cU - Total_SIN_PriceNoTax_cU\n\n//[AR] - 18/09/2024\n//prj_SOR__::zsm_Total_PriceNoTax_Stored - prj_SNL__::zsm_Total_PriceNoTax_Signed"
+    },
+    {
+     "name": "Total_Diff_ORDSOR_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Total_ORD_PriceNoTax_cU - Total_SOR_PriceNoTax_cU\n\n//AR 08/08/2022\n//prj_ORD__::zsm_Total_PriceNoTax_All_Stored - prj_SOR__::zsm_Total_PriceNoTax_Stored"
+    },
+    {
+     "name": "Total_Diff_ORDINV_Percent_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Let (\n[\n\t_inv = Total_INV_PriceNoTax_Numbered_cU;\n\t_ord = Total_ORD_PriceNoTax_cU\n];\n\nCase ( IsEmpty ( _ord ) or _ord = 0 ; \"\" ; Round ( ( _inv / _ord ) * 100 ; 2 ) )\n\n)\n\n//[AR] - 18/09/2024\n/*\n\t_inv = prj_INV__::zsm_Total_PriceNoTax_Stored;\n\t_ord = "
+    },
+    {
+     "name": "Total_Diff_SORSNL_Percent_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Let (\n[\n\t_sin = Total_SIN_PriceNoTax_cU;\n\t_sor = Total_SOR_PriceNoTax_cU\n];\n\nCase ( IsEmpty ( _sor ) or _sor = 0 ; \"\" ; Round ( ( _sin / _sor ) * 100 ; 2 ) )\n\n)\n\n\n/*\n//[AR] - 18/09/2024\nLet (\n[\n\t_inv = prj_SNL__::zsm_Total_PriceNoTax_Signed;\n\t_ord = "
+    },
+    {
+     "name": "zkf_ENT",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "z_Val_ActiveProject_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( isActive_b ; NameNumberFormatted_c ; \"\" )"
+    },
+    {
+     "name": "zg_Filter_Supplier",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "Total_INV_PriceNoTax_All_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "prj_INV__::zsm_Total_PriceNoTax_Stats_Stored"
+    },
+    {
+     "name": "Total_ORD_PriceNoTax_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "prj_ORD__::zsm_Total_PriceNoTax_All_Stored + 0"
+    },
+    {
+     "name": "Total_SIN_PriceNoTax_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( IsEmpty ( zg_Filter_Supplier ) ; prj_SNL__::zsm_Total_PriceNoTax_Signed ; prj_SNL__FilterSupplier::zsm_Total_PriceNoTax_Signed  )\n+ 0"
+    },
+    {
+     "name": "Total_SIN_PriceVAT_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( IsEmpty ( zg_Filter_Supplier ) ; prj_SNL__::zsm_Total_VAT_Signed ; prj_SNL__FilterSupplier::zsm_Total_VAT_Signed  )"
+    },
+    {
+     "name": "Total_SIN_PriceWithTax_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( IsEmpty ( zg_Filter_Supplier ) ; prj_SNL__::zsm_Total_PriceWithTax_Signed ; prj_SNL__FilterSupplier::zsm_Total_PriceWithTax_Signed  )"
+    },
+    {
+     "name": "Total_SOR_PriceNoTax_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( IsEmpty ( zg_Filter_Supplier ) ; prj_SOR__::zsm_Total_PriceNoTax_Stored ; prj_SOR__FilterSupplier::zsm_Total_PriceNoTax_Stored  )"
+    },
+    {
+     "name": "Total_SOR_PriceWithTax_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( IsEmpty ( zg_Filter_Supplier ) ; prj_SOR__::zsm_Total_PriceWithTax_Stored; prj_SOR__FilterSupplier::zsm_Total_PriceWithTax_Stored  )"
+    },
+    {
+     "name": "zkm_SuppliersAll_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "List ( prj_SOR__::zkf_CPY ) & \"¶\" &\nList ( prj_snl_SIN__::zkf_CPY )"
+    },
+    {
+     "name": "z__isImported_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Type",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Mission",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "_TBDEL___Code",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Date_End",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Date_FA_Sign_Stored",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Date_TK_Sign_Stored",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Fee_Amo",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Fee_Build",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Fee_Design",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "TKBudget",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Surface",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "LeadOrigin",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Likelihood",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Date_ProvisionalAcceptance_Stored",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Date_FinalAcceptance_Stored",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_USR_SalesResponsible",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_USR_PMResponsible",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Picture",
+     "type": "Normal",
+     "datatype": "Binary",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "WORK_Address_Full_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_lang = Language;\n\t_serial = 60; //Floor\n\t_field = Left ( GetFieldName ( prj_ZLAB__All::zkp ) ; Position ( GetFieldName ( prj_ZLAB__All::zkp ) ; \":\" ; 1 ; 1 ) - 1 ) & \"::\" & _lang ;\n\t_floorTitle = \n\nExecuteSQL ( \n\"SELECT \" & sql.GFN ( GetFie"
+    },
+    {
+     "name": "Date_Start_ae",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Fee_Study",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Fee_Referral_ae",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "USR_PM_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "USR_Sales_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_CTC_SalesLeadOrigin",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CTC_Sales_Name_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PRJP_CurrentPhase_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "prj_PRJP__NotDone_s::Description"
+    },
+    {
+     "name": "Comments_Sales",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "__TEST",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PRJP_CurrentPhase_Stored",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_USR_PLProjectLeader",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "USR_PL_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_USR_Supervisor",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "USR_Supervisor_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "LeadOriginDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "ReferralContact",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "GrossMargin",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Date_FA_Sign_cU",
+     "type": "Calculated",
+     "datatype": "Date",
+     "global": false,
+     "calc": "//SQL\n\nDate_ConvertFrom_YYYYMMDD (\nLet (\n[\n\t_prj = prj__PRJ__::zkp;\n\t_value = \"4\"\n];\n\nExecuteSQL ( \n\"SELECT \" & sql.GFN ( prjp__PRJP__d::Date ) &\n\" FROM \" &  sql.GTN ( prjp__PRJP__d::zkp ) &\n\"WHERE \" & sql.GFN ( prjp__PRJP__d::zkf_PRJ ) & \" = ? AND \""
+    },
+    {
+     "name": "Date_TK_Sign_cU",
+     "type": "Calculated",
+     "datatype": "Date",
+     "global": false,
+     "calc": "//D. Folder Build / Turnkey\n\nDate_ConvertFrom_YYYYMMDD (\nLet (\n[\n\t_prj = prj__PRJ__::zkp;\n\t_value = \"7\" \n];\n\nExecuteSQL ( \n\"SELECT \" & sql.GFN ( prjp__PRJP__d::Date ) &\n\" FROM \" &  sql.GTN ( prjp__PRJP__d::zkp ) &\n\"WHERE \" & sql.GFN ( prjp__PRJP__d::"
+    },
+    {
+     "name": "Date_ProvisionalAcceptance_cU",
+     "type": "Calculated",
+     "datatype": "Date",
+     "global": false,
+     "calc": "//F. Construction\n\nDate_ConvertFrom_YYYYMMDD (\nLet (\n[\n\t_prj = prj__PRJ__::zkp;\n\t_value = \"9\" \n];\n\nExecuteSQL ( \n\"SELECT \" & sql.GFN ( prjp__PRJP__d::Date ) &\n\" FROM \" &  sql.GTN ( prjp__PRJP__d::zkp ) &\n\"WHERE \" & sql.GFN ( prjp__PRJP__d::zkf_PRJ ) "
+    },
+    {
+     "name": "Date_FinalAcceptance_cU",
+     "type": "Calculated",
+     "datatype": "Date",
+     "global": false,
+     "calc": "//G. Snag List & After Care\n\nDate_ConvertFrom_YYYYMMDD (\nLet (\n[\n\t_prj = prj__PRJ__::zkp;\n\t_value = \"10\" \n];\n\nExecuteSQL ( \n\"SELECT \" & sql.GFN ( prjp__PRJP__d::Date ) &\n\" FROM \" &  sql.GTN ( prjp__PRJP__d::zkp ) &\n\"WHERE \" & sql.GFN ( prjp__PRJP__d:"
+    },
+    {
+     "name": "Total_INV_ToPay_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "prj_INV__Numbered::zsm_PAY_ToPay_Stored"
+    },
+    {
+     "name": "ENT_Entity_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "HOURS_PlannedTotal_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "Sum ( prjp__PRJP__d::TimePlanned_Total )"
+    },
+    {
+     "name": "HOURS_PlannedTotal_Stored",
+     "type": "Normal",
+     "datatype": "Time",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zg_Filter_PL",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zg_Filter_PM",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zg_Filter_Supervisor",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zg_QuickFindPortal",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "___TEMP_USR",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_trigg = prj__PRJ__::USR_PM_ae\n];\n\nExecuteSQL (\n\"SELECT \" & sql.GFN ( prj_ZUSR__All::zkp ) &\n\"FROM  \" & sql.GTN ( prj_ZUSR__All::zkp ) &\n\"WHERE \" & sql.GFN ( prj_ZUSR__All::NameFirstLast_c ) & \" = ?\"   ;\"\" ;\"\" ; _trigg\n)\n\n)"
+    },
+    {
+     "name": "HOURS_Balance_cU",
+     "type": "Calculated",
+     "datatype": "Time",
+     "global": false,
+     "calc": "HOURS_PlannedTotal_cU - TIL_Total_cU"
+    },
+    {
+     "name": "zsm_List_PRJP_CurrentPhase",
+     "type": "Summary",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zg_Filter_Phases",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zg_Filter_Category",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "Total_OFF_PriceNoTax_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( \n\nIsEmpty ( zg_Filter_Category ) ; prj_OFF__::zsm_Total_PriceNoTax_Stored ; \tprj_OFF__FilterCategory::zsm_Total_PriceNoTax_Stored\n)"
+    },
+    {
+     "name": "Total_OFF_PriceWithTax_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( \nIsEmpty ( zg_Filter_Category ) ; prj_OFF__::zsm_Total_PriceWithTax_Stored ; \tprj_OFF__FilterCategory::zsm_Total_PriceWithTax_Stored\n)"
+    },
+    {
+     "name": "Total_ORD_PriceNoTax_Filter_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( \n\nIsEmpty ( zg_Filter_Category ) ; prj_ORD__::zsm_Total_PriceNoTax_All_Stored ; \tprj_ORD__FilterCategory::zsm_Total_PriceNoTax_All_Stored\n)"
+    },
+    {
+     "name": "Total_ORD_PriceWithTax_Filter_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( \n\nIsEmpty ( zg_Filter_Category ) ; prj_ORD__::zsm_Total_PriceWithTax_Stored ; \tprj_ORD__FilterCategory::zsm_Total_PriceWithTax_Stored\n)"
+    },
+    {
+     "name": "Total_INV_PriceNoTax_All_Filter_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( \n\nIsEmpty ( zg_Filter_Category ) ; prj_INV__::zsm_Total_PriceNoTax_Stats_Stored ; \tprj_INV__FilterCategory::zsm_Total_PriceNoTax_Stats_Stored\n)"
+    },
+    {
+     "name": "Total_INV_PriceWithTax_All_Filter_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( \n\nIsEmpty ( zg_Filter_Category ) ; prj_INV__::zsm_Total_PriceWithTax_Stats_Stored ; \tprj_INV__FilterCategory::zsm_Total_PriceWithTax_Stats_Stored\n)"
+    },
+    {
+     "name": "Total_INV_PriceNoTax_Numbered_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "prj_INV__Numbered::zsm_Total_PriceNoTax_Stats_Stored + 0"
+    },
+    {
+     "name": "WORK_Address_Floor",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zsm_List_CurrentStatus",
+     "type": "Summary",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zg_Filter_Statuses",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zsm_List_Types",
+     "type": "Summary",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zg_Filter_Types",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "Total_INV_PriceNoTax_Numbered_Filter_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( \n\nIsEmpty ( zg_Filter_Category ) ; prj_INV__Numbered::zsm_Total_PriceNoTax_Stats_Stored ; \tprj_INV__Numbered.FilterCategory::zsm_Total_PriceNoTax_Stats_Stored\n)"
+    },
+    {
+     "name": "Total_INV_PriceWithTax_Numbered_Filter_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( \n\nIsEmpty ( zg_Filter_Category ) ; prj_INV__Numbered::zsm_Total_PriceWithTax_Stats_Stored ; \tprj_INV__Numbered.FilterCategory::zsm_Total_PriceWithTax_Stats_Stored\n)"
+    },
+    {
+     "name": "zsm_CreaAccount",
+     "type": "Summary",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    }
+   ]
+  },
+  {
+   "name": "JCPYCTC_JoinCompaniesContacts",
+   "field_count": 26,
+   "fields": [
+    {
+     "name": "z_________________________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "//------------------------------- DEVELOPER FIELDS ---------------------------------//"
+    },
+    {
+     "name": "z_RecordIndicator",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "/*RecordIndicator*/"
+    },
+    {
+     "name": "zg_QuickFind",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zkk_0",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "0"
+    },
+    {
+     "name": "zkk_1",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "1"
+    },
+    {
+     "name": "zkk_ID",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkk_XXX_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "\"JCPYCTC\""
+    },
+    {
+     "name": "zkp",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zSM_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// ------------------------------ SUMMARIES ----------------------------------- //"
+    },
+    {
+     "name": "zkf_CPY",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_CTC",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Role",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zLOG_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// --------------------------------- LOG -------------------------------------- //"
+    },
+    {
+     "name": "zlog_creaAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifScriptParameter",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_trigger",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "z__isImported_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    }
+   ]
+  },
+  {
+   "name": "OFF_Offers",
+   "field_count": 83,
+   "fields": [
+    {
+     "name": "z_________________________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "//------------------------------- DEVELOPER FIELDS ---------------------------------//"
+    },
+    {
+     "name": "z_RecordIndicator",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "RecordIndicator"
+    },
+    {
+     "name": "zg_QuickFind",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zkk_0",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "0"
+    },
+    {
+     "name": "zkk_1",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "1"
+    },
+    {
+     "name": "zkk_ID",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkk_XXX_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "\"OFF\""
+    },
+    {
+     "name": "zkp",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zLOG_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// --------------------------------- LOG -------------------------------------- //"
+    },
+    {
+     "name": "zlog_creaAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifScriptParameter",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_trigger",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zSM_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// ------------------------------ SUMMARIES ----------------------------------- //"
+    },
+    {
+     "name": "zkf_PRJ",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_CPY",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_CTC",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CPY_Name_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CPY_Name_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "CPY_Name_ae"
+    },
+    {
+     "name": "Language",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Number",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "NumberFull_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "NumberPrefix_ae & Case ( Version <> 1 ; Number & \"-V\" & Version ; Number )"
+    },
+    {
+     "name": "NumberInteger_c",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "GetAsNumber ( Filter ( Number ; \"0123456789\" ) )"
+    },
+    {
+     "name": "Status",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zg_OFFList",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zsm_List_zkp",
+     "type": "Summary",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CPY_AddressFull_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Version",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CTC_Name_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CTC_Name_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "CTC_Name_ae"
+    },
+    {
+     "name": "PRJ_NumberName_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PRJ_Number_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PRJ_Name_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PRJ_NumberName_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "TextFormatRemove ( PRJ_NumberName_ae )"
+    },
+    {
+     "name": "Comments",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Date",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "DateValidity_ae",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "OFL_Total_Discount_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Round ( Sum ( ofl__OFL__::DiscountTotal_Final_c ) ; 2 )"
+    },
+    {
+     "name": "OFL_Total_PriceNoTax_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Round ( Sum ( ofl__OFL__::PriceTotal_NoTax_Final_c ) ; 2 )"
+    },
+    {
+     "name": "OFL_Total_PriceWithTax_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "OFL_Total_PriceNoTax_cU + OFL_Total_VAT_cU"
+    },
+    {
+     "name": "OFL_Total_VAT_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Round ( Sum ( ofl__OFL__::VATAmount_Final_c ) ; 2 )"
+    },
+    {
+     "name": "OFL_Total_Discount_Stored",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "OFL_Total_PriceNoTax_Stored",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "OFL_Total_PriceWithTax_Stored",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "OFL_Total_VAT_Stored",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "isAccepted_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Status = \"Accepted\" ; 1 ; 0 )"
+    },
+    {
+     "name": "isRejected_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Status = \"Refused\" ; 1 ; 0 )"
+    },
+    {
+     "name": "isPending_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Status = \"Pending\" ; 1 ; 0 )"
+    },
+    {
+     "name": "isSent_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Status = \"Sent\" ; 1 ; 0 )"
+    },
+    {
+     "name": "isNoAnswer_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Status = \"No response\" ; 1 ; 0 )"
+    },
+    {
+     "name": "zg_PortalFilter",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zg_DocPreview",
+     "type": "Normal",
+     "datatype": "Binary",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "Description",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_MET",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "isFromMetre_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( not IsEmpty ( zkf_MET ) ; 1 ; 0 )"
+    },
+    {
+     "name": "zsm_Total_PriceNoTax_Stored",
+     "type": "Summary",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zsm_Total_PriceWithTax_Stored",
+     "type": "Summary",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zsm_Total_VAT_Stored",
+     "type": "Summary",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zsm_Total_Discount_Stored",
+     "type": "Summary",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "ORD_Count_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Count ( off_ORD__::zkk_1 )"
+    },
+    {
+     "name": "INV_Count_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Count ( off_INV__::zkk_1 )"
+    },
+    {
+     "name": "Title",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "TitleRef_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "NumberFull_c & \" - \" & Title"
+    },
+    {
+     "name": "zkf_ENT",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "DateValidityDelay",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CPY_VAT_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CPY_VAT_Print_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_vat = CPY_VAT_ae\n];\n\nCase ( IsEmpty ( _vat ) ; \"\" ; ZLAB::#[7] & \" : \" & _vat )\n\n)\n\n//Case ( IsEmpty ( _vat ) ; ZLAB::#[51] ; _vat )"
+    },
+    {
+     "name": "isAdvanced_bcU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Count ( offp__OFFP__::zkk_1 ) > 0 or Count ( ofl__OFL__::Unit ) > 0 or isAdvancedManual_b ; 1 ; 0 )\n\n\n//Advanced if existing OFFP or units assigned to at least one line"
+    },
+    {
+     "name": "isAdvancedManual_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "INV_TotalInvoiced_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Sum ( off_INV__::INL_Total_PriceNoTax_Stats_Stored_c )"
+    },
+    {
+     "name": "INV_TotalInvoicedPercentage_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Round ( ( INV_TotalInvoiced_cU / OFL_Total_PriceNoTax_Stored ) * 100 ; 2 )"
+    },
+    {
+     "name": "Print_AdditionalInformation_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case (\n\tLanguage = \"NL\" ; off_ENT__::OFF_AdditionalInformation_Print_NL ;\n\tLanguage = \"EN\" ; off_ENT__::OFF_AdditionalInformation_Print_EN ;\n\toff_ENT__::OFF_AdditionalInformation_Print_FR\n)"
+    },
+    {
+     "name": "Category",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zsm_creaAccount",
+     "type": "Summary",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "NumberPrefix_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    }
+   ]
+  },
+  {
+   "name": "ZVAL_Values",
+   "field_count": 72,
+   "fields": [
+    {
+     "name": "z_________________________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "//------------------------------- DEVELOPER FIELDS ---------------------------------//"
+    },
+    {
+     "name": "z_RecordIndicator",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "RecordIndicator"
+    },
+    {
+     "name": "zg_QuickFind",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zkk_0",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "0"
+    },
+    {
+     "name": "zkk_1",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "1"
+    },
+    {
+     "name": "zkk_ID",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkk_XXX_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "\"ZVAL\""
+    },
+    {
+     "name": "zkp",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zSM_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// ------------------------------ SUMMARIES ----------------------------------- //"
+    },
+    {
+     "name": "zsm_List_zkp",
+     "type": "Summary",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zLOG_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// --------------------------------- LOG -------------------------------------- //"
+    },
+    {
+     "name": "zlog_creaAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifScriptParameter",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_trigger",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Value",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "SortOrder",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Type",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Print_SINPAY_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( Type = \"SINPAY\" ; Value ; \"\" )"
+    },
+    {
+     "name": "isSINCategory_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"SINCategory\" ; 1 ; 0 )"
+    },
+    {
+     "name": "zkf_VAL_Parent",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "z_sortIsValueEmpty_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( IsEmpty ( Value ) ; 1 ; 0 )"
+    },
+    {
+     "name": "isParent_bcU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( not IsEmpty ( zval_ZVAL__Children::zkk_1 ) ; 1 ; 0 )"
+    },
+    {
+     "name": "Print_SINCategories_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( Type = \"SINCategory\" ; Value ; \"\" )"
+    },
+    {
+     "name": "Description",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Print_VAT_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( Type = \"VAT\" ; Value & Case ( not IsEmpty ( Trim ( Value ) ) ; \" %\" ; \"\" ) & Case ( not IsEmpty ( Description ) ; \" - \" & Description ; \"\" )  ; \"\" )"
+    },
+    {
+     "name": "Value_Int_c",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "GetAsNumber ( Value )"
+    },
+    {
+     "name": "isPRDCategory_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"PRDCategory\" ; 1 ; 0 )"
+    },
+    {
+     "name": "Print_PRDCategories_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( Type = \"PRDCategory\" ; Value ; \"\" )"
+    },
+    {
+     "name": "isPRDSubCategory_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"PRDSubCategory\" ; 1 ; 0 )"
+    },
+    {
+     "name": "isSINSubCategory_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"SINSubCategory\" ; 1 ; 0 )"
+    },
+    {
+     "name": "Print_FR",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Print_NL",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Print_EN",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Description_FR",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Description_NL",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Description_EN",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "isPRDUnit_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"PRDUnit\" ; 1 ; 0 )"
+    },
+    {
+     "name": "Print_PRDUnit_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( Type = \"PRDUnit\" ; Value ; \"\" )"
+    },
+    {
+     "name": "isCTCTitle_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"CTCTitle\" ; 1 ; 0 )"
+    },
+    {
+     "name": "Print_CTCTitle_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( Type = \"CTCTitle\" ; Value ; \"\" )"
+    },
+    {
+     "name": "isINVCategory_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"INVCategory\" ; 1 ; 0 )"
+    },
+    {
+     "name": "Print_OFF.ORD.INVCategories_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( Type = \"INVCategory\" ; Value ; \"\" )"
+    },
+    {
+     "name": "isTIMActivity_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"TIMActivity\" ; 1 ; 0 )"
+    },
+    {
+     "name": "Print_TIM.Activities_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( Type = \"TIMActivity\" ; Value ; \"\" )"
+    },
+    {
+     "name": "isSINStatus_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"SINStatus\" ; 1 ; 0 )"
+    },
+    {
+     "name": "Print_SINStatuses_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( Type = \"SINStatus\" ; Value ; \"\" )"
+    },
+    {
+     "name": "ValueColor",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "ValueColored_cU",
+     "type": "Calculated",
+     "datatype": "Binary",
+     "global": false,
+     "calc": "ColorSwatch ( ValueColor )"
+    },
+    {
+     "name": "isPRJStatus_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"PRJStatus\" ; 1 ; 0 )"
+    },
+    {
+     "name": "Print_PRJStatuses_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( Type = \"PRJStatus\" ; Value ; \"\" )"
+    },
+    {
+     "name": "ValueBoolean_b",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Print_PRJTypes_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( Type = \"PRJType\" ; Value ; \"\" )"
+    },
+    {
+     "name": "isPRJType_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"PRJType\" ; 1 ; 0 )"
+    },
+    {
+     "name": "Print_PRJTypesOrder_c",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"PRJType\" ; SortOrder & \" - \" & Value ; \"\" )"
+    },
+    {
+     "name": "isRefContact_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"RefContact\" ; 1 ; 0 )"
+    },
+    {
+     "name": "Print_RefContact_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( Type = \"RefContact\" ; Value ; \"\" )"
+    },
+    {
+     "name": "isPRJLikelihood_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"PRJLikelihood\" ; 1 ; 0 )"
+    },
+    {
+     "name": "Print_PRJLikelihood_c",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"PRJLikelihood\" ; Value ; \"\" )"
+    },
+    {
+     "name": "Print_PRJLikelihoodOrder_c",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"PRJLikelihood\" ; SortOrder & \" - \" & Value ; \"\" )"
+    },
+    {
+     "name": "Print_OFF.ORD.INVCategoriesOrdered_c",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"INVCategory\" ; SortOrder & \". \" & Value ; \"\" )"
+    },
+    {
+     "name": "Print_AccountCode_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Case ( Type = \"AccountCode\" ; Value & Case ( not IsEmpty ( Description ) ; \" - \" & Description ; \"\" )  ; \"\" )"
+    },
+    {
+     "name": "isVAT_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Type = \"VAT\" ; 1 ; 0 )"
+    },
+    {
+     "name": "VAT_VentilationCode",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    }
+   ]
+  },
+  {
+   "name": "SOR_SupplierOrders",
+   "field_count": 97,
+   "fields": [
+    {
+     "name": "z_________________________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "//------------------------------- DEVELOPER FIELDS ---------------------------------//"
+    },
+    {
+     "name": "z_RecordIndicator",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "RecordIndicator"
+    },
+    {
+     "name": "zg_QuickFind",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zkk_0",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "0"
+    },
+    {
+     "name": "zkk_1",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "1"
+    },
+    {
+     "name": "zkk_ID",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkk_XXX_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "\"SOR\""
+    },
+    {
+     "name": "zkp",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zLOG_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// --------------------------------- LOG -------------------------------------- //"
+    },
+    {
+     "name": "zlog_creaAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifScriptParameter",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_trigger",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zSM_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// ------------------------------ SUMMARIES ----------------------------------- //"
+    },
+    {
+     "name": "zkf_PRJ",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_CPY",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_CTC",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CPY_Name_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CPY_Name_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "CPY_Name_ae"
+    },
+    {
+     "name": "Language",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Number",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "NumberFull_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "NumberPrefix_ae & Number"
+    },
+    {
+     "name": "NumberInteger_c",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "GetAsNumber ( Filter ( Number ; \"0123456789\" ) )"
+    },
+    {
+     "name": "Status",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zg_SORList",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zsm_List_zkp",
+     "type": "Summary",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CPY_AddressFull_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CTC_Name_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CTC_Name_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "CTC_Name_ae"
+    },
+    {
+     "name": "PRJ_NumberName_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PRJ_Number_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PRJ_Name_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PRJ_NumberName_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "PRJ_NumberName_ae"
+    },
+    {
+     "name": "Comments",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Date",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "SOL_Total_Discount_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Round ( Sum ( sol__SOL__::DiscountTotal_c ) ; 2 )"
+    },
+    {
+     "name": "SOL_Total_PriceNoTax_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Round ( Sum ( sol__SOL__::PriceTotal_NoTax_c ); 2 )"
+    },
+    {
+     "name": "SOL_Total_PriceWithTax_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "SOL_Total_PriceNoTax_cU + SOL_Total_VAT_cU"
+    },
+    {
+     "name": "SOL_Total_VAT_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Round ( Sum ( sol__SOL__::VATAmount_c ) ; 2 )"
+    },
+    {
+     "name": "SOL_Total_Discount_Stored",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "SOL_Total_PriceNoTax_Stored",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "SOL_Total_PriceWithTax_Stored",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "SOL_Total_VAT_Stored",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "isPending_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Status = \"En attente\" ; 1 ; 0 )"
+    },
+    {
+     "name": "isSent_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Status = \"Envoyée\" ; 1 ; 0 )"
+    },
+    {
+     "name": "zg_PortalFilter",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zg_DocPreview",
+     "type": "Normal",
+     "datatype": "Binary",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "Description",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_ENT",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "isFromMetre_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( not IsEmpty ( zkf_ENT ) ; 1 ; 0 )"
+    },
+    {
+     "name": "isInvoiced_bc",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Case ( Status = \"Facturée\" ; 1 ; 0 )"
+    },
+    {
+     "name": "zsm_Total_PriceNoTax_Stored",
+     "type": "Summary",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zsm_Total_PriceWithTax_Stored",
+     "type": "Summary",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zsm_Total_VAT_Stored",
+     "type": "Summary",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zsm_Total_Discount_Stored",
+     "type": "Summary",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "SIN_TotalInvoicedNoTax_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Let (\n[\n\t_total = Sum ( sor_SNL__::PriceHT_Signed_c )\n];\n\nCase ( IsEmpty ( _total ) ; 0 ; Round ( _total ; 2 ) )\n\n)"
+    },
+    {
+     "name": "SIN_Count_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Count ( sor_SNL__::zkk_1 )"
+    },
+    {
+     "name": "SIN_TotalInvoicedPercentage_cU",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Round( ( SIN_TotalInvoicedNoTax_cU / SOL_Total_PriceNoTax_Stored ) * 100 ; 2 )"
+    },
+    {
+     "name": "Print_DateNumberAmount_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Date & \" - \" & NumberFull_c & \" - \" & CPY_Name_c & \" - \" & FormatNumberAsText ( SOL_Total_PriceNoTax_Stored ; \"\" ; \".\" ; \",\" ; 2 ) & \" € HT ( \" & PRJ_NumberName_c & \" )\""
+    },
+    {
+     "name": "SIN_CountText_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_count = SIN_Count_cU\n];\n\n\nCase ( _count < 2 ; _count & \" facture liée\" ; _count & \" factures liées\"  )\n\n\n)"
+    },
+    {
+     "name": "zg_SINList",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zg_SNLSelection",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "Title",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "TitleRef_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "NumberFull_c & \" - \" & Title"
+    },
+    {
+     "name": "CPY_VAT_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "CPY_VAT_Print_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_vat = CPY_VAT_ae\n];\n\nCase ( IsEmpty ( _vat ) ; ZLAB::#[51] ; _vat )\n\n)"
+    },
+    {
+     "name": "zkf_MET",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Delivery_Address",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Delivery_Address_Full_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_lang = Language;\n\t_serial = 60; //Floor\n\t_field = Left ( GetFieldName ( sor_ZLAB__All::zkp ) ; Position ( GetFieldName ( sor_ZLAB__All::zkp ) ; \":\" ; 1 ; 1 ) - 1 ) & \"::\" & _lang ;\n\t_floorTitle = \n\nExecuteSQL ( \n\"SELECT \" & sql.GFN ( GetFie"
+    },
+    {
+     "name": "Delivery_AddressCity",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Delivery_AddressComp",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Delivery_AddressCountry",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Delivery_AddressPostalCode",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Delivery_Address_Floor",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_USR_ContactPerson_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "USR_ContactPerson_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Supp_QuoteReference",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_DOC_Planning",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PlanningDisplay_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_doc = sor_DOC__Planning::FileName_c;\n\t_text = \"Custom text\"\n];\n\nCase ( PlanningType = \"Doc\" ; _doc ; _text )\n\n)"
+    },
+    {
+     "name": "PenalityAmount",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "InvoicingSplit",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_DOC_Contractuals",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "OrderConfirmationDays",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PlanningText",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PlanningType",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PRJ_Work_Address_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_lang = Language;\n\t_serial = 60; //Floor\n\t_field = Left ( GetFieldName ( sor_ZLAB__All::zkp ) ; Position ( GetFieldName ( sor_ZLAB__All::zkp ) ; \":\" ; 1 ; 1 ) - 1 ) & \"::\" & _lang ;\n\t_floorTitle = \n\nExecuteSQL ( \n\"SELECT \" & sql.GFN ( GetFie"
+    },
+    {
+     "name": "zsm_CreaAccount",
+     "type": "Summary",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "NumberPrefix_ae",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Category",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    }
+   ]
+  },
+  {
+   "name": "SOL_SupplierOrderLines",
+   "field_count": 46,
+   "fields": [
+    {
+     "name": "z_________________________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "//------------------------------- DEVELOPER FIELDS ---------------------------------//"
+    },
+    {
+     "name": "z_RecordIndicator",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "RecordIndicator"
+    },
+    {
+     "name": "zg_QuickFind",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "zkk_0",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "0"
+    },
+    {
+     "name": "zkk_1",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "1"
+    },
+    {
+     "name": "zkk_ID",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkk_XXX_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "\"SOL\""
+    },
+    {
+     "name": "zkp",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zSM_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// ------------------------------ SUMMARIES ----------------------------------- //"
+    },
+    {
+     "name": "zsm_List_zkp",
+     "type": "Summary",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zkf_SOR",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Quantity",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PriceUnit",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Discount",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VATRate",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Title",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "Comments",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PriceTotal_NoTax_c",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Let (\n[\n\t_qty = Quantity;\n\t_unitPrice = PriceUnit;\n\t_vat = VATRate;\n\t_discountTotal = DiscountTotal_c\n];\n\nCase ( \n\tIsEmpty ( _qty ) or IsEmpty ( _unitPrice ) or IsEmpty ( _vat ) ; \"\" ;\n\t( _qty * _unitPrice ) - _discountTotal\n)\n\n)"
+    },
+    {
+     "name": "DiscountTotal_c",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Let (\n[\n\t_qty = Quantity;\n\t_unitPrice = PriceUnit;\n\t_amount = _qty * _unitPrice;\n\t_discount = Discount;\n\t_type = DiscountType\n];\n\nCase ( \n\t_type = \"%\" ; _amount * _discount /100 ;\n\t_type = \"€\" ; _discount ;\n\t0\n)\n)"
+    },
+    {
+     "name": "DiscountType",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "PriceTotal_Tax_c",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Let (\n[\n\t_priceTotalNoTax = PriceTotal_NoTax_c;\n\t_vat = VATAmount_c\n];\n\nCase ( \n\tIsEmpty ( _priceTotalNoTax ) ; \"\" ;\n\t_priceTotalNoTax + _vat\n)\n\n)"
+    },
+    {
+     "name": "VATAmount_c",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": false,
+     "calc": "Let (\n[\n\t_priceTotalNoTax = PriceTotal_NoTax_c;\n\t_vat = VATRate\n];\n\n_priceTotalNoTax * _vat / 100\n\n)"
+    },
+    {
+     "name": "zsm_PriceTotal_NoTax",
+     "type": "Summary",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zsm_VATAmount",
+     "type": "Summary",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "z_DRAG_N_DROP",
+     "type": "Normal",
+     "datatype": "Binary",
+     "global": true,
+     "calc": null
+    },
+    {
+     "name": "SortOder",
+     "type": "Normal",
+     "datatype": "Number",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zLOG_______________",
+     "type": "Calculated",
+     "datatype": "Number",
+     "global": true,
+     "calc": "// --------------------------------- LOG -------------------------------------- //"
+    },
+    {
+     "name": "zlog_creaAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_creaUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifAccount",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifDate",
+     "type": "Normal",
+     "datatype": "Date",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifScriptName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifScriptParameter",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifTimeStamp",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_modifUserName",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "zlog_trigger",
+     "type": "Normal",
+     "datatype": "Timestamp",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "DiscountPrint_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_discount = Discount;\n\t_type = DiscountType\n];\n\nCase ( not IsEmpty ( _discount ) ; _discount & \" \" & _type ; \"\" )\n\n)"
+    },
+    {
+     "name": "VATDescription",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VATPrint_c",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_rate = VATRate;\n\t_desc = VATDescription\n];\n\nCase ( IsEmpty ( Trim ( _rate ) ) ; \"\" ;\n\n\t_rate & \"%\" &\n\tCase ( not IsEmpty ( _desc ) ; \" (\" & _desc & \")\" ; \"\" )\n\n)\n)"
+    },
+    {
+     "name": "zkf_PRD",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    },
+    {
+     "name": "VATDescription_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_lg = sor__SOR__::Language\n\n];\n\nCase ( _lg = \"FR\" ; sol_ZVAL__VAT::Print_FR ; _lg = \"NL\" ; sol_ZVAL__VAT::Print_NL ; _lg = \"EN\" ; sol_ZVAL__VAT::Print_EN ; VATDescription )\n\n)"
+    },
+    {
+     "name": "VATPrintLang_cU",
+     "type": "Calculated",
+     "datatype": "Text",
+     "global": false,
+     "calc": "Let (\n[\n\t_rate = VATRate;\n\t_desc = VATDescription_cU\n];\n\nCase ( IsEmpty ( Trim ( _rate ) ) ; \"\" ;\n\n\t_rate & \"%\" &\n\tCase ( not IsEmpty ( _desc ) ; \" (\" & _desc & \")\" ; \"\" )\n\n)\n)"
+    },
+    {
+     "name": "zkf_VAL_VAT",
+     "type": "Normal",
+     "datatype": "Text",
+     "global": false,
+     "calc": null
+    }
+   ]
+  }
+ ],
+ "relationships": [
+  {
+   "id": "299",
+   "left": "métré_prj_MET__",
+   "right": "prj__PRJ__",
+   "predicates": [
+    {
+     "op": "Equal",
+     "left": "zkf_PRJ",
+     "right": "zkp"
+    }
+   ]
+  }
+ ],
+ "note": "Sous-ensemble de ShakeDesign : uniquement les tables auxquelles ShakeMetre est couple (directement ou via cle etrangere)."
+}
