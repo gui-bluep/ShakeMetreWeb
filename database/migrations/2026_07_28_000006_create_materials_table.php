@@ -21,11 +21,13 @@ return new class extends Migration
         Schema::create('materials', function (Blueprint $table) {
             $table->uuid('id')->primary();
 
-            $table->foreignUuid('category_id')->constrained('categories');
-            $table->foreignUuid('sub_category_id')->constrained('sub_categories');
-            $table->foreignUuid('reference_id')->constrained('references');
-            $table->foreignUuid('sub_reference_id')->constrained('sub_references');
-            $table->foreignUuid('sub_reference_line_id')->constrained('sub_reference_lines');
+            // Nullable for the same reason as on metre_lines: FileMaker has no NOT NULL and
+            // a catalogue entry need not be classified against every axis.
+            $table->foreignUuid('category_id')->nullable()->constrained('categories');
+            $table->foreignUuid('sub_category_id')->nullable()->constrained('sub_categories');
+            $table->foreignUuid('reference_id')->nullable()->constrained('references');
+            $table->foreignUuid('sub_reference_id')->nullable()->constrained('sub_references');
+            $table->foreignUuid('sub_reference_line_id')->nullable()->constrained('sub_reference_lines');
             $table->foreignUuid('parent_id')->nullable()->constrained('materials');
 
             // Cross-system: points to CTC_Contacts in ShakeDesign, no local constraint.

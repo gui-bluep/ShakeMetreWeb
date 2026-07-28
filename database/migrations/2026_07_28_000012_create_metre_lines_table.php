@@ -10,10 +10,13 @@ return new class extends Migration
      * FileMaker source: METL_MetreLines (docs/filemaker-reference/ShakeMetre_data_dictionary.json)
      *
      * The biggest and most business-critical table (see section 4.1 of
-     * ShakeMetre_Analyse_et_Plan_Migration_Laravel.md). lot_id is created here WITHOUT a
-     * foreign key constraint because `lots` doesn't exist yet at this point in the
-     * requested migration order; constrained afterwards in
-     * 2026_07_28_000015_add_lot_foreign_key_to_metre_lines_table.php.
+     * ShakeMetre_Analyse_et_Plan_Migration_Laravel.md).
+     *
+     * Every foreign key except metre_id is nullable: FileMaker has no NOT NULL, and the
+     * source calculations prove these are genuinely optional -
+     *   isDefined_b       reads `not IsEmpty ( zkf_MAT )`
+     *   LOT_AmountNotAssignedBuy reads `IsEmpty ( zkf_LOT )`
+     * A line always belongs to a metre, so metre_id stays required.
      *
      * accounting_code_id is treated as cross-system (ShakeDesign ZVAL_Values) by the same
      * reasoning as vat_value_id, even though it wasn't in the literal exception list -
@@ -25,14 +28,12 @@ return new class extends Migration
             $table->uuid('id')->primary();
 
             $table->foreignUuid('metre_id')->constrained('metres');
-            $table->foreignUuid('reference_id')->constrained('references');
-            $table->foreignUuid('sub_reference_id')->constrained('sub_references');
-            $table->foreignUuid('sub_reference_line_id')->constrained('sub_reference_lines');
-            $table->foreignUuid('material_id')->constrained('materials');
-            $table->foreignUuid('cart_material_id')->constrained('cart_materials');
-
-            // Local, but constrained later (see note above).
-            $table->uuid('lot_id')->nullable();
+            $table->foreignUuid('reference_id')->nullable()->constrained('references');
+            $table->foreignUuid('sub_reference_id')->nullable()->constrained('sub_references');
+            $table->foreignUuid('sub_reference_line_id')->nullable()->constrained('sub_reference_lines');
+            $table->foreignUuid('material_id')->nullable()->constrained('materials');
+            $table->foreignUuid('cart_material_id')->nullable()->constrained('cart_materials');
+            $table->foreignUuid('lot_id')->nullable()->constrained('lots');
 
             // Cross-system: ShakeDesign SOR_SupplierOrders / CPY_Companies / ZVAL_Values.
             $table->uuid('supplier_order_id')->nullable();
