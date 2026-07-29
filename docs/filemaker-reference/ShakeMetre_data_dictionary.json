@@ -4612,7 +4612,7 @@
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "Let (\n[\n\t_min = Min ( \n\tmetl__METL__::TENDER_Supp1_TotalPrice_c ;\n\tmetl__METL__::TENDER_Supp2_TotalPrice_c ;\n\tmetl__METL__::TENDER_Supp3_TotalPrice_c ;\n\tmetl__METL__::TENDER_Supp4_TotalPrice_c ;\n\tmetl__METL__::TENDER_Supp5_TotalPrice_c\n\t)\n];\n\nCase ( "
+     "calc": "Let (\n[\n\t_min = Min ( \n\tmetl__METL__::TENDER_Supp1_TotalPrice_c ;\n\tmetl__METL__::TENDER_Supp2_TotalPrice_c ;\n\tmetl__METL__::TENDER_Supp3_TotalPrice_c ;\n\tmetl__METL__::TENDER_Supp4_TotalPrice_c ;\n\tmetl__METL__::TENDER_Supp5_TotalPrice_c\n\t)\n];\n\nCase ( metl__METL__::isTenderLine_b ; 0 ; _min )\n\n)"
     },
     {
      "name": "TENDER_Supp1_BestPricePercentage_c",
@@ -4696,14 +4696,14 @@
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "Let (\n[\n\t_min = Min ( \n\tmetl__METL__::TENDER_Supp1_TotalPriceNoOption_c ;\n\tmetl__METL__::TENDER_Supp2_TotalPriceNoOption_c ;\n\tmetl__METL__::TENDER_Supp3_TotalPriceNoOption_c ;\n\tmetl__METL__::TENDER_Supp4_TotalPriceNoOption_c ;\n\tmetl__METL__::TENDER_S"
+     "calc": "Let (\n[\n\t_min = Min ( \n\tmetl__METL__::TENDER_Supp1_TotalPriceNoOption_c ;\n\tmetl__METL__::TENDER_Supp2_TotalPriceNoOption_c ;\n\tmetl__METL__::TENDER_Supp3_TotalPriceNoOption_c ;\n\tmetl__METL__::TENDER_Supp4_TotalPriceNoOption_c ;\n\tmetl__METL__::TENDER_Supp5_TotalPriceNoOption_c\n\t)\n];\n\nCase ( metl__METL__::isTenderLine_b ; 0 ; _min )\n\n)"
     },
     {
      "name": "TENDER_BestPriceOption_c",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "Let (\n[\n\t_min = Min ( \n\tmetl__METL__::TENDER_Supp1_TotalPriceOption_c ;\n\tmetl__METL__::TENDER_Supp2_TotalPriceOption_c ;\n\tmetl__METL__::TENDER_Supp3_TotalPriceOption_c ;\n\tmetl__METL__::TENDER_Supp4_TotalPriceOption_c ;\n\tmetl__METL__::TENDER_Supp5_Tot"
+     "calc": "Let (\n[\n\t_min = Min ( \n\tmetl__METL__::TENDER_Supp1_TotalPriceOption_c ;\n\tmetl__METL__::TENDER_Supp2_TotalPriceOption_c ;\n\tmetl__METL__::TENDER_Supp3_TotalPriceOption_c ;\n\tmetl__METL__::TENDER_Supp4_TotalPriceOption_c ;\n\tmetl__METL__::TENDER_Supp5_TotalPriceOption_c\n\t)\n];\n\nCase ( metl__METL__::isTenderLine_b ; 0 ; _min )\n\n)"
     },
     {
      "name": "zsm_TENDER_Total_BestPriceOption",
@@ -4717,70 +4717,70 @@
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "Case ( \n\tIsEmpty ( metl_LOT__::TENDER_Weighting_Price ) or metl_LOT__::TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp1 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp1_BestPricePercentage_c - 100 ) );\n\"\"\n)\n\n// *"
+     "calc": "Case ( \n\tIsEmpty ( metl_LOT__::TENDER_Weighting_Price ) or metl_LOT__::TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp1 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp1_BestPricePercentage_c - 100 ) );\n\"\"\n)\n\n// * metl__LOT__::TENDER_Weighting_Price/100 "
     },
     {
      "name": "zsm_TENDER_Total_Supp2_BestPricePercentage_Score_cU",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "Case ( \n\tIsEmpty ( metl_LOT__::TENDER_Weighting_Price ) or metl_LOT__::TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp2 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp2_BestPricePercentage_c - 100 ) ) ;\n\"\"\n)\n\n// "
+     "calc": "Case ( \n\tIsEmpty ( metl_LOT__::TENDER_Weighting_Price ) or metl_LOT__::TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp2 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp2_BestPricePercentage_c - 100 ) ) ;\n\"\"\n)\n\n// * metl__LOT__::TENDER_Weighting_Price/100 "
     },
     {
      "name": "zsm_TENDER_Total_Supp3_BestPricePercentage_Score_cU",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "Case ( \n\tIsEmpty ( metl_LOT__::TENDER_Weighting_Price ) or metl_LOT__::TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp3 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp3_BestPricePercentage_c - 100 ) ) ;\n\"\"\n)\n\n// "
+     "calc": "Case ( \n\tIsEmpty ( metl_LOT__::TENDER_Weighting_Price ) or metl_LOT__::TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp3 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp3_BestPricePercentage_c - 100 ) ) ;\n\"\"\n)\n\n// * metl__LOT__::TENDER_Weighting_Price/100"
     },
     {
      "name": "zsm_TENDER_Total_Supp4_BestPricePercentage_Score_cU",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "Case ( \n\tIsEmpty ( metl_LOT__::TENDER_Weighting_Price ) or metl_LOT__::TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp4 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp4_BestPricePercentage_c - 100 ) ) ;\n\"\"\n)\n\n// "
+     "calc": "Case ( \n\tIsEmpty ( metl_LOT__::TENDER_Weighting_Price ) or metl_LOT__::TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp4 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp4_BestPricePercentage_c - 100 ) ) ;\n\"\"\n)\n\n// * metl__LOT__::TENDER_Weighting_Price/100"
     },
     {
      "name": "zsm_TENDER_Total_Supp5_BestPricePercentage_Score_cU",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "Case ( \n\tIsEmpty ( metl_LOT__::TENDER_Weighting_Price ) or metl_LOT__::TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp5 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp5_BestPricePercentage_c - 100 ) ) ;\n\"\"\n)\n\n// "
+     "calc": "Case ( \n\tIsEmpty ( metl_LOT__::TENDER_Weighting_Price ) or metl_LOT__::TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp5 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp5_BestPricePercentage_c - 100 ) ) ;\n\"\"\n)\n\n// * metl__LOT__::TENDER_Weighting_Price/100"
     },
     {
      "name": "zsm_TENDER_Total_Supp1_Final_Score_cU",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "( metl_LOT__::TENDER_Weighting_Price/100 * metl__METL__::zsm_TENDER_Total_Supp1_BestPricePercentage_Score_cU ) +\n( metl_LOT__::TENDER_Weighting_Crit1 /100 * metl_LOT__::TENDER_Weighting_Crit1_Supp1 ) +\n( metl_LOT__::TENDER_Weighting_Crit2 /100 * metl"
+     "calc": "( metl_LOT__::TENDER_Weighting_Price/100 * metl__METL__::zsm_TENDER_Total_Supp1_BestPricePercentage_Score_cU ) +\n( metl_LOT__::TENDER_Weighting_Crit1 /100 * metl_LOT__::TENDER_Weighting_Crit1_Supp1 ) +\n( metl_LOT__::TENDER_Weighting_Crit2 /100 * metl_LOT__::TENDER_Weighting_Crit2_Supp1 ) +\n( metl_LOT__::TENDER_Weighting_Crit3 /100 * metl_LOT__::TENDER_Weighting_Crit3_Supp1 ) +\n( metl_LOT__::TENDER_Weighting_Crit4 /100 * metl_LOT__::TENDER_Weighting_Crit4_Supp1 ) +\n( metl_LOT__::TENDER_Weighting_Crit5 /100 * metl_LOT__::TENDER_Weighting_Crit5_Supp1 )"
     },
     {
      "name": "zsm_TENDER_Total_Supp2_Final_Score_cU",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "( metl_LOT__::TENDER_Weighting_Price/100 * metl__METL__::zsm_TENDER_Total_Supp2_BestPricePercentage_Score_cU ) +\n( metl_LOT__::TENDER_Weighting_Crit1 /100 * metl_LOT__::TENDER_Weighting_Crit1_Supp2 ) +\n( metl_LOT__::TENDER_Weighting_Crit2 /100 * metl"
+     "calc": "( metl_LOT__::TENDER_Weighting_Price/100 * metl__METL__::zsm_TENDER_Total_Supp2_BestPricePercentage_Score_cU ) +\n( metl_LOT__::TENDER_Weighting_Crit1 /100 * metl_LOT__::TENDER_Weighting_Crit1_Supp2 ) +\n( metl_LOT__::TENDER_Weighting_Crit2 /100 * metl_LOT__::TENDER_Weighting_Crit2_Supp2 ) +\n( metl_LOT__::TENDER_Weighting_Crit3 /100 * metl_LOT__::TENDER_Weighting_Crit3_Supp2 ) +\n( metl_LOT__::TENDER_Weighting_Crit4 /100 * metl_LOT__::TENDER_Weighting_Crit4_Supp2 ) +\n( metl_LOT__::TENDER_Weighting_Crit5 /100 * metl_LOT__::TENDER_Weighting_Crit5_Supp2 )"
     },
     {
      "name": "zsm_TENDER_Total_Supp3_Final_Score_cU",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "( metl_LOT__::TENDER_Weighting_Price/100 * metl__METL__::zsm_TENDER_Total_Supp3_BestPricePercentage_Score_cU ) +\n( metl_LOT__::TENDER_Weighting_Crit1 /100 * metl_LOT__::TENDER_Weighting_Crit1_Supp3 ) +\n( metl_LOT__::TENDER_Weighting_Crit2 /100 * metl"
+     "calc": "( metl_LOT__::TENDER_Weighting_Price/100 * metl__METL__::zsm_TENDER_Total_Supp3_BestPricePercentage_Score_cU ) +\n( metl_LOT__::TENDER_Weighting_Crit1 /100 * metl_LOT__::TENDER_Weighting_Crit1_Supp3 ) +\n( metl_LOT__::TENDER_Weighting_Crit2 /100 * metl_LOT__::TENDER_Weighting_Crit2_Supp3 ) +\n( metl_LOT__::TENDER_Weighting_Crit3 /100 * metl_LOT__::TENDER_Weighting_Crit3_Supp3 ) +\n( metl_LOT__::TENDER_Weighting_Crit4 /100 * metl_LOT__::TENDER_Weighting_Crit4_Supp3 ) +\n( metl_LOT__::TENDER_Weighting_Crit5 /100 * metl_LOT__::TENDER_Weighting_Crit5_Supp3 )"
     },
     {
      "name": "zsm_TENDER_Total_Supp4_Final_Score_cU",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "( metl_LOT__::TENDER_Weighting_Price/100 * metl__METL__::zsm_TENDER_Total_Supp4_BestPricePercentage_Score_cU ) +\n( metl_LOT__::TENDER_Weighting_Crit1 /100 * metl_LOT__::TENDER_Weighting_Crit1_Supp4 ) +\n( metl_LOT__::TENDER_Weighting_Crit2 /100 * metl"
+     "calc": "( metl_LOT__::TENDER_Weighting_Price/100 * metl__METL__::zsm_TENDER_Total_Supp4_BestPricePercentage_Score_cU ) +\n( metl_LOT__::TENDER_Weighting_Crit1 /100 * metl_LOT__::TENDER_Weighting_Crit1_Supp4 ) +\n( metl_LOT__::TENDER_Weighting_Crit2 /100 * metl_LOT__::TENDER_Weighting_Crit2_Supp4 ) +\n( metl_LOT__::TENDER_Weighting_Crit3 /100 * metl_LOT__::TENDER_Weighting_Crit3_Supp4 ) +\n( metl_LOT__::TENDER_Weighting_Crit4 /100 * metl_LOT__::TENDER_Weighting_Crit4_Supp4 ) +\n( metl_LOT__::TENDER_Weighting_Crit5 /100 * metl_LOT__::TENDER_Weighting_Crit5_Supp4 )"
     },
     {
      "name": "zsm_TENDER_Total_Supp5_Final_Score_cU",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "( metl_LOT__::TENDER_Weighting_Price/100 * metl__METL__::zsm_TENDER_Total_Supp5_BestPricePercentage_Score_cU ) +\n( metl_LOT__::TENDER_Weighting_Crit1 /100 * metl_LOT__::TENDER_Weighting_Crit1_Supp5 ) +\n( metl_LOT__::TENDER_Weighting_Crit2 /100 * metl"
+     "calc": "( metl_LOT__::TENDER_Weighting_Price/100 * metl__METL__::zsm_TENDER_Total_Supp5_BestPricePercentage_Score_cU ) +\n( metl_LOT__::TENDER_Weighting_Crit1 /100 * metl_LOT__::TENDER_Weighting_Crit1_Supp5 ) +\n( metl_LOT__::TENDER_Weighting_Crit2 /100 * metl_LOT__::TENDER_Weighting_Crit2_Supp5 ) +\n( metl_LOT__::TENDER_Weighting_Crit3 /100 * metl_LOT__::TENDER_Weighting_Crit3_Supp5 ) +\n( metl_LOT__::TENDER_Weighting_Crit4 /100 * metl_LOT__::TENDER_Weighting_Crit4_Supp5 ) +\n( metl_LOT__::TENDER_Weighting_Crit5 /100 * metl_LOT__::TENDER_Weighting_Crit5_Supp5 )"
     },
     {
      "name": "GainOnPurchases_c",
@@ -4801,7 +4801,7 @@
      "type": "Calculated",
      "datatype": "Text",
      "global": false,
-     "calc": "Case (\n\tProcurementMethodCode_ae = \"LS\" ; \"Lump Sum\" ;\n\tProcurementMethodCode_ae = \"PM\" ; \"Memo (included in our offer)\" ;\n\tProcurementMethodCode_ae = \"PJ\" ; \"Price to justify\" ;\n\tProcurementMethodCode_ae = \"NI\" ; \"Not included in this offer\" ;\n\tProc"
+     "calc": "Case (\n\tProcurementMethodCode_ae = \"LS\" ; \"Lump Sum\" ;\n\tProcurementMethodCode_ae = \"PM\" ; \"Memo (included in our offer)\" ;\n\tProcurementMethodCode_ae = \"PJ\" ; \"Price to justify\" ;\n\tProcurementMethodCode_ae = \"NI\" ; \"Not included in this offer\" ;\n\tProcurementMethodCode_ae = \"VA\" ; \"Variant\" ;\n\tProcurementMethodCode_ae = \"PQ\" ; \"Presumed quantity\" ;\n\tProcurementMethodCode_ae = \"FQ\" ; \"Flat-rate quantity\" ;\n\"\"\n)"
     },
     {
      "name": "TENDER_Supp1_Omit_b",
@@ -6190,7 +6190,7 @@
      "type": "Calculated",
      "datatype": "Text",
      "global": false,
-     "calc": "Code & \" - \" &  Upper ( \nCase (\n    lot_MET::Language = \"FR\" and not IsEmpty ( Title_FR ); Title_FR;\n\tlot_MET::Language = \"NL\" and not IsEmpty ( Title_NL ); Title_NL;\n    //GV 27/07/26\n\t//prj_lot_MET__::Language = \"FR\" and not IsEmpty ( Title_FR ); T"
+     "calc": "Code & \" - \" &  Upper ( \nCase (\n    lot_MET::Language = \"FR\" and not IsEmpty ( Title_FR ); Title_FR;\n\tlot_MET::Language = \"NL\" and not IsEmpty ( Title_NL ); Title_NL;\n    //GV 27/07/26\n\t//prj_lot_MET__::Language = \"FR\" and not IsEmpty ( Title_FR ); Title_FR;\n\t//prj_lot_MET__::Language = \"NL\" and not IsEmpty ( Title_NL ); Title_NL;\n\tTitle_EN\n)\n)\n\n//Code & \" - \" & CPY_Name_ae"
     },
     {
      "name": "zg_METcurrent",
@@ -6281,7 +6281,7 @@
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "Case ( \n\tIsEmpty ( TENDER_Weighting_Price ) or TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp1 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp1_BestPricePercentage_c - 100 ) ) * TENDER_Weighting_Price/100 ;\n\"\"\n)"
+     "calc": "Case ( \n\tIsEmpty ( TENDER_Weighting_Price ) or TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp1 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp1_BestPricePercentage_c - 100 ) ) * TENDER_Weighting_Price/100 ;\n\"\"\n)\n\n/*\nCase ( \n\tIsEmpty ( TENDER_Weighting_Price ) or TENDER_Weighting_Price = 0 ; \"\" ;\n\t( 100 - (metl__METL__::zsm_TENDER_Total_Supp1_BestPricePercentage_c - 100 ) ) * TENDER_Weighting_Price/100\n)\n*/"
     },
     {
      "name": "TENDER_Weighting_Price",
@@ -6295,14 +6295,14 @@
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "Case ( \n\tIsEmpty ( TENDER_Weighting_Price ) or TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp2 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp2_BestPricePercentage_c - 100 ) ) * TENDER_Weighting_Price/100 ;\n\"\"\n)"
+     "calc": "Case ( \n\tIsEmpty ( TENDER_Weighting_Price ) or TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp2 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp2_BestPricePercentage_c - 100 ) ) * TENDER_Weighting_Price/100 ;\n\"\"\n)\n\n/*\nCase ( \n\tIsEmpty ( TENDER_Weighting_Price ) or TENDER_Weighting_Price = 0 ; \"\" ;\n\t( 100 - (metl__METL__::zsm_TENDER_Total_Supp2_BestPricePercentage_c - 100 ) ) * TENDER_Weighting_Price/100\n)\n*/"
     },
     {
      "name": "TENDER_Supp3_WeightedPricePercentage_cU",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "Case ( \n\tIsEmpty ( TENDER_Weighting_Price ) or TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp3 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp3_BestPricePercentage_c - 100 ) ) * TENDER_Weighting_Price/100 ;\n\"\"\n)"
+     "calc": "Case ( \n\tIsEmpty ( TENDER_Weighting_Price ) or TENDER_Weighting_Price = 0 ; \"\" ;\n\tnot IsEmpty ( metl__METL__::zsm_TENDER_Total_Supp3 ) ; ( 100 - (metl__METL__::zsm_TENDER_Total_Supp3_BestPricePercentage_c - 100 ) ) * TENDER_Weighting_Price/100 ;\n\"\"\n)\n\n/*\nCase ( \n\tIsEmpty ( TENDER_Weighting_Price ) or TENDER_Weighting_Price = 0 ; \"\" ;\n\t( 100 - (metl__METL__::zsm_TENDER_Total_Supp3_BestPricePercentage_c - 100 ) ) * TENDER_Weighting_Price/100\n)\n*/"
     },
     {
      "name": "TENDER_Supp4_WeightedPricePercentage_cU",
@@ -6428,35 +6428,35 @@
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "/*TENDER_Supp1_WeightedPricePercentage_cU +*/\nmetl__METL__::zsm_TENDER_Total_Supp1_BestPricePercentage_Score_cU +\n( metl_LOT__::TENDER_Weighting_Crit1 /100 * metl_LOT__::TENDER_Weighting_Crit1_Supp1 ) +\n( metl_LOT__::TENDER_Weighting_Crit2 /100 * met"
+     "calc": "/*TENDER_Supp1_WeightedPricePercentage_cU +*/\nmetl__METL__::zsm_TENDER_Total_Supp1_BestPricePercentage_Score_cU +\n( metl_LOT__::TENDER_Weighting_Crit1 /100 * metl_LOT__::TENDER_Weighting_Crit1_Supp1 ) +\n( metl_LOT__::TENDER_Weighting_Crit2 /100 * metl_LOT__::TENDER_Weighting_Crit2_Supp1 ) +\n( metl_LOT__::TENDER_Weighting_Crit3 /100 * metl_LOT__::TENDER_Weighting_Crit3_Supp1 ) +\n( metl_LOT__::TENDER_Weighting_Crit4 /100 * metl_LOT__::TENDER_Weighting_Crit4_Supp1 ) +\n( metl_LOT__::TENDER_Weighting_Crit5 /100 * metl_LOT__::TENDER_Weighting_Crit5_Supp1 )\n\n\n/*TENDER_Supp1_WeightedPricePercentage_cU +*/\n/*\nmetl__METL__::zsm_TENDER_Total_Supp1_BestPricePercentage_Score_cU +\n( TENDER_Weighting_Crit1 /100 * TENDER_Weighting_Crit1_Supp1 ) +\n( TENDER_Weighting_Crit2 /100 * TENDER_Weighting_Crit2_Supp1 ) +\n( TENDER_Weighting_Crit3 /100 * TENDER_Weighting_Crit3_Supp1 ) +\n( TENDER_Weighting_Crit4 /100 * TENDER_Weighting_Crit4_Supp1 ) +\n( TENDER_Weighting_Crit5 /100 * TENDER_Weighting_Crit5_Supp1 )\n*/"
     },
     {
      "name": "TENDER_Supp2_Total_cU",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "TENDER_Supp2_WeightedPricePercentage_cU +\n( TENDER_Weighting_Crit1 /100 * TENDER_Weighting_Crit1_Supp2 ) +\n( TENDER_Weighting_Crit2 /100 * TENDER_Weighting_Crit2_Supp2 ) +\n( TENDER_Weighting_Crit3 /100 * TENDER_Weighting_Crit3_Supp2 ) +\n( TENDER_Weig"
+     "calc": "TENDER_Supp2_WeightedPricePercentage_cU +\n( TENDER_Weighting_Crit1 /100 * TENDER_Weighting_Crit1_Supp2 ) +\n( TENDER_Weighting_Crit2 /100 * TENDER_Weighting_Crit2_Supp2 ) +\n( TENDER_Weighting_Crit3 /100 * TENDER_Weighting_Crit3_Supp2 ) +\n( TENDER_Weighting_Crit4 /100 * TENDER_Weighting_Crit4_Supp2 ) +\n( TENDER_Weighting_Crit5 /100 * TENDER_Weighting_Crit5_Supp2 )"
     },
     {
      "name": "TENDER_Supp3_Total_cU",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "TENDER_Supp3_WeightedPricePercentage_cU +\n( TENDER_Weighting_Crit1 /100 * TENDER_Weighting_Crit1_Supp3 ) +\n( TENDER_Weighting_Crit2 /100 * TENDER_Weighting_Crit2_Supp3 ) +\n( TENDER_Weighting_Crit3 /100 * TENDER_Weighting_Crit3_Supp3 ) +\n( TENDER_Weig"
+     "calc": "TENDER_Supp3_WeightedPricePercentage_cU +\n( TENDER_Weighting_Crit1 /100 * TENDER_Weighting_Crit1_Supp3 ) +\n( TENDER_Weighting_Crit2 /100 * TENDER_Weighting_Crit2_Supp3 ) +\n( TENDER_Weighting_Crit3 /100 * TENDER_Weighting_Crit3_Supp3 ) +\n( TENDER_Weighting_Crit4 /100 * TENDER_Weighting_Crit4_Supp3 ) +\n( TENDER_Weighting_Crit5 /100 * TENDER_Weighting_Crit5_Supp3 )"
     },
     {
      "name": "TENDER_Supp4_Total_cU",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "TENDER_Supp4_WeightedPricePercentage_cU +\n( TENDER_Weighting_Crit1 /100 * TENDER_Weighting_Crit1_Supp4 ) +\n( TENDER_Weighting_Crit2 /100 * TENDER_Weighting_Crit2_Supp4 ) +\n( TENDER_Weighting_Crit3 /100 * TENDER_Weighting_Crit3_Supp4 ) +\n( TENDER_Weig"
+     "calc": "TENDER_Supp4_WeightedPricePercentage_cU +\n( TENDER_Weighting_Crit1 /100 * TENDER_Weighting_Crit1_Supp4 ) +\n( TENDER_Weighting_Crit2 /100 * TENDER_Weighting_Crit2_Supp4 ) +\n( TENDER_Weighting_Crit3 /100 * TENDER_Weighting_Crit3_Supp4 ) +\n( TENDER_Weighting_Crit4 /100 * TENDER_Weighting_Crit4_Supp4 ) +\n( TENDER_Weighting_Crit5 /100 * TENDER_Weighting_Crit5_Supp4 )"
     },
     {
      "name": "TENDER_Supp5_Total_cU",
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "TENDER_Supp5_WeightedPricePercentage_cU +\n( TENDER_Weighting_Crit1 /100 * TENDER_Weighting_Crit1_Supp5 ) +\n( TENDER_Weighting_Crit2 /100 * TENDER_Weighting_Crit2_Supp5 ) +\n( TENDER_Weighting_Crit3 /100 * TENDER_Weighting_Crit3_Supp5 ) +\n( TENDER_Weig"
+     "calc": "TENDER_Supp5_WeightedPricePercentage_cU +\n( TENDER_Weighting_Crit1 /100 * TENDER_Weighting_Crit1_Supp5 ) +\n( TENDER_Weighting_Crit2 /100 * TENDER_Weighting_Crit2_Supp5 ) +\n( TENDER_Weighting_Crit3 /100 * TENDER_Weighting_Crit3_Supp5 ) +\n( TENDER_Weighting_Crit4 /100 * TENDER_Weighting_Crit4_Supp5 ) +\n( TENDER_Weighting_Crit5 /100 * TENDER_Weighting_Crit5_Supp5 )"
     },
     {
      "name": "TENDER_Weighting_Crit2_Supp1",
@@ -7168,7 +7168,7 @@
      "type": "Calculated",
      "datatype": "Number",
      "global": false,
-     "calc": "Let (\n[\n\t_qty = QuantitySales;\n\t_l = Evaluate ( Length );\n\t_h = Evaluate ( Height );\n\t_w = Evaluate ( Width )\n\n];\n\nRound (\n_qty *\nCase ( not IsEmpty ( _l ) ; _l ; 1 ) *\nCase ( not IsEmpty ( _w ) ; _w ; 1 ) *\nCase ( not IsEmpty ( _h ) ; _h ; 1 )\n\n; 2 "
+     "calc": "Let (\n[\n\t_qty = QuantitySales;\n\t_l = Evaluate ( Length );\n\t_h = Evaluate ( Height );\n\t_w = Evaluate ( Width )\n\n];\n\nRound (\n_qty *\nCase ( not IsEmpty ( _l ) ; _l ; 1 ) *\nCase ( not IsEmpty ( _w ) ; _w ; 1 ) *\nCase ( not IsEmpty ( _h ) ; _h ; 1 )\n\n; 2 )\n\n)"
     },
     {
      "name": "QuantitySales",
