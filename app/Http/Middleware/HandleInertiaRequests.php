@@ -33,6 +33,9 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 'user' => $request->user(),
+                // Lets the UI hide what a readonly account cannot do. The guarantee is the
+                // role.write middleware, not this.
+                'canWrite' => $request->user()?->canWrite() ?? false,
             ],
         ];
     }

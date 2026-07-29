@@ -18,8 +18,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // A readonly account may look at its profile but not rewrite or delete it.
+    Route::middleware('role.write')->group(function () {
+        Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+        Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    });
 });
 
 /*
@@ -30,12 +34,15 @@ Route::middleware('auth')->group(function () {
 | group. routes/api.php is stateless and reserved for the machine-to-machine ShakeDesign
 | integration. The URI keeps the /api prefix because it returns JSON rather than an Inertia
 | response, but the middleware stack is the web one.
+|
+| `role.write` refuses the readonly role. Enforced here, not only hidden in the UI.
 */
 Route::middleware('auth')->group(function () {
     Route::get('/metres/{metre}/lines', [MetreLineController::class, 'index'])
         ->name('metres.lines.index');
 
     Route::patch('/api/metre-lines/{metreLine}', [MetreLineController::class, 'update'])
+        ->middleware('role.write')
         ->name('metre-lines.update');
 });
 

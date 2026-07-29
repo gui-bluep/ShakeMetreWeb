@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, usePage } from '@inertiajs/vue3';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import GridToasts from '../../Components/GridToasts.vue';
 import { useDebouncedRowSave } from '../../composables/useDebouncedRowSave';
@@ -67,7 +67,16 @@ const gridTemplate = computed(() =>
 /** Local working copy: edits land here first, the server confirms afterwards. */
 const rows = ref(props.lines.map((line) => ({ ...line, computed: { ...line.computed } })));
 
-const readOnly = computed(() => props.metre.is_locked_b);
+/**
+ * Two independent reasons the grid may refuse edits: the métré is locked, or the account is
+ * readonly. Both are enforced server-side (423 and 403 respectively); this only spares the
+ * user from typing into cells whose every save would be rejected.
+ */
+const page = usePage();
+const readOnly = computed(() => props.metre.is_locked_b || page.props.auth?.canWrite === false);
+const readOnlyReason = computed(() =>
+    props.metre.is_locked_b ? 'verrouillé — lecture seule' : 'compte en lecture seule'
+);
 
 // --- virtualization ---------------------------------------------------------------------
 
@@ -254,7 +263,7 @@ function money(value) {
                 <p class="mt-0.5 text-xs text-gray-500">
                     {{ rows.length }} ligne{{ rows.length === 1 ? '' : 's' }}
                     <span v-if="readOnly" class="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">
-                        verrouillé — lecture seule
+                        {{ readOnlyReason }}
                     </span>
                 </p>
             </div>

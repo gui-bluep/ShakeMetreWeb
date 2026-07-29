@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureUserCanWrite;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -21,6 +22,8 @@ return Application::configure(basePath: dirname(__DIR__))
             // Sanctum ships these but registers no alias of its own.
             'abilities' => CheckAbilities::class,
             'ability' => CheckForAnyAbility::class,
+            // Refuses the readonly role; applied per write route, see routes/web.php.
+            'role.write' => EnsureUserCanWrite::class,
         ]);
 
         $middleware->web(append: [
