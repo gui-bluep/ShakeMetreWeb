@@ -31,15 +31,29 @@ class Lot extends Model
     | assigned to the lot - unlike the MET_Metre totals, where a FileMaker "Total of X" summary
     | evaluated inside one record resolves to that record's own value.
     |
-    | There is deliberately no counterpart to LOT_Lot::TENDER_Supp{n}_Total_cU. That field is
-    | stale: its own source starts with
+    | There is deliberately no counterpart to LOT_Lot::TENDER_Supp{n}_Total_cU, and the reason is
+    | narrower than it first looked - the export used to truncate every calc at 250 characters,
+    | which cut these five apart in a misleading way. In full:
     |
-    |     /*TENDER_Supp{n}_WeightedPricePercentage_cU +*\/
-    |     zsm_TENDER_Total_Supp{n}_BestPricePercentage_Score_cU + ...
+    |   - Supp2 through Supp5 read
+    |         TENDER_Supp{n}_WeightedPricePercentage_cU + Σ ( Weighting_Crit{i}/100 * note )
+    |     and WeightedPricePercentage_cU is ( 200 - percentage ) * TENDER_Weighting_Price/100, so
+    |     they are algebraically identical to the METL formula implemented below. They agree.
     |
-    | - the weighted price term commented out and replaced by the raw, unweighted score, so it
-    | ignores TENDER_Weighting_Price entirely. The METL formula applies the weighting. Keeping
-    | both would mean two scores that disagree, so only the METL one exists here.
+    |   - Supp1 alone reads
+    |         /*TENDER_Supp1_WeightedPricePercentage_cU +*\/
+    |         zsm_TENDER_Total_Supp1_BestPricePercentage_Score_cU + Σ ( ... )
+    |     with the weighted price term commented out and replaced by the raw, unweighted score.
+    |     It ignores TENDER_Weighting_Price, and so scores supplier 1 on a different scale from
+    |     the other four - in a five-way comparison, systematically in supplier 1's favour
+    |     whenever the price weighting is below 100. It also reaches the criteria weightings
+    |     through metl_LOT__:: where its four siblings read them locally, which is the trace of a
+    |     hand edit rather than a deliberate rule.
+    |
+    | So this is not "the LOT side is stale" as a whole: it is one broken slot among five. What
+    | that rules out is reproducing the LOT fields as a family, since doing so would carry the
+    | supp1 defect into the port. The METL formula is the one implemented, per the ruling that it
+    | is the correct one, and it matches LOT supp2-5 exactly.
     */
 
     /**
@@ -111,6 +125,10 @@ class Lot extends Model
      * `100 - (percentage - 100)` is `200 - percentage`, which is where the constant comes from:
      * the cheapest supplier sits at 100% and scores 100, and every point above the benchmark
      * costs one point of score.
+     *
+     * The source field ends with `// * metl__LOT__::TENDER_Weighting_Price/100` - commented out.
+     * That is deliberate and load-bearing: the weighting is applied once, by the final score
+     * multiplying this result. Returning a weighted value here would apply it twice.
      */
     public function priceScoreForSupplier(int $supplier): ?float
     {
