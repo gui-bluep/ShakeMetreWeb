@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\Api\ProjectMetreController;
+use App\Http\Controllers\Api\SsoTicketController;
 use App\Models\Metre;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -81,7 +82,7 @@ class ProjectMetreApiTest extends TestCase
     {
         $this->artisan('shakedesign:issue-token')->assertSuccessful();
 
-        $account = User::where('email', 'shakedesign-machine@invalid.local')->sole();
+        $account = User::where('email', 'shakedesign-sync@invalid.local')->sole();
         $this->assertCount(1, $account->tokens);
         $this->assertSame([ProjectMetreController::ABILITY], $account->tokens->first()->abilities);
     }
@@ -90,12 +91,72 @@ class ProjectMetreApiTest extends TestCase
     {
         $this->artisan('shakedesign:issue-token')->assertSuccessful();
         $this->artisan('shakedesign:issue-token')->assertSuccessful();
-        $this->assertCount(2, User::where('email', 'shakedesign-machine@invalid.local')->sole()->tokens);
+        $this->assertCount(2, User::where('email', 'shakedesign-sync@invalid.local')->sole()->tokens);
 
         $this->artisan('shakedesign:issue-token --revoke-existing')->assertSuccessful();
 
-        $account = User::where('email', 'shakedesign-machine@invalid.local')->sole();
+        $account = User::where('email', 'shakedesign-sync@invalid.local')->sole();
         $this->assertCount(1, $account->fresh()->tokens);
+    }
+
+    public function test_each_ability_gets_its_own_machine_account(): void
+    {
+        $this->artisan('shakedesign:issue-token --ability=metres:read')->assertSuccessful();
+        $this->artisan('shakedesign:issue-token --ability=sso:issue')->assertSuccessful();
+
+        $sync = User::where('email', 'shakedesign-sync@invalid.local')->sole();
+        $sso = User::where('email', 'shakedesign-sso@invalid.local')->sole();
+
+        $this->assertNotSame($sync->getKey(), $sso->getKey());
+        $this->assertSame([ProjectMetreController::ABILITY], $sync->tokens->first()->abilities);
+        $this->assertSame([SsoTicketController::ABILITY], $sso->tokens->first()->abilities);
+    }
+
+    public function test_revoking_one_integration_leaves_the_other_alone(): void
+    {
+        // The reason the accounts are separate: --revoke-existing wipes every token on the
+        // account it targets, so a shared account meant rotating the SSO token silently
+        // killed the portal token with it.
+        $this->artisan('shakedesign:issue-token --ability=metres:read')->assertSuccessful();
+        $this->artisan('shakedesign:issue-token --ability=sso:issue')->assertSuccessful();
+
+        $this->artisan('shakedesign:issue-token --ability=sso:issue --revoke-existing')
+            ->assertSuccessful();
+
+        $this->assertCount(1, User::where('email', 'shakedesign-sync@invalid.local')->sole()->tokens);
+        $this->assertCount(1, User::where('email', 'shakedesign-sso@invalid.local')->sole()->tokens);
+    }
+
+    public function test_a_token_can_never_carry_both_abilities(): void
+    {
+        // Splitting the abilities is pointless if one token can hold both, so the option takes
+        // a single value: two integrations mean two tokens.
+        $this->artisan('shakedesign:issue-token --ability=sso:issue')->assertSuccessful();
+
+        $token = User::where('email', 'shakedesign-sso@invalid.local')->sole()->tokens->first();
+
+        $this->assertCount(1, $token->abilities);
+        $this->assertNotContains(ProjectMetreController::ABILITY, $token->abilities);
+    }
+
+    public function test_it_refuses_an_unknown_ability(): void
+    {
+        $this->artisan('shakedesign:issue-token --ability=metres:write')
+            ->assertFailed();
+
+        $this->assertSame(0, User::query()->count());
+    }
+
+    public function test_the_machine_account_cannot_be_logged_into(): void
+    {
+        $this->artisan('shakedesign:issue-token --ability=sso:issue')->assertSuccessful();
+
+        $account = User::where('email', 'shakedesign-sso@invalid.local')->sole();
+
+        // A random 64-character password nobody holds, and an address in an unroutable TLD.
+        $this->post('/login', ['email' => $account->email, 'password' => 'password'])
+            ->assertSessionHasErrors('email');
+        $this->assertGuest();
     }
 
     /*
