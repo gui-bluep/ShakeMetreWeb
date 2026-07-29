@@ -231,11 +231,14 @@ class SsoTicketTest extends TestCase
     public static function privilegeSetProvider(): array
     {
         return [
+            // FileMaker's built-in sets are bracketed; ShakeDesign's custom ones are not.
+            'Full Access' => ['[Full Access]', UserRole::Admin],
             'Admin' => ['Admin', UserRole::Admin],
             'User' => ['User', UserRole::User],
             'Read-Only Access' => ['[Read-Only Access]', UserRole::ReadOnly],
             // Anything unrecognised must land on the least privilege, never admin.
             'unknown privilege set' => ['Superviseur', UserRole::ReadOnly],
+            'Data Entry Only is not mapped yet' => ['[Data Entry Only]', UserRole::ReadOnly],
             'empty' => ['', UserRole::ReadOnly],
         ];
     }

@@ -18,9 +18,19 @@ enum UserRole: string
 
     case ReadOnly = 'readonly';
 
+    /**
+     * The bracketed names are FileMaker's own built-in privilege sets; the bare ones are
+     * ShakeDesign's custom sets.
+     *
+     * `[Data Entry Only]` is FileMaker's remaining built-in set and is deliberately absent: it
+     * would plausibly map to User, but mapping it on that reasoning would be granting write
+     * access by inference, which is the one thing this mapping refuses to do. It currently
+     * lands on ReadOnly like anything unrecognised, and needs an explicit decision to change.
+     */
     public static function fromPrivilegeSet(?string $privilegeSet): self
     {
         return match (trim((string) $privilegeSet)) {
+            '[Full Access]' => self::Admin,
             'Admin' => self::Admin,
             'User' => self::User,
             '[Read-Only Access]' => self::ReadOnly,
