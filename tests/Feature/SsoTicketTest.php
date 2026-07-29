@@ -52,8 +52,13 @@ class SsoTicketTest extends TestCase
         Sanctum::actingAs(User::factory()->create(), $abilities);
     }
 
-    /** @param array<string, mixed> $overrides */
-    private function fakeShakeDesignAccount(array $overrides = []): void
+    /**
+     * A ZUSR_Users record as the Data API would return it.
+     *
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function accountBody(array $overrides = []): array
     {
         $fieldData = $overrides + [
             'zkp' => self::ZKP,
@@ -65,15 +70,27 @@ class SsoTicketTest extends TestCase
             'isActiveUser_b' => 1,
         ];
 
+        return [
+            'response' => ['data' => [['fieldData' => $fieldData, 'recordId' => '1', 'modId' => '0']]],
+            'messages' => [['code' => '0', 'message' => 'OK']],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function sessionBody(): array
+    {
+        return [
+            'response' => ['token' => 'tok'],
+            'messages' => [['code' => '0', 'message' => 'OK']],
+        ];
+    }
+
+    /** @param array<string, mixed> $overrides */
+    private function fakeShakeDesignAccount(array $overrides = []): void
+    {
         Http::fake([
-            '*/sessions' => Http::response([
-                'response' => ['token' => 'tok'],
-                'messages' => [['code' => '0', 'message' => 'OK']],
-            ]),
-            '*/layouts/API_ZUSR/_find' => Http::response([
-                'response' => ['data' => [['fieldData' => $fieldData, 'recordId' => '1', 'modId' => '0']]],
-                'messages' => [['code' => '0', 'message' => 'OK']],
-            ]),
+            '*/sessions' => Http::response($this->sessionBody()),
+            '*/layouts/API_ZUSR/_find' => Http::response($this->accountBody($overrides)),
         ]);
     }
 
@@ -356,12 +373,112 @@ class SsoTicketTest extends TestCase
         $this->assertSame($passwordBefore, $existing->refresh()->password);
     }
 
-    public function test_an_account_without_an_email_is_rejected(): void
+    public function test_an_active_account_without_an_email_still_gets_a_ticket(): void
     {
         $this->actingAsSsoMachine();
         $this->fakeShakeDesignAccount(['Mail_1' => '']);
 
-        $this->issue()->assertStatus(422);
+        // Access is governed by the two active flags and nothing else: a missing address is a
+        // gap in convenience data, not grounds for refusing a legitimate account.
+        $this->issue()->assertOk()->assertJsonStructure(['login_url']);
+
+        $user = User::where('shakedesign_user_id', self::ZKP)->sole();
+        $this->assertSame(self::ZKP.'@shakedesign.local', $user->email);
+        $this->assertSame('Anne Dupont', $user->name);
+    }
+
+    public function test_a_synthetic_address_is_stable_across_logins(): void
+    {
+        $this->actingAsSsoMachine();
+        $this->fakeShakeDesignAccount(['Mail_1' => '']);
+
+        $this->issue()->assertOk();
+        $this->issue()->assertOk();
+
+        // Derived from the zkp, so it does not drift and does not create a second user.
+        $this->assertSame(1, User::where('shakedesign_user_id', self::ZKP)->count());
+        $this->assertSame(
+            self::ZKP.'@shakedesign.local',
+            User::where('shakedesign_user_id', self::ZKP)->sole()->email,
+        );
+    }
+
+    public function test_two_addressless_accounts_do_not_collide(): void
+    {
+        $this->actingAsSsoMachine();
+
+        foreach ([self::ZKP, 'ZUSR-SECOND-ACCOUNT'] as $zkp) {
+            Http::fake([
+                '*/sessions' => Http::response([
+                    'response' => ['token' => 'tok'],
+                    'messages' => [['code' => '0', 'message' => 'OK']],
+                ]),
+                '*/layouts/API_ZUSR/_find' => Http::response([
+                    'response' => ['data' => [['fieldData' => [
+                        'zkp' => $zkp, 'Mail_1' => '', 'NameFirst' => 'Sans', 'NameLast' => 'Adresse',
+                        'PrivilegeSet' => 'User', 'isActiveAccount_b' => 1, 'isActiveUser_b' => 1,
+                    ], 'recordId' => '1', 'modId' => '0']]],
+                    'messages' => [['code' => '0', 'message' => 'OK']],
+                ]),
+            ]);
+
+            $this->postJson('/api/sso/tickets', ['shakedesign_user_id' => $zkp])->assertOk();
+        }
+
+        // users.email is unique, so a shared placeholder would have made the second login fail.
+        $this->assertSame(2, User::whereNotNull('shakedesign_user_id')->count());
+    }
+
+    public function test_a_real_address_replaces_a_synthetic_one_on_the_next_login(): void
+    {
+        $this->actingAsSsoMachine();
+
+        // A sequence, not two Http::fake() calls: Laravel stacks stubs and the first matching
+        // one keeps winning, so a second fake for the same URL would never apply.
+        Http::fake([
+            '*/sessions' => Http::response($this->sessionBody()),
+            '*/layouts/API_ZUSR/_find' => Http::sequence()
+                ->push($this->accountBody(['Mail_1' => '']))
+                ->push($this->accountBody(['Mail_1' => 'anne.dupont@example.test'])),
+        ]);
+
+        $this->issue()->assertOk();
+        $this->assertSame(
+            self::ZKP.'@shakedesign.local',
+            User::where('shakedesign_user_id', self::ZKP)->sole()->email,
+        );
+
+        // Mail_1 filled in on the ShakeDesign side since.
+        $this->issue()->assertOk();
+
+        $this->assertSame(
+            'anne.dupont@example.test',
+            User::where('shakedesign_user_id', self::ZKP)->sole()->email,
+        );
+    }
+
+    public function test_mail_2_is_never_used_as_a_fallback(): void
+    {
+        $this->actingAsSsoMachine();
+        $this->fakeShakeDesignAccount(['Mail_1' => '', 'Mail_2' => 'secondaire@example.test']);
+
+        $this->issue()->assertOk();
+
+        // Mail_2 is a secondary address, not a stand-in for the primary one: promoting it
+        // could send mail to the wrong person.
+        $this->assertSame(
+            self::ZKP.'@shakedesign.local',
+            User::where('shakedesign_user_id', self::ZKP)->sole()->email,
+        );
+    }
+
+    public function test_an_inactive_account_without_an_email_is_still_refused(): void
+    {
+        $this->actingAsSsoMachine();
+        $this->fakeShakeDesignAccount(['Mail_1' => '', 'isActiveUser_b' => 0]);
+
+        // Relaxing the email requirement must not have relaxed the access condition.
+        $this->issue()->assertForbidden();
         $this->assertDatabaseMissing('users', ['shakedesign_user_id' => self::ZKP]);
     }
 

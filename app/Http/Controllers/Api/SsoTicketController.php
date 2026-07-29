@@ -13,7 +13,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 
 /**
  * Mints a one-time login URL for a user already authenticated inside ShakeDesign.
@@ -80,6 +79,31 @@ class SsoTicketController extends Controller
     }
 
     /**
+     * The address to store, synthesised when ShakeDesign holds none.
+     *
+     * An empty Mail_1 used to refuse the login outright, which was wrong: access is governed
+     * by isActiveAccount_b and isActiveUser_b, and by nothing else. The address is a
+     * convenience here - display today, mail notifications later - so a legitimate active
+     * account without one must still get in.
+     *
+     * Derived from the zkp so it is stable across logins and unique per ShakeDesign account,
+     * which matters because users.email carries a unique index: two addressless accounts must
+     * not collide on a shared placeholder. If Mail_1 is filled in later, the next login
+     * overwrites the synthetic address with the real one, and vice versa.
+     *
+     * Mail_2 is deliberately ignored - it is a secondary address in ShakeDesign, not a
+     * fallback for the primary one, and silently promoting it could mail the wrong person.
+     *
+     * @param  array<string, mixed>  $account
+     */
+    private function email(string $zkp, array $account): string
+    {
+        $mail = trim((string) ($account['Mail_1'] ?? ''));
+
+        return $mail !== '' ? $mail : $zkp.'@shakedesign.local';
+    }
+
+    /**
      * Upserts the Laravel user for this ShakeDesign account: created on first arrival, and
      * re-synchronised from ShakeDesign on every single call thereafter.
      *
@@ -99,14 +123,8 @@ class SsoTicketController extends Controller
      */
     private function resolveUser(string $zkp, array $account): User
     {
-        $email = trim((string) ($account['Mail_1'] ?? ''));
         $name = trim(trim((string) ($account['NameFirst'] ?? '')).' '.trim((string) ($account['NameLast'] ?? '')));
-
-        if ($email === '') {
-            throw ValidationException::withMessages([
-                'shakedesign_user_id' => 'Le compte ShakeDesign n\'a pas d\'adresse e-mail (Mail_1).',
-            ]);
-        }
+        $email = $this->email($zkp, $account);
 
         $user = User::firstOrNew(['shakedesign_user_id' => $zkp]);
 
