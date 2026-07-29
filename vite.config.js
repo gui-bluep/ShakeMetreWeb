@@ -23,6 +23,8 @@ export default defineConfig({
                 },
             },
         }),
+        // Breeze 2.4 installs a Tailwind v3 toolchain (postcss + tailwind.config.js); this
+        // project stays on v4 through the Vite plugin, so those were removed again.
         tailwindcss(),
     ],
     server: {

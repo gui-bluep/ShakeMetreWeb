@@ -17,8 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Sanctum ships these but registers no alias of its own.
         $middleware->alias([
+            // Sanctum ships these but registers no alias of its own.
             'abilities' => CheckAbilities::class,
             'ability' => CheckForAnyAbility::class,
         ]);
@@ -27,11 +27,6 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
-
-        // No authentication UI exists yet, so the `auth` middleware has no named `login`
-        // route to redirect a guest to and would raise a RouteNotFoundException (HTTP 500)
-        // instead of turning them away. Point it at the root until real auth lands.
-        $middleware->redirectGuestsTo('/');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 
+/* Breeze's form components rely on the forms plugin's resets. Declared with `@plugin`
+   because this project is on Tailwind v4, whereas Breeze 2.4 ships a v3 setup. */
+@plugin '@tailwindcss/forms';
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 

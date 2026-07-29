@@ -63,7 +63,9 @@ class MetreLineGridTest extends TestCase
 
     public function test_the_grid_requires_authentication(): void
     {
-        $this->get("/metres/{$this->metre->id}/lines")->assertRedirect('/');
+        // Breeze provides a real login screen now, so a guest is sent there rather than to the
+        // root - the redirectGuestsTo('/') stopgap is gone.
+        $this->get("/metres/{$this->metre->id}/lines")->assertRedirect(route('login'));
     }
 
     public function test_it_renders_the_grid_with_its_lines_and_catalogues(): void

@@ -6,6 +6,9 @@
     {{-- Fallback for the grid's PATCH when the XSRF-TOKEN cookie is unavailable. --}}
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title inertia>{{ config('app.name') }}</title>
+
+    {{-- Ziggy: Breeze's pages resolve their routes with route(). --}}
+    @routes
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @inertiaHead
 </head>
