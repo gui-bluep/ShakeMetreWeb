@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use InvalidArgumentException;
 
 #[ObservedBy(MetreLineObserver::class)]
 class MetreLine extends Model
@@ -71,6 +72,103 @@ class MetreLine extends Model
             $this->price_total_sales_no_options - $this->price_total_ordered_no_options,
             2,
         ));
+    }
+
+    /** A tender compares five candidate suppliers per lot, no more and no fewer. */
+    public const SUPPLIER_SLOTS = [1, 2, 3, 4, 5];
+
+    /**
+     * METL_MetreLines::TENDER_Supp{n}_TotalPriceNoOption_c
+     *
+     *     Case ( isOption_b ; "" ; TENDER_Supp{n}_TotalPrice_c )
+     *     TENDER_Supp{n}_TotalPrice_c = Round ( TENDER_Supp{n}_Quantity * TENDER_Supp{n}_Price ; 2 )
+     *
+     * Note the source keeps these as two fields: the bare TotalPrice_c has no option guard and
+     * feeds the per-line best price, while the NoOption variant is what the lot-level summaries
+     * add up. This method is the NoOption one - the option guard is what makes it return null.
+     *
+     * A supplier who quoted nothing yields 0.0, not null: FileMaker multiplies empty by empty
+     * and rounds, which gives 0. Only an option line is empty.
+     */
+    public function totalPriceForSupplier(int $supplier): ?float
+    {
+        $this->assertSupplierSlot($supplier);
+
+        if ($this->is_option_b) {
+            return null;
+        }
+
+        return round(
+            (float) $this->{"tender_supp{$supplier}_price"} * (float) $this->{"tender_supp{$supplier}_quantity"},
+            2,
+        );
+    }
+
+    /**
+     * METL_MetreLines::TENDER_BestPrice_c - the cheapest quote on this line.
+     *
+     * The source reads:
+     *
+     *     Let ( [ _min = Min ( TENDER_Supp1_TotalPrice_c ; ... ; TENDER_Supp5_TotalPrice_c ) ] ;
+     *       Case ( <<truncated in the export>>
+     *
+     * Two things about that, both of which the implementation has to decide without the source:
+     *
+     *  - The export caps every calculation at 250 characters, and this one is cut off exactly at
+     *    its Case condition. The `is_tender_line_b` guard below is what the requirement
+     *    specified, not something the export confirms - no formula in it references that field
+     *    at all.
+     *  - A supplier who has not quoted totals 0, and 0 is not empty, so a literal Min over the
+     *    five values would return 0 as soon as one supplier is missing - collapsing every
+     *    percentage that divides by it. Suppliers who did not quote are therefore excluded.
+     *    Whatever the truncated Case does, it must do something equivalent, or the metric
+     *    could not work at all.
+     */
+    public function bestPriceAmongSuppliers(): ?float
+    {
+        if (! $this->is_tender_line_b) {
+            return 0.0;
+        }
+
+        $quoted = array_filter(
+            array_map(fn (int $n) => $this->totalPriceForSupplier($n), self::SUPPLIER_SLOTS),
+            fn (?float $total) => $total !== null && $total > 0,
+        );
+
+        return $quoted === [] ? null : min($quoted);
+    }
+
+    /**
+     * METL_MetreLines::TENDER_Supp{n}_BestPricePercentage_c
+     *
+     *     Case ( not IsEmpty ( TENDER_Supp{n}_TotalPrice_c ) ;
+     *            Round ( TENDER_Supp{n}_TotalPrice_c / TENDER_BestPrice_c * 100 ; "" ) ; "" )
+     *
+     * `Round ( x ; "" )` is FileMaker for zero decimals, so the percentage is a whole number.
+     * 100 means this supplier is the cheapest on the line; 120 means twenty percent above it.
+     *
+     * This is the per-line percentage. The lot-level score uses Lot's own percentage, computed
+     * from the summed totals - the two are different numbers and the source keeps them apart.
+     */
+    public function bestPricePercentageForSupplier(int $supplier): ?float
+    {
+        $total = $this->totalPriceForSupplier($supplier);
+        $best = $this->bestPriceAmongSuppliers();
+
+        if ($total === null || $total <= 0 || $best === null || $best <= 0) {
+            return null;
+        }
+
+        return round($total / $best * 100);
+    }
+
+    private function assertSupplierSlot(int $supplier): void
+    {
+        if (! in_array($supplier, self::SUPPLIER_SLOTS, true)) {
+            throw new InvalidArgumentException(
+                "Supplier slot must be one of 1-5, got {$supplier}."
+            );
+        }
     }
 
     /**
