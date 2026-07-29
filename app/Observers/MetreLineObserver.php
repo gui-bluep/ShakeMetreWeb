@@ -13,21 +13,40 @@ use App\Models\MetreLine;
 class MetreLineObserver
 {
     /**
-     * METL_MetreLines::QuantityOrdered auto-enter: `Case ( Unit = "pm" ; "" ; Self )`.
+     * Both quantity columns carry the same auto-enter in METL_MetreLines:
      *
-     * `Self` means "leave the value alone", so the whole rule is: a "pm" (pour mémoire) line
-     * carries no ordered quantity. It says nothing about Quantity - the two quantities are
-     * independent, each fed from its own component sum by METL_METC_UpdateQuantities.
+     *     Quantity         Case ( Unit = "pm" ; "" ; Self )
+     *     QuantityOrdered  Case ( Unit = "pm" ; "" ; Self )
      *
-     * Applied on every save rather than only when QuantityOrdered changes, because in
-     * FileMaker the auto-enter re-evaluates whenever a referenced field does - including Unit.
+     * `Self` means "leave the value alone", so the rule reads: a "pm" (pour mémoire) line
+     * carries no quantity at all - neither sold nor ordered. Such a line is a placeholder in
+     * the métré, priced later, so every total derived from it lands on zero.
+     *
+     * This says nothing about the two quantities tracking each other: they remain
+     * independent, each fed from its own component sum by METL_METC_UpdateQuantities. They
+     * merely share the same emptying rule.
+     *
+     * Applied on every save rather than only when a quantity changes, because in FileMaker
+     * the auto-enter re-evaluates whenever a referenced field does - including Unit.
      */
+    private const QUANTITY_COLUMNS = ['quantity', 'quantity_ordered'];
+
     public function saving(MetreLine $metreLine): void
     {
-        // FileMaker text comparison is case-insensitive, so "PM" and "Pm" match too.
-        if (mb_strtolower(trim((string) $metreLine->unit)) === 'pm') {
-            $metreLine->quantity_ordered = null;
+        if (! $this->isPourMemoire($metreLine)) {
+            return;
         }
+
+        // Iterated rather than assigned twice, so the two columns cannot drift apart.
+        foreach (self::QUANTITY_COLUMNS as $column) {
+            $metreLine->{$column} = null;
+        }
+    }
+
+    /** FileMaker text comparison is case-insensitive, so "PM" and "Pm" match too. */
+    private function isPourMemoire(MetreLine $metreLine): bool
+    {
+        return mb_strtolower(trim((string) $metreLine->unit)) === 'pm';
     }
 
     public function saved(MetreLine $metreLine): void

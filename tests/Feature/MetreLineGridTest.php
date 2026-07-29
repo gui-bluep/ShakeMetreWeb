@@ -385,26 +385,69 @@ class MetreLineGridTest extends TestCase
         $this->assertNull($line->refresh()->quantity_ordered);
     }
 
-    public function test_the_pour_memoire_rule_does_not_touch_the_sales_quantity(): void
+    #[DataProvider('pourMemoireUnitProvider')]
+    public function test_a_pour_memoire_unit_forces_the_sales_quantity_empty_too(string $unit): void
     {
         $this->actingAs(User::factory()->create());
-        $line = $this->line(['unit' => 'pm', 'quantity' => 4]);
+        $line = $this->line(['unit' => $unit, 'quantity' => 4]);
 
-        // The auto-enter is on QuantityOrdered only; Quantity has its own, different one.
-        $this->patchJson("/api/metre-lines/{$line->id}", ['quantity' => 6])->assertOk();
+        // Quantity carries the same auto-enter as QuantityOrdered:
+        //   Case ( Unit = "pm" ; "" ; Self )
+        $this->patchJson("/api/metre-lines/{$line->id}", ['quantity' => 6])
+            ->assertOk()
+            ->assertJsonPath('data.quantity', null);
 
-        $this->assertEquals(6, (float) $line->refresh()->quantity);
+        $this->assertNull($line->refresh()->quantity);
     }
 
-    public function test_a_pour_memoire_line_reports_a_zero_ordered_total(): void
+    public function test_a_pour_memoire_line_carries_no_quantity_at_all(): void
     {
         $this->actingAs(User::factory()->create());
-        $line = $this->line(['unit' => 'pm', 'price_ordered' => 80, 'quantity_ordered' => 3]);
+        $line = $this->line(['unit' => 'm2', 'quantity' => 4, 'quantity_ordered' => 3]);
 
+        // Switching the unit to pm empties both, because the auto-enter re-evaluates when
+        // Unit changes - not only when a quantity does.
+        $line->forceFill(['unit' => 'pm'])->save();
+
+        $line->refresh();
+        $this->assertNull($line->quantity);
+        $this->assertNull($line->quantity_ordered);
+    }
+
+    public function test_a_pour_memoire_line_reports_every_total_at_zero(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $line = $this->line([
+            'unit' => 'pm',
+            'price_sales' => 100,
+            'price_ordered' => 80,
+            'quantity' => 4,
+            'quantity_ordered' => 3,
+        ]);
+
+        // A placeholder line is priced later, so nothing it holds may reach a total.
         $this->patchJson("/api/metre-lines/{$line->id}", ['price_ordered' => 90])
             ->assertOk()
+            ->assertJsonPath('data.quantity', null)
             ->assertJsonPath('data.quantity_ordered', null)
-            ->assertJsonPath('data.computed.price_total_ordered_no_options', 0);
+            ->assertJsonPath('data.computed.price_total_sales_no_options', 0)
+            ->assertJsonPath('data.computed.price_total_ordered_no_options', 0)
+            ->assertJsonPath('data.computed.price_total_gain_no_options', 0);
+    }
+
+    public function test_a_non_pour_memoire_unit_leaves_both_quantities_alone(): void
+    {
+        $this->actingAs(User::factory()->create());
+        // "pmt" and "m" must not match a rule keyed on exactly "pm".
+        foreach (['m2', 'pmt', 'm'] as $unit) {
+            $line = $this->line(['unit' => $unit, 'quantity' => 4, 'quantity_ordered' => 3]);
+
+            $this->patchJson("/api/metre-lines/{$line->id}", ['quantity' => 6])->assertOk();
+
+            $line->refresh();
+            $this->assertEquals(6, (float) $line->quantity, "unit {$unit}");
+            $this->assertEquals(3, (float) $line->quantity_ordered, "unit {$unit}");
+        }
     }
 
     public function test_the_grid_exposes_the_unit_so_the_cell_can_disable_itself(): void

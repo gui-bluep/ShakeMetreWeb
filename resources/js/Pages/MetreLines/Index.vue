@@ -31,16 +31,22 @@ const EDITABLE_COLUMNS = [
 ];
 
 /**
- * METL_MetreLines::QuantityOrdered auto-enter: `Case ( Unit = "pm" ; "" ; Self )`. A pour
- * mémoire line carries no ordered quantity, so the cell refuses input instead of letting the
- * server silently blank it a moment later. Mirrors MetreLineObserver::saving().
+ * Both quantity columns share the auto-enter `Case ( Unit = "pm" ; "" ; Self )`, so a pour
+ * mémoire line carries no quantity at all. The cells refuse input rather than letting the
+ * server blank them a moment later. Mirrors MetreLineObserver::saving().
  */
+const QUANTITY_COLUMNS = ['quantity', 'quantity_ordered'];
+
+function isPourMemoire(row) {
+    return String(row.unit ?? '').trim().toLowerCase() === 'pm';
+}
+
 function isCellDisabled(row, key) {
     if (readOnly.value) {
         return true;
     }
 
-    return key === 'quantity_ordered' && String(row.unit ?? '').trim().toLowerCase() === 'pm';
+    return QUANTITY_COLUMNS.includes(key) && isPourMemoire(row);
 }
 
 /**
@@ -357,7 +363,7 @@ function money(value) {
                             :disabled="isCellDisabled(rows[virtualRow.index], column.key)"
                             :title="
                                 isCellDisabled(rows[virtualRow.index], column.key) && !readOnly
-                                    ? 'Unité « pm » : pas de quantité commandée'
+                                    ? 'Unité « pm » (pour mémoire) : pas de quantité'
                                     : null
                             "
                             class="w-full rounded border-none bg-transparent px-1 py-0.5 text-right text-xs tabular-nums focus:bg-white focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-300"

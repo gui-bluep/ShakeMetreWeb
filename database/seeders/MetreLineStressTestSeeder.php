@@ -106,7 +106,10 @@ class MetreLineStressTestSeeder extends Seeder
 
             // Deterministic but varied: every 7th line is an option (so its totals must read
             // 0), every 11th has no sub-reference, every 13th sells at a loss so the negative
-            // margin styling gets exercised.
+            // margin styling gets exercised, and every 17th is "pour mémoire" - the unit is
+            // not editable from the grid, so without these the pm rule could not be seen at
+            // all (both quantity cells greyed out, every total at zero).
+            $isPourMemoire = $i % 17 === 0;
             $isOption = $i % 7 === 0;
             $priceBuy = round(40 + ($i % 37) * 2.5, 2);
             $priceOrdered = round($priceBuy * 1.05, 2);
@@ -122,9 +125,13 @@ class MetreLineStressTestSeeder extends Seeder
                 'description' => "Ligne de charge {$i} — ".Str::random(mt_rand(10, 40)),
                 'sort_order' => $i,
                 'sequence_number' => $i,
-                'unit' => $units[$i % count($units)],
-                'quantity' => round(1 + ($i % 23) * 1.5, 4),
-                'quantity_ordered' => round(1 + ($i % 19) * 1.5, 4),
+                'unit' => $isPourMemoire ? 'pm' : $units[$i % count($units)],
+                // Null on a pm line: this bulk insert bypasses the observer, so the invariant
+                // it enforces has to be honoured here by hand. Seeding a quantity behind a
+                // greyed-out cell would render a state the application never produces, and
+                // read as a bug rather than as the rule working.
+                'quantity' => $isPourMemoire ? null : round(1 + ($i % 23) * 1.5, 4),
+                'quantity_ordered' => $isPourMemoire ? null : round(1 + ($i % 19) * 1.5, 4),
                 'price_sales' => $priceSales,
                 'price_ordered' => $priceOrdered,
                 'price_buy' => $priceBuy,
