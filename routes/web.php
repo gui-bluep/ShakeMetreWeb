@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\SsoConsumeController;
 use App\Http\Controllers\MetreLineController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -45,5 +46,14 @@ Route::middleware('auth')->group(function () {
         ->middleware('role.write')
         ->name('metre-lines.update');
 });
+
+/*
+| Consumes a one-time SSO ticket minted by POST /api/sso/tickets, so a user already
+| authenticated in ShakeDesign lands here signed in. Deliberately outside the `auth` group -
+| it is what creates the session - and throttled, since the token is the only secret.
+*/
+Route::get('/sso/consume/{token}', [SsoConsumeController::class, '__invoke'])
+    ->middleware('throttle:sso-consume')
+    ->name('sso.consume');
 
 require __DIR__.'/auth.php';

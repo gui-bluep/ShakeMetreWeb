@@ -34,6 +34,8 @@ class ShakeDesignClient
 
     private const LAYOUT_VALUE = 'API_ZVAL';
 
+    private const LAYOUT_USER = 'API_ZUSR';
+
     private const LAYOUT_OFFER = 'API_OFF';
 
     private const LAYOUT_OFFER_LINE = 'API_OFL';
@@ -115,6 +117,18 @@ class ShakeDesignClient
     public function findVatValue(string $zkp): ?array
     {
         return $this->findOneByKey(self::LAYOUT_VALUE, $zkp, 'VAT value');
+    }
+
+    /**
+     * The ShakeDesign account behind an SSO ticket (ZUSR_Users).
+     *
+     * @return array<string, mixed>|null null when no account carries that zkp
+     *
+     * @throws ShakeDesignApiException on a genuine failure (auth, transport, bad request)
+     */
+    public function findUserByZkp(string $zkp): ?array
+    {
+        return $this->findOneByKey(self::LAYOUT_USER, $zkp, 'user');
     }
 
     /**
