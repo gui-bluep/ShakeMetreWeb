@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\SsoConsumeController;
+use App\Http\Controllers\MetreLineComponentController;
 use App\Http\Controllers\MetreLineController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -45,6 +46,23 @@ Route::middleware('auth')->group(function () {
     Route::patch('/api/metre-lines/{metreLine}', [MetreLineController::class, 'update'])
         ->middleware('role.write')
         ->name('metre-lines.update');
+
+    // Components of a metre line - the METC portal. Reading is open to a readonly account;
+    // every write goes through role.write like the line endpoint, because changing a component
+    // rewrites the parent line's quantities.
+    Route::get('/api/metre-lines/{metreLine}/components', [MetreLineComponentController::class, 'index'])
+        ->name('metre-line-components.index');
+
+    Route::middleware('role.write')->group(function () {
+        Route::post('/api/metre-lines/{metreLine}/components', [MetreLineComponentController::class, 'store'])
+            ->name('metre-line-components.store');
+
+        Route::patch('/api/metre-line-components/{metreLineComponent}', [MetreLineComponentController::class, 'update'])
+            ->name('metre-line-components.update');
+
+        Route::delete('/api/metre-line-components/{metreLineComponent}', [MetreLineComponentController::class, 'destroy'])
+            ->name('metre-line-components.destroy');
+    });
 });
 
 /*

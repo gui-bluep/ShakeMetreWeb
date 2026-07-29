@@ -26,6 +26,9 @@ class MetreLineController extends Controller
     public function index(Metre $metre): Response
     {
         $lines = $metre->metreLines()
+            // Counted rather than probed per row: hasComponents() reads this, so a métré of
+            // hundreds of lines costs one extra query instead of one per line.
+            ->withCount('metreLineComponents')
             ->orderBy('sort_order')
             ->orderBy('sequence_number')
             ->get();

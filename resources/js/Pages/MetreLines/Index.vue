@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { Head, usePage } from '@inertiajs/vue3';
 import { useVirtualizer } from '@tanstack/vue-virtual';
+import ComponentsPanel from '../../Components/ComponentsPanel.vue';
 import GridToasts from '../../Components/GridToasts.vue';
 import { useDebouncedRowSave } from '../../composables/useDebouncedRowSave';
 import { useGridKeyboardNav } from '../../composables/useGridKeyboardNav';
@@ -31,9 +32,13 @@ const EDITABLE_COLUMNS = [
 ];
 
 /**
- * Both quantity columns share the auto-enter `Case ( Unit = "pm" ; "" ; Self )`, so a pour
- * mémoire line carries no quantity at all. The cells refuse input rather than letting the
- * server blank them a moment later. Mirrors MetreLineObserver::saving().
+ * Two independent reasons a quantity cell refuses input, both of them cases where the server
+ * would overwrite whatever was typed:
+ *
+ *  - a "pm" unit, from the auto-enter `Case ( Unit = "pm" ; "" ; Self )` on both quantity
+ *    columns, which empties them on save (MetreLineObserver::saving);
+ *  - a composed line, whose quantities are summed from its components by
+ *    RecalculateMetreLineQuantitiesFromComponents.
  */
 const QUANTITY_COLUMNS = ['quantity', 'quantity_ordered'];
 
@@ -46,7 +51,20 @@ function isCellDisabled(row, key) {
         return true;
     }
 
-    return QUANTITY_COLUMNS.includes(key) && isPourMemoire(row);
+    return QUANTITY_COLUMNS.includes(key) && (isPourMemoire(row) || row.has_components);
+}
+
+/** Why a quantity cell is locked, so the tooltip names the actual cause. */
+function disabledReason(row, key) {
+    if (readOnly.value || !QUANTITY_COLUMNS.includes(key)) {
+        return null;
+    }
+
+    if (row.has_components) {
+        return 'Calculé depuis les composants';
+    }
+
+    return isPourMemoire(row) ? 'Unité « pm » (pour mémoire) : pas de quantité' : null;
 }
 
 /**
@@ -77,6 +95,29 @@ const readOnly = computed(() => props.metre.is_locked_b || page.props.auth?.canW
 const readOnlyReason = computed(() =>
     props.metre.is_locked_b ? 'verrouillé — lecture seule' : 'compte en lecture seule'
 );
+
+// --- components panel -------------------------------------------------------------------
+
+/** Selected by id, not by object: the row is replaced whenever the server confirms a save. */
+const selectedLineId = ref(null);
+const selectedLine = computed(() => rows.value.find((row) => row.id === selectedLineId.value) ?? null);
+
+/**
+ * A component write recomputes the parent line's quantities server-side, and the endpoint
+ * returns them. Applied here so the main grid never disagrees with the panel beside it.
+ */
+function applyLineUpdate(update) {
+    const row = rows.value.find((candidate) => candidate.id === selectedLineId.value);
+
+    if (!row || !update) {
+        return;
+    }
+
+    row.quantity = update.quantity;
+    row.quantity_ordered = update.quantity_ordered;
+    row.has_components = update.has_components;
+    row.computed = { ...update.computed };
+}
 
 // --- virtualization ---------------------------------------------------------------------
 
@@ -256,7 +297,8 @@ function money(value) {
 <template>
     <Head :title="`Lignes — ${metre.name ?? 'Métré'}`" />
 
-    <div class="flex h-screen flex-col">
+    <div class="flex h-screen">
+      <div class="flex min-w-0 flex-1 flex-col">
         <header class="flex items-baseline justify-between border-b border-gray-200 bg-white px-4 py-3">
             <div>
                 <h1 class="text-sm font-semibold text-gray-900">{{ metre.name ?? 'Métré' }}</h1>
@@ -299,15 +341,37 @@ function money(value) {
                     v-for="virtualRow in virtualRows"
                     :key="rows[virtualRow.index].id"
                     class="absolute left-0 top-0 grid w-full items-center gap-px border-b border-gray-100 px-2 hover:bg-blue-50/40"
+                    :class="
+                        rows[virtualRow.index].id === selectedLineId
+                            ? 'bg-blue-50 ring-1 ring-inset ring-blue-200'
+                            : ''
+                    "
                     :style="{
                         gridTemplateColumns: gridTemplate,
                         height: `${ROW_HEIGHT}px`,
                         transform: `translateY(${virtualRow.start}px)`,
                     }"
+                    @click="selectedLineId = rows[virtualRow.index].id"
                 >
-                    <div class="pr-1 text-right text-xs tabular-nums text-gray-400">
+                    <!-- Doubles as the components affordance: the marker shows which lines are
+                         composed, and clicking anywhere on the row opens that line's panel. -->
+                    <button
+                        type="button"
+                        class="flex w-full items-center justify-end gap-1 pr-1 text-xs tabular-nums text-gray-400 transition hover:text-blue-600"
+                        :title="
+                            rows[virtualRow.index].has_components
+                                ? 'Ligne composée — voir ses composants'
+                                : 'Ouvrir les composants'
+                        "
+                        @click.stop="selectedLineId = rows[virtualRow.index].id"
+                    >
+                        <span
+                            v-if="rows[virtualRow.index].has_components"
+                            class="size-1.5 rounded-full bg-blue-400"
+                            aria-hidden="true"
+                        />
                         {{ virtualRow.index + 1 }}
-                    </div>
+                    </button>
 
                     <template v-for="(column, colIndex) in EDITABLE_COLUMNS" :key="column.key">
                         <!-- reference -->
@@ -370,11 +434,7 @@ function money(value) {
                             :value="rows[virtualRow.index][column.key]"
                             :data-cell="`${virtualRow.index}-${colIndex}`"
                             :disabled="isCellDisabled(rows[virtualRow.index], column.key)"
-                            :title="
-                                isCellDisabled(rows[virtualRow.index], column.key) && !readOnly
-                                    ? 'Unité « pm » (pour mémoire) : pas de quantité'
-                                    : null
-                            "
+                            :title="disabledReason(rows[virtualRow.index], column.key)"
                             class="w-full rounded border-none bg-transparent px-1 py-0.5 text-right text-xs tabular-nums focus:bg-white focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-300"
                             @input="edit(rows[virtualRow.index], column.key, $event.target.value)"
                             @blur="flushRow(rows[virtualRow.index])"
@@ -435,6 +495,15 @@ function money(value) {
                 Ce métré n'a aucune ligne.
             </p>
         </div>
+      </div>
+
+      <ComponentsPanel
+          :line="selectedLine"
+          :read-only="readOnly"
+          @close="selectedLineId = null"
+          @line-updated="applyLineUpdate"
+          @error="(message) => notify(selectedLineId, message)"
+      />
     </div>
 
     <GridToasts :toasts="toasts" @dismiss="dismiss" />

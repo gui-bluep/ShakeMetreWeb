@@ -73,6 +73,30 @@ class MetreLine extends Model
         ));
     }
 
+    /**
+     * Whether this line is "composed" - its quantities come from its components rather than
+     * being typed in.
+     *
+     * Derived from the relation, never from metc_is_present_b. That column exists (Phase 1
+     * migrated FileMaker's own denormalized flag) but a flag maintained alongside the rows it
+     * describes is a second source of truth that drifts the moment one write path forgets it.
+     *
+     * Reads a withCount() result when the caller loaded one, so a grid of hundreds of lines
+     * costs one query rather than one per row.
+     */
+    public function hasComponents(): bool
+    {
+        if ($this->relationLoaded('metreLineComponents')) {
+            return $this->metreLineComponents->isNotEmpty();
+        }
+
+        if ($this->metre_line_components_count !== null) {
+            return $this->metre_line_components_count > 0;
+        }
+
+        return $this->metreLineComponents()->exists();
+    }
+
     public function metre(): BelongsTo
     {
         return $this->belongsTo(Metre::class);

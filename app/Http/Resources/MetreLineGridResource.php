@@ -45,6 +45,10 @@ class MetreLineGridResource extends JsonResource
             // (METL_MetreLines::QuantityOrdered auto-enter), so the cell disables itself
             // rather than accepting a value the server will immediately clear.
             'unit' => $this->unit,
+
+            // Likewise: on a composed line both quantities come from the components, so the
+            // cells disable rather than accept a value the next recalculation would overwrite.
+            'has_components' => $this->hasComponents(),
         ];
     }
 
