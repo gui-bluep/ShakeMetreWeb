@@ -17,7 +17,7 @@
         "vitest": "^4.1.10"
     },
     "dependencies": {
-        "@inertiajs/vue3": "^3.6.1",
+        "@inertiajs/vue3": "^2.3.27",
         "@tanstack/vue-virtual": "^3.13.35",
         "@vitejs/plugin-vue": "^6.0.8",
         "vue": "^3.5.40"
