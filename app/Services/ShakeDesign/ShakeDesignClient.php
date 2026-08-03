@@ -59,6 +59,13 @@ class ShakeDesignClient
     private const KEY_FIELD = 'zkp';
 
     /**
+     * Comfortably above the 292 active suppliers the live data holds, so the picker is not
+     * quietly missing entries - the previous 200 was below it and truncated in silence.
+     * Reaching this cap is reported rather than hidden; see ShakeDesignLookupController.
+     */
+    public const COMPANY_LIST_LIMIT = 500;
+
+    /**
      * Enforced here rather than by FileMaker: both fields carry notEmpty="False" in the
      * source schema, so the only thing that ever guaranteed them was the offer-creation
      * script we are replacing. zkf_MET in particular is the stored reference from
@@ -192,47 +199,44 @@ class ShakeDesignClient
     }
 
     /**
-     * Companies for the supplier picker, name-ordered.
+     * Suppliers for the supplier picker, name-ordered.
      *
-     * With no search term this lists records outright (GET records) rather than issuing a
-     * find, because the Data API has no "match everything" query - a `*` on a field would
-     * still exclude records where that field is empty.
+     * Narrowed to isSupplier_b = 1 and isActive_b = 1, both now exposed on API_CPY. Criteria
+     * within a single `query` element are AND-ed by the Data API, so the search term joins them
+     * rather than widening the result.
      *
-     * NOT filtered to suppliers or to active companies: API_CPY exposes neither isSupplier_b
-     * nor isActive_b (confirmed against the live layout, which carries zkp, Name, VAT, Phone1,
-     * LanguageMain and the billing address). Filtering on a field that is not there would mean
-     * inventing the criterion, so every company is listed and the caller sees all of them. Add
-     * those two fields to API_CPY and this can narrow.
+     * Filtering on isSupplier_b is also what makes a find work with no search term: the Data
+     * API has no "match everything" query, but "every active supplier" is a real criterion, so
+     * there is no longer any need to fall back to listing records - which could not have been
+     * filtered at all.
+     *
+     * On the live data isActive_b currently excludes nothing: every one of the 292 suppliers is
+     * active, and no company anywhere has isActive_b = 0. It is applied because it is the right
+     * criterion for a picker offering a new choice, not because it has been seen to matter -
+     * its effect is covered by a test rather than by real data.
      *
      * @return list<array<string, mixed>> each the company's fieldData; empty when nothing matches
      *
      * @throws ShakeDesignApiException on a genuine failure (auth, transport, bad request)
      */
-    public function listCompanies(?string $term = null, int $limit = 200): array
+    public function listCompanies(?string $term = null, int $limit = self::COMPANY_LIST_LIMIT): array
     {
+        $criteria = ['isSupplier_b' => '==1', 'isActive_b' => '==1'];
         $needle = trim((string) $term);
 
-        if ($needle === '') {
-            return $this->rows(
-                'get',
-                'layouts/'.self::LAYOUT_COMPANY.'/records',
-                [
-                    '_limit' => $limit,
-                    '_sort' => json_encode([['fieldName' => 'Name', 'sortOrder' => 'ascend']]),
-                ],
-                'company list',
-            );
+        if ($needle !== '') {
+            $criteria['Name'] = '*'.$this->escapeFindValue($needle).'*';
         }
 
         return $this->rows(
             'post',
             'layouts/'.self::LAYOUT_COMPANY.'/_find',
             [
-                'query' => [['Name' => '*'.$this->escapeFindValue($needle).'*']],
+                'query' => [$criteria],
                 'limit' => $limit,
                 'sort' => [['fieldName' => 'Name', 'sortOrder' => 'ascend']],
             ],
-            'company search',
+            'supplier list',
         );
     }
 
@@ -243,10 +247,10 @@ class ShakeDesignClient
      * one to fetch every referenced contact at once - the Data API ORs the elements of
      * `query`, so N contact keys become a single request rather than N lookups.
      *
-     * `role` comes from the join's Role field, which API_JCPYCTC does not currently expose -
-     * so it is null in practice. Kept in the shape rather than dropped because the source
-     * table does carry it: adding Role to the layout starts populating this with no code
-     * change, and a null role is honest about not knowing rather than pretending there is none.
+     * `role` comes from the join's Role field, now exposed on API_JCPYCTC and carrying real
+     * values ("Développeur", "Architect - Co-Founder"). An empty Role becomes null rather than
+     * an empty string, so a contact with no stated role reads as unknown instead of as having
+     * one that happens to be blank.
      *
      * @return list<array{zkp: string, name: string, role: ?string}> name-ordered
      *

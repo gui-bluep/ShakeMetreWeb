@@ -33,6 +33,10 @@ const rows = ref([]);
 const loading = ref(false);
 const error = ref(null);
 
+/** Set when the endpoint capped its result, so a partial list is not shown as a whole one. */
+const truncated = ref(false);
+const limit = ref(null);
+
 let debounceTimer = null;
 let requestToken = 0;
 
@@ -88,11 +92,14 @@ async function load(term) {
         // A slower earlier request must not overwrite a faster later one.
         if (thisRequest === requestToken) {
             rows.value = body.data ?? [];
+            truncated.value = body.truncated === true;
+            limit.value = body.limit ?? null;
         }
     } catch (e) {
         if (thisRequest === requestToken) {
             error.value = e.message;
             rows.value = [];
+            truncated.value = false;
         }
     } finally {
         if (thisRequest === requestToken) {
@@ -132,6 +139,10 @@ function detail(row) {
                 class="mt-3 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                 @input="onInput($event.target.value)"
             />
+
+            <p v-if="truncated" class="mt-2 rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                Seuls les {{ limit }} premiers résultats sont affichés — affinez la recherche.
+            </p>
 
             <div class="mt-3 max-h-80 divide-y divide-gray-100 overflow-y-auto rounded border border-gray-200">
                 <p v-if="loading" class="p-4 text-center text-sm text-gray-400">Chargement…</p>

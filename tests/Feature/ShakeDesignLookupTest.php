@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Lot;
 use App\Models\User;
+use App\Services\ShakeDesign\ShakeDesignClient;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -81,7 +82,7 @@ class ShakeDesignLookupTest extends TestCase
 
         Http::fake([
             '*/sessions' => Http::response($this->sessionBody()),
-            '*/layouts/API_CPY/records*' => Http::response($this->found([
+            '*/layouts/API_CPY/_find' => Http::response($this->found([
                 ['zkp' => 'CPY-1', 'Name' => 'Alpha', 'VAT' => 'BE123', 'AddressBill_City' => 'Lasne'],
             ])),
         ]);
@@ -94,24 +95,27 @@ class ShakeDesignLookupTest extends TestCase
     }
 
     /**
-     * With no term the Data API has no "match everything" query - a `*` on Name would drop
-     * companies whose Name is empty - so the records endpoint is used instead of a find.
+     * The picker offers suppliers, not every company. Filtering on isSupplier_b is also what
+     * lets a find work with no search term: the Data API has no "match everything" query, but
+     * "every active supplier" is a real criterion.
      */
-    public function test_listing_with_no_term_reads_records_rather_than_issuing_a_find(): void
+    public function test_it_only_offers_active_suppliers(): void
     {
         $this->actAsWriter();
 
         Http::fake([
             '*/sessions' => Http::response($this->sessionBody()),
-            '*/layouts/API_CPY/records*' => Http::response($this->found([])),
+            '*/layouts/API_CPY/_find' => Http::response($this->found([])),
         ]);
 
         $this->getJson('/api/shakedesign/companies')->assertOk();
 
-        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), '/layouts/API_CPY/_find'));
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), '/layouts/API_CPY/_find')
+            && $r['query'] === [['isSupplier_b' => '==1', 'isActive_b' => '==1']]);
     }
 
-    public function test_a_search_term_becomes_a_contains_query_on_name(): void
+    /** Criteria inside one query element are AND-ed, so the term narrows rather than widens. */
+    public function test_a_search_term_is_anded_with_the_supplier_filter(): void
     {
         $this->actAsWriter();
 
@@ -123,7 +127,45 @@ class ShakeDesignLookupTest extends TestCase
         $this->getJson('/api/shakedesign/companies?q=alph')->assertOk();
 
         Http::assertSent(fn (Request $r) => str_contains($r->url(), '/layouts/API_CPY/_find')
-            && $r['query'] === [['Name' => '*alph*']]);
+            && $r['query'] === [['isSupplier_b' => '==1', 'isActive_b' => '==1', 'Name' => '*alph*']]);
+    }
+
+    /**
+     * The live data holds 292 active suppliers, which the previous limit of 200 cut off in
+     * silence - a capped list is indistinguishable from a complete one, so it has to say so.
+     */
+    public function test_a_capped_result_says_so_rather_than_looking_complete(): void
+    {
+        $this->actAsWriter();
+
+        $atTheCap = array_map(
+            fn (int $i) => ['zkp' => "CPY-{$i}", 'Name' => "Société {$i}"],
+            range(1, ShakeDesignClient::COMPANY_LIST_LIMIT),
+        );
+
+        Http::fake([
+            '*/sessions' => Http::response($this->sessionBody()),
+            '*/layouts/API_CPY/_find' => Http::response($this->found($atTheCap)),
+        ]);
+
+        $this->getJson('/api/shakedesign/companies')
+            ->assertOk()
+            ->assertJsonPath('truncated', true)
+            ->assertJsonPath('limit', ShakeDesignClient::COMPANY_LIST_LIMIT);
+    }
+
+    public function test_a_result_below_the_cap_is_not_flagged_as_truncated(): void
+    {
+        $this->actAsWriter();
+
+        Http::fake([
+            '*/sessions' => Http::response($this->sessionBody()),
+            '*/layouts/API_CPY/_find' => Http::response($this->found([['zkp' => 'CPY-1', 'Name' => 'Alpha']])),
+        ]);
+
+        $this->getJson('/api/shakedesign/companies')
+            ->assertOk()
+            ->assertJsonPath('truncated', false);
     }
 
     public function test_a_company_without_a_name_still_gets_a_label(): void
@@ -132,7 +174,7 @@ class ShakeDesignLookupTest extends TestCase
 
         Http::fake([
             '*/sessions' => Http::response($this->sessionBody()),
-            '*/layouts/API_CPY/records*' => Http::response($this->found([['zkp' => 'CPY-1', 'Name' => '']])),
+            '*/layouts/API_CPY/_find' => Http::response($this->found([['zkp' => 'CPY-1', 'Name' => '']])),
         ]);
 
         $this->getJson('/api/shakedesign/companies')
@@ -275,7 +317,7 @@ class ShakeDesignLookupTest extends TestCase
 
         Http::fake([
             '*/sessions' => Http::response($this->sessionBody()),
-            '*/layouts/API_CPY/records*' => Http::response($this->found([])),
+            '*/layouts/API_CPY/_find' => Http::response($this->found([])),
         ]);
 
         $this->getJson('/api/shakedesign/companies')->assertOk();

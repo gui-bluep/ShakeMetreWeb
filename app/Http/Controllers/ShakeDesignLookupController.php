@@ -33,6 +33,14 @@ class ShakeDesignLookupController extends Controller
                 ],
                 $companies,
             ), fn (array $company) => $company['zkp'] !== '')),
+
+            /*
+             * Reported, not hidden: a list that stops at the cap looks exactly like a complete
+             * one, so the picker would present a partial roster as the whole of it. The client
+             * says so and invites a search instead.
+             */
+            'truncated' => count($companies) >= ShakeDesignClient::COMPANY_LIST_LIMIT,
+            'limit' => ShakeDesignClient::COMPANY_LIST_LIMIT,
         ]);
     }
 
