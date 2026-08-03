@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\SsoConsumeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LotController;
+use App\Http\Controllers\MetreController;
 use App\Http\Controllers\MetreLineComponentController;
 use App\Http\Controllers\MetreLineController;
 use App\Http\Controllers\ProfileController;
@@ -46,6 +47,24 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role.write')->group(function () {
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    });
+});
+
+/*
+| One métré's own page: header fields, totals, and the actions on the métré as a whole.
+| Duplicating and deleting are redirects (Inertia visits), the field edits are JSON under
+| /api like every other debounced editor here.
+|
+| Declared before /metres/{metre}/lines only for readability; the two cannot collide, since
+| `lines` is a literal segment and this route has none.
+*/
+Route::middleware('auth')->group(function () {
+    Route::get('/metres/{metre}', [MetreController::class, 'show'])->name('metres.show');
+
+    Route::middleware('role.write')->group(function () {
+        Route::patch('/api/metres/{metre}', [MetreController::class, 'update'])->name('metres.update');
+        Route::post('/metres/{metre}/duplicate', [MetreController::class, 'duplicate'])->name('metres.duplicate');
+        Route::delete('/metres/{metre}', [MetreController::class, 'destroy'])->name('metres.destroy');
     });
 });
 
