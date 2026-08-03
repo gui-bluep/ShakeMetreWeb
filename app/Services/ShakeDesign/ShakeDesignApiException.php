@@ -30,6 +30,13 @@ class ShakeDesignApiException extends RuntimeException
     /** FileMaker: "Invalid FileMaker Data API token". */
     public const CODE_INVALID_TOKEN = '952';
 
+    /**
+     * FileMaker: "Layout is missing". Distinct from a failed request: the layout this code
+     * asks for has not been built in ShakeDesign, so no amount of retrying helps - somebody
+     * has to create it. Callers surface it as an instruction rather than an error.
+     */
+    public const CODE_MISSING_LAYOUT = '105';
+
     public function __construct(
         string $message,
         public readonly ?string $fileMakerCode = null,
@@ -123,6 +130,11 @@ class ShakeDesignApiException extends RuntimeException
     public function isNotFound(): bool
     {
         return $this->fileMakerCode === self::CODE_NO_RECORDS;
+    }
+
+    public function isMissingLayout(): bool
+    {
+        return $this->fileMakerCode === self::CODE_MISSING_LAYOUT;
     }
 
     public function isExpiredSession(): bool

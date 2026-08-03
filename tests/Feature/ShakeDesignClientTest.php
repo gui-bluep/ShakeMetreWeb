@@ -70,6 +70,20 @@ class ShakeDesignClientTest extends TestCase
     }
 
     /**
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function manyFoundBody(array $rows): array
+    {
+        return $this->ok([
+            'data' => array_map(
+                fn (array $fieldData, int $i) => ['fieldData' => $fieldData, 'recordId' => (string) $i, 'modId' => '0'],
+                $rows,
+                array_keys($rows),
+            ),
+        ]);
+    }
+
+    /**
      * Reads fieldData off the wire. Decoded from the raw body rather than via $request[...]
      * because the client sends fieldData as a JSON object, not an array.
      *
@@ -119,6 +133,76 @@ class ShakeDesignClientTest extends TestCase
             // `==` not `=`: an exact whole-field match, so a zkp cannot resolve a
             // different record by word-boundary matching.
             return $request['query'] === [['zkp' => '==CPY-9']] && $request['limit'] === 1;
+        });
+    }
+
+    // --- project search -----------------------------------------------------------------
+
+    public function test_it_searches_projects_by_name_or_number(): void
+    {
+        Http::fake([
+            '*/sessions' => Http::response($this->sessionBody()),
+            '*/layouts/API_PRJ/_find' => Http::response($this->manyFoundBody([
+                ['zkp' => 'PRJ-1', 'Name' => 'Chantier Nord', 'Number' => '2026-001'],
+                ['zkp' => 'PRJ-2', 'Name' => 'Chantier Sud', 'Number' => '2026-002'],
+            ])),
+        ]);
+
+        $projects = $this->client()->searchProjects('Chantier');
+
+        $this->assertSame(['PRJ-1', 'PRJ-2'], array_column($projects, 'zkp'));
+    }
+
+    public function test_the_search_query_ors_name_and_number_and_is_limited(): void
+    {
+        Http::fake([
+            '*/sessions' => Http::response($this->sessionBody()),
+            '*/layouts/API_PRJ/_find' => Http::response($this->manyFoundBody([])),
+        ]);
+
+        $this->client()->searchProjects('nord', 10);
+
+        Http::assertSent(function (Request $request) {
+            if (! str_contains($request->url(), '/layouts/API_PRJ/_find')) {
+                return false;
+            }
+
+            // Two elements in `query` are OR'd by the Data API: a project whose Name
+            // contains the term, or whose Number does - not one requiring both.
+            return $request['query'] === [['Name' => '*nord*'], ['Number' => '*nord*']]
+                && $request['limit'] === 10;
+        });
+    }
+
+    public function test_a_search_matching_nothing_returns_an_empty_list(): void
+    {
+        Http::fake([
+            '*/sessions' => Http::response($this->sessionBody()),
+            '*/layouts/API_PRJ/_find' => Http::response(
+                $this->fmError('401', 'No records match the request'), 404
+            ),
+        ]);
+
+        $this->assertSame([], $this->client()->searchProjects('nothing matches this'));
+    }
+
+    public function test_the_search_term_is_escaped_against_filemaker_find_operators(): void
+    {
+        Http::fake([
+            '*/sessions' => Http::response($this->sessionBody()),
+            '*/layouts/API_PRJ/_find' => Http::response($this->manyFoundBody([])),
+        ]);
+
+        $this->client()->searchProjects('50% "special"');
+
+        Http::assertSent(function (Request $request) {
+            if (! str_contains($request->url(), '/layouts/API_PRJ/_find')) {
+                return false;
+            }
+
+            // The literal characters must survive escaped, not be interpreted as find
+            // operators (FileMaker has no `%` operator, but `"` and `=` are meaningful).
+            return $request['query'][0]['Name'] === '*50% \\"special\\"*';
         });
     }
 

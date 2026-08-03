@@ -32,6 +32,17 @@ class ShakeDesignClient
 
     private const LAYOUT_CONTACT = 'API_CTC';
 
+    /**
+     * JCPYCTC_JoinCompaniesContacts - which contacts belong to which company.
+     *
+     * Confirmed against the live layout, which exposes zkp, zkf_CPY and zkf_CTC. Only the two
+     * foreign keys are needed: contact names are resolved from API_CTC in a second call, so no
+     * related fields have to be added here. Note the layout does NOT expose `Role`, which the
+     * source table carries - contactsForCompany() therefore reports a null role rather than
+     * inventing one, and adding the field to the layout is all it would take to populate it.
+     */
+    private const LAYOUT_COMPANY_CONTACT = 'API_JCPYCTC';
+
     private const LAYOUT_VALUE = 'API_ZVAL';
 
     private const LAYOUT_USER = 'API_ZUSR';
@@ -129,6 +140,217 @@ class ShakeDesignClient
     public function findUserByZkp(string $zkp): ?array
     {
         return $this->findOneByKey(self::LAYOUT_USER, $zkp, 'user');
+    }
+
+    /**
+     * Projects whose Name or Number contains $term - the dashboard's project search.
+     *
+     * Name and Number are an inference, not a proven field list: API_PRJ is a
+     * to-be-built API layout (per the migration plan, "layouts dédiés à l'API...
+     * exposant uniquement les champs nécessaires"), and nothing in the export pins down
+     * which fields it exposes beyond zkp, which findProject() already relies on. Name and
+     * Number are PRJ_Projects' own plain identifying fields (ShakeDesign_boundary_tables.json),
+     * the two a person would actually type into a search box - confirm against the real
+     * layout before depending on this for anything beyond display.
+     *
+     * The two fields are OR'd: the Data API treats each element of `query` as a
+     * whole-record alternative, so this matches a project whose Name contains the term OR
+     * whose Number does, not one requiring both.
+     *
+     * @return list<array<string, mixed>> each element the matching project's fieldData,
+     *                                    empty when nothing matches
+     *
+     * @throws ShakeDesignApiException on a genuine failure (auth, transport, bad request)
+     */
+    public function searchProjects(string $term, int $limit = 25): array
+    {
+        $needle = $this->escapeFindValue(trim($term));
+
+        try {
+            $body = $this->send(
+                'post',
+                'layouts/'.self::LAYOUT_PROJECT.'/_find',
+                [
+                    'query' => [
+                        ['Name' => "*{$needle}*"],
+                        ['Number' => "*{$needle}*"],
+                    ],
+                    'limit' => $limit,
+                    'sort' => [['fieldName' => 'Name', 'sortOrder' => 'ascend']],
+                ],
+                'project search',
+            );
+        } catch (ShakeDesignApiException $e) {
+            if ($e->isNotFound()) {
+                return [];
+            }
+
+            throw $e;
+        }
+
+        return array_column($body['response']['data'] ?? [], 'fieldData');
+    }
+
+    /**
+     * Companies for the supplier picker, name-ordered.
+     *
+     * With no search term this lists records outright (GET records) rather than issuing a
+     * find, because the Data API has no "match everything" query - a `*` on a field would
+     * still exclude records where that field is empty.
+     *
+     * NOT filtered to suppliers or to active companies: API_CPY exposes neither isSupplier_b
+     * nor isActive_b (confirmed against the live layout, which carries zkp, Name, VAT, Phone1,
+     * LanguageMain and the billing address). Filtering on a field that is not there would mean
+     * inventing the criterion, so every company is listed and the caller sees all of them. Add
+     * those two fields to API_CPY and this can narrow.
+     *
+     * @return list<array<string, mixed>> each the company's fieldData; empty when nothing matches
+     *
+     * @throws ShakeDesignApiException on a genuine failure (auth, transport, bad request)
+     */
+    public function listCompanies(?string $term = null, int $limit = 200): array
+    {
+        $needle = trim((string) $term);
+
+        if ($needle === '') {
+            return $this->rows(
+                'get',
+                'layouts/'.self::LAYOUT_COMPANY.'/records',
+                [
+                    '_limit' => $limit,
+                    '_sort' => json_encode([['fieldName' => 'Name', 'sortOrder' => 'ascend']]),
+                ],
+                'company list',
+            );
+        }
+
+        return $this->rows(
+            'post',
+            'layouts/'.self::LAYOUT_COMPANY.'/_find',
+            [
+                'query' => [['Name' => '*'.$this->escapeFindValue($needle).'*']],
+                'limit' => $limit,
+                'sort' => [['fieldName' => 'Name', 'sortOrder' => 'ascend']],
+            ],
+            'company search',
+        );
+    }
+
+    /**
+     * The contacts linked to one company, through JCPYCTC_JoinCompaniesContacts.
+     *
+     * Two calls, whatever the number of contacts: one to read the join rows for this company,
+     * one to fetch every referenced contact at once - the Data API ORs the elements of
+     * `query`, so N contact keys become a single request rather than N lookups.
+     *
+     * `role` comes from the join's Role field, which API_JCPYCTC does not currently expose -
+     * so it is null in practice. Kept in the shape rather than dropped because the source
+     * table does carry it: adding Role to the layout starts populating this with no code
+     * change, and a null role is honest about not knowing rather than pretending there is none.
+     *
+     * @return list<array{zkp: string, name: string, role: ?string}> name-ordered
+     *
+     * @throws ShakeDesignApiException on a genuine failure, including the layout going missing
+     */
+    public function contactsForCompany(string $companyZkp, int $limit = 200): array
+    {
+        $joins = $this->rows(
+            'post',
+            'layouts/'.self::LAYOUT_COMPANY_CONTACT.'/_find',
+            [
+                'query' => [['zkf_CPY' => '=='.$this->escapeFindValue($companyZkp)]],
+                'limit' => $limit,
+            ],
+            'company-contact link lookup',
+        );
+
+        // zkf_CTC -> Role, keyed so a contact appearing twice cannot produce a duplicate row.
+        $roles = [];
+
+        foreach ($joins as $join) {
+            $contactZkp = trim((string) ($join['zkf_CTC'] ?? ''));
+
+            if ($contactZkp !== '') {
+                $roles[$contactZkp] ??= is_scalar($join['Role'] ?? null) && (string) $join['Role'] !== ''
+                    ? (string) $join['Role']
+                    : null;
+            }
+        }
+
+        if ($roles === []) {
+            return [];
+        }
+
+        $contacts = $this->rows(
+            'post',
+            'layouts/'.self::LAYOUT_CONTACT.'/_find',
+            [
+                'query' => array_values(array_map(
+                    fn (string $zkp) => [self::KEY_FIELD => '=='.$this->escapeFindValue($zkp)],
+                    array_keys($roles),
+                )),
+                'limit' => $limit,
+            ],
+            'contact lookup',
+        );
+
+        $resolved = [];
+
+        foreach ($contacts as $contact) {
+            $zkp = trim((string) ($contact[self::KEY_FIELD] ?? ''));
+
+            if ($zkp === '') {
+                continue;
+            }
+
+            $resolved[] = [
+                'zkp' => $zkp,
+                'name' => self::contactName($contact),
+                'role' => $roles[$zkp] ?? null,
+            ];
+        }
+
+        usort($resolved, fn (array $a, array $b) => strcasecmp($a['name'], $b['name']));
+
+        return $resolved;
+    }
+
+    /**
+     * API_CTC exposes NameFirst and NameLast separately - there is no combined field on it -
+     * so the display name is assembled here rather than read.
+     *
+     * @param  array<string, mixed>  $contact
+     */
+    public static function contactName(array $contact): string
+    {
+        $name = trim(implode(' ', array_filter([
+            trim((string) ($contact['NameFirst'] ?? '')),
+            trim((string) ($contact['NameLast'] ?? '')),
+        ], fn (string $part) => $part !== '')));
+
+        return $name === '' ? 'Contact sans nom' : $name;
+    }
+
+    /**
+     * A list read where matching nothing is a normal outcome, not a failure - the same
+     * FileMaker error 401 that findOneByKey() swallows, surfaced as an empty list.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return list<array<string, mixed>>
+     */
+    private function rows(string $method, string $path, array $payload, string $context): array
+    {
+        try {
+            $body = $this->send($method, $path, $payload, $context);
+        } catch (ShakeDesignApiException $e) {
+            if ($e->isNotFound()) {
+                return [];
+            }
+
+            throw $e;
+        }
+
+        return array_values(array_column($body['response']['data'] ?? [], 'fieldData'));
     }
 
     /**
