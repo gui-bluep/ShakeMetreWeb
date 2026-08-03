@@ -1,10 +1,14 @@
 <?php
 
 use App\Http\Controllers\Auth\SsoConsumeController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LotController;
 use App\Http\Controllers\MetreLineComponentController;
 use App\Http\Controllers\MetreLineController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectSearchController;
+use App\Http\Controllers\ShakeDesignLookupController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -16,7 +20,23 @@ Route::get('/', function () {
 })->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/dashboard', fn () => Inertia::render('Dashboard'))->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Backs the dashboard's search box - a plain read against ShakeDesign, open to a
+    // readonly account like any other lookup.
+    Route::get('/api/projects/search', ProjectSearchController::class)->name('projects.search');
+});
+
+/*
+| ShakeDesign lookups behind the company / contact pickers. Reads only, so no role.write -
+| choosing a value is a write, but that goes through PATCH /api/lots/{lot}, which is gated.
+*/
+Route::middleware('auth')->group(function () {
+    Route::get('/api/shakedesign/companies', [ShakeDesignLookupController::class, 'companies'])
+        ->name('shakedesign.companies');
+
+    Route::get('/api/shakedesign/companies/{company}/contacts', [ShakeDesignLookupController::class, 'contacts'])
+        ->name('shakedesign.company-contacts');
 });
 
 Route::middleware('auth')->group(function () {
@@ -67,6 +87,30 @@ Route::middleware('auth')->group(function () {
 });
 
 /*
+| A project's own métrés and lots. `project` is a bare ShakeDesign zkp, not a local model -
+| PRJ_Projects has no local table - so there is no route-model binding to reject an unknown
+| one with; see ProjectController for why that is fine here.
+|
+| storeMetre redirects back to the page (an Inertia form post, validation errors flash to
+| the session) while storeLot answers JSON (the "manage lots" panel appends the row itself
+| without a page visit) - which is why the latter lives under /api: this app renders
+| validation failures as JSON only for that prefix (see bootstrap/app.php,
+| shouldRenderJsonWhen), the same rule every other JSON endpoint here follows.
+*/
+Route::middleware('auth')->group(function () {
+    Route::get('/projects/{project}', [ProjectController::class, 'show'])
+        ->name('projects.show');
+
+    Route::middleware('role.write')->group(function () {
+        Route::post('/projects/{project}/metres', [ProjectController::class, 'storeMetre'])
+            ->name('projects.metres.store');
+
+        Route::post('/api/projects/{project}/lots', [ProjectController::class, 'storeLot'])
+            ->name('projects.lots.store');
+    });
+});
+
+/*
 | Supplier tender comparison for one lot. Reading (the page itself and the scoring refresh)
 | is open to a readonly account like the rest of the app; the weighting patch and the award
 | both go through role.write, same guarantee as the grid.
@@ -81,6 +125,9 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role.write')->group(function () {
         Route::patch('/api/lots/{lot}', [LotController::class, 'update'])
             ->name('lots.update');
+
+        Route::delete('/api/lots/{lot}', [LotController::class, 'destroy'])
+            ->name('lots.destroy');
 
         Route::post('/api/lots/{lot}/tender-award', [LotController::class, 'award'])
             ->name('lots.tender-award');

@@ -160,11 +160,40 @@ class LotTenderComparisonTest extends TestCase
     {
         $this->actAsWriter();
 
-        $this->patchJson("/api/lots/{$this->lot->id}", ['company_id' => 'CPY-9'])
+        $this->patchJson("/api/lots/{$this->lot->id}", ['project_id' => 'PRJ-9'])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['company_id']);
+            ->assertJsonValidationErrors(['project_id']);
 
-        $this->assertNull($this->lot->fresh()->company_id);
+        $this->assertSame('PRJ-1', $this->lot->fresh()->project_id);
+    }
+
+    /**
+     * title_custom, the language titles, code, and the assigned supplier/contact are the
+     * project page's "manage lots" panel writing through this same endpoint - one whitelist
+     * for the whole Lot, not a second one that could disagree with this one about what is
+     * editable.
+     */
+    public function test_the_lot_identity_fields_are_editable_through_the_same_endpoint(): void
+    {
+        $this->actAsWriter();
+
+        $this->patchJson("/api/lots/{$this->lot->id}", [
+            'title_custom' => 'Gros oeuvre',
+            'title_fr' => 'Gros oeuvre FR',
+            'title_en' => 'Shell and core',
+            'title_nl' => 'Ruwbouw',
+            'code' => 7,
+            'company_id' => 'CPY-9',
+            'contact_id' => 'CTC-3',
+        ])->assertOk();
+
+        $fresh = $this->lot->fresh();
+        $this->assertSame('Gros oeuvre FR', $fresh->title_fr);
+        $this->assertSame('Shell and core', $fresh->title_en);
+        $this->assertSame('Ruwbouw', $fresh->title_nl);
+        $this->assertSame('CPY-9', $fresh->company_id);
+        $this->assertSame('CTC-3', $fresh->contact_id);
+        $this->assertSame(7, $fresh->code);
     }
 
     public function test_a_note_outside_zero_to_a_hundred_is_rejected(): void
@@ -236,5 +265,39 @@ class LotTenderComparisonTest extends TestCase
             'supplier_number' => 1,
             'company_id' => 'CPY-1',
         ])->assertStatus(403);
+    }
+
+    // --- delete -----------------------------------------------------------------------------
+
+    public function test_deleting_an_empty_lot_succeeds(): void
+    {
+        $this->actAsWriter();
+
+        $this->deleteJson("/api/lots/{$this->lot->id}")->assertNoContent();
+        $this->assertDatabaseMissing('lots', ['id' => $this->lot->id]);
+    }
+
+    /**
+     * A tender line's lot_id is data - which lot it was compared under - so deleting the lot
+     * out from under it is refused rather than silently orphaning or cascading.
+     */
+    public function test_deleting_a_lot_with_metre_lines_is_refused(): void
+    {
+        $this->actAsWriter();
+        $this->line();
+
+        $this->deleteJson("/api/lots/{$this->lot->id}")
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Ce lot contient des lignes de métré et ne peut pas être supprimé.');
+
+        $this->assertDatabaseHas('lots', ['id' => $this->lot->id]);
+    }
+
+    public function test_a_readonly_account_cannot_delete_a_lot(): void
+    {
+        $this->actAsReadOnly();
+
+        $this->deleteJson("/api/lots/{$this->lot->id}")->assertStatus(403);
+        $this->assertDatabaseHas('lots', ['id' => $this->lot->id]);
     }
 }
