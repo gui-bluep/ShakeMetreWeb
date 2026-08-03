@@ -182,8 +182,15 @@ class RecalculateMetreTotals implements ShouldBeUniqueUntilProcessing, ShouldQue
     /**
      * FileMaker `<amount> * <boolean flag>`: an empty amount multiplied by a flag yields 0,
      * so a never-computed base column resolves to 0 rather than null.
+     *
+     * The flag is nullable, not just falsy-able. A Metre built by forceCreate() carries only
+     * the attributes that were passed, so a boolean column left to its database default reads
+     * as null on that instance rather than false - and a strict `bool` parameter turned that
+     * into a TypeError the moment this job was handed a freshly-created métré instead of one
+     * read back from the database. Null means "not set", which is false here, matching
+     * FileMaker treating an empty flag as 0.
      */
-    private function validated(?float $amount, bool $flag): float
+    private function validated(?float $amount, ?bool $flag): float
     {
         return ($amount ?? 0.0) * ($flag ? 1 : 0);
     }
