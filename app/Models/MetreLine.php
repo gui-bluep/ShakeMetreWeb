@@ -107,29 +107,31 @@ class MetreLine extends Model
     /**
      * METL_MetreLines::TENDER_BestPrice_c - the cheapest quote on this line.
      *
-     * The source reads:
+     * The un-truncated export reads:
      *
      *     Let ( [ _min = Min ( TENDER_Supp1_TotalPrice_c ; ... ; TENDER_Supp5_TotalPrice_c ) ] ;
-     *       Case ( <<truncated in the export>>
+     *       Case ( isTenderLine_b ; 0 ; _min ) )
      *
-     * Two things about that, both of which the implementation has to decide without the source:
+     * Read literally, a tender line scores 0 here - the opposite of what the name and every
+     * caller expect, since it is exactly the tender lines this metric exists to compare, and a
+     * lot made up entirely of tender lines would benchmark at zero. isTenderLine_b carries no
+     * formula and no comment anywhere else in the export, so there is nothing to confirm which
+     * reading - or which polarity - is intended.
      *
-     *  - The export caps every calculation at 250 characters, and this one is cut off exactly at
-     *    its Case condition. The `is_tender_line_b` guard below is what the requirement
-     *    specified, not something the export confirms - no formula in it references that field
-     *    at all.
-     *  - A supplier who has not quoted totals 0, and 0 is not empty, so a literal Min over the
-     *    five values would return 0 as soon as one supplier is missing - collapsing every
-     *    percentage that divides by it. Suppliers who did not quote are therefore excluded.
-     *    Whatever the truncated Case does, it must do something equivalent, or the metric
-     *    could not work at all.
+     * The deliberate choice here is to drop the guard rather than reproduce it: this method
+     * computes the per-line minimum unconditionally, and callers filter is_tender_line_b at the
+     * query that selects which lines to compare (the tender-comparison endpoint), never inside
+     * the price calculation itself. That keeps a single, unconditional meaning for "the cheapest
+     * quote on this line" regardless of what the flag turns out to mean.
+     *
+     * Separately: a supplier who has not quoted totals 0, and 0 is not empty, so a literal Min
+     * over the five values would return 0 as soon as one supplier is missing - collapsing every
+     * percentage that divides by it. Suppliers who did not quote are therefore excluded from
+     * the minimum; whatever the source's own Min does, it must do something equivalent, or the
+     * metric could not work at all.
      */
     public function bestPriceAmongSuppliers(): ?float
     {
-        if (! $this->is_tender_line_b) {
-            return 0.0;
-        }
-
         $quoted = array_filter(
             array_map(fn (int $n) => $this->totalPriceForSupplier($n), self::SUPPLIER_SLOTS),
             fn (?float $total) => $total !== null && $total > 0,

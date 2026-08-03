@@ -166,11 +166,17 @@ class TenderScoringTest extends TestCase
         $this->assertSame(80.0, $line->bestPriceAmongSuppliers());
     }
 
-    public function test_a_line_outside_the_tender_has_no_best_price(): void
+    public function test_the_best_price_does_not_depend_on_is_tender_line_b(): void
     {
-        $line = $this->line([1 => ['qty' => 10, 'price' => 10]], ['is_tender_line_b' => false]);
+        // isTenderLine_b carries no formula anywhere in the export and its two readings
+        // disagree on polarity; bestPriceAmongSuppliers() computes the same per-line minimum
+        // regardless of the flag. Filtering which lines belong to a tender comparison is the
+        // caller's job (the query that selects is_tender_line_b = true rows), not this method's.
+        $onTender = $this->line([1 => ['qty' => 10, 'price' => 10]], ['is_tender_line_b' => true]);
+        $offTender = $this->line([1 => ['qty' => 10, 'price' => 10]], ['is_tender_line_b' => false]);
 
-        $this->assertSame(0.0, $line->bestPriceAmongSuppliers());
+        $this->assertSame(100.0, $onTender->bestPriceAmongSuppliers());
+        $this->assertSame(100.0, $offTender->bestPriceAmongSuppliers());
     }
 
     public function test_the_per_line_percentage_is_relative_to_that_line(): void
