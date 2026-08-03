@@ -10,6 +10,7 @@ use App\Services\Sso\SsoTicket;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -234,6 +235,13 @@ class SsoTicketTest extends TestCase
             // FileMaker's built-in sets are bracketed; ShakeDesign's custom ones are not.
             'Full Access' => ['[Full Access]', UserRole::Admin],
             'Admin' => ['Admin', UserRole::Admin],
+            // The real spelling on the live API_ZUSR layout - French, not English. Its absence
+            // silently demoted a full-privilege account to readonly, which surfaced far away
+            // as "every field in the app is greyed out".
+            'Administrateur' => ['Administrateur', UserRole::Admin],
+            // Manager writes like Admin and User; it maps to the lesser of the two writing
+            // roles so a future admin-only power is not inherited by accident.
+            'Manager' => ['Manager', UserRole::User],
             'User' => ['User', UserRole::User],
             'Read-Only Access' => ['[Read-Only Access]', UserRole::ReadOnly],
             // Anything unrecognised must land on the least privilege, never admin.
@@ -241,6 +249,36 @@ class SsoTicketTest extends TestCase
             'Data Entry Only is not mapped yet' => ['[Data Entry Only]', UserRole::ReadOnly],
             'empty' => ['', UserRole::ReadOnly],
         ];
+    }
+
+    /**
+     * The safe default is right but was silent; an account merely spelled differently than
+     * expected became readonly with nothing anywhere naming the value that was rejected.
+     */
+    public function test_an_unrecognised_privilege_set_is_logged_with_its_value(): void
+    {
+        Log::shouldReceive('warning')
+            ->once()
+            ->withArgs(fn (string $message, array $context) => str_contains($message, 'not recognised')
+                && $context['privilege_set'] === 'Superviseur');
+
+        $this->assertSame(UserRole::ReadOnly, UserRole::fromPrivilegeSet('Superviseur'));
+    }
+
+    public function test_a_missing_privilege_set_is_logged_as_absent_rather_than_unknown(): void
+    {
+        Log::shouldReceive('warning')
+            ->once()
+            ->withArgs(fn (string $message, array $context) => str_contains($context['privilege_set'], 'absent'));
+
+        $this->assertSame(UserRole::ReadOnly, UserRole::fromPrivilegeSet(null));
+    }
+
+    public function test_a_recognised_privilege_set_logs_nothing(): void
+    {
+        Log::shouldReceive('warning')->never();
+
+        $this->assertSame(UserRole::Admin, UserRole::fromPrivilegeSet('Administrateur'));
     }
 
     #[DataProvider('privilegeSetProvider')]
@@ -263,6 +301,32 @@ class SsoTicketTest extends TestCase
         $this->issue()->assertOk();
 
         $this->assertFalse(User::where('shakedesign_user_id', self::ZKP)->sole()->canWrite());
+    }
+
+    /** All three of ShakeDesign's custom privilege sets are meant to write. */
+    #[DataProvider('writingPrivilegeSetProvider')]
+    public function test_every_shakedesign_privilege_set_can_write(string $privilegeSet): void
+    {
+        $this->actingAsSsoMachine();
+        $this->fakeShakeDesignAccount(['PrivilegeSet' => $privilegeSet]);
+
+        $this->issue()->assertOk();
+
+        $this->assertTrue(
+            User::where('shakedesign_user_id', self::ZKP)->sole()->canWrite(),
+            "{$privilegeSet} should be able to write",
+        );
+    }
+
+    /** @return array<string, array{string}> */
+    public static function writingPrivilegeSetProvider(): array
+    {
+        return [
+            'Admin' => ['Admin'],
+            'Administrateur' => ['Administrateur'],
+            'Manager' => ['Manager'],
+            'User' => ['User'],
+        ];
     }
 
     // --- provisioning the Laravel user -------------------------------------------------
