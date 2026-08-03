@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Head, usePage } from '@inertiajs/vue3';
 import { useDebouncedRowSave } from '../../composables/useDebouncedRowSave';
 
@@ -56,6 +56,17 @@ function cloneLine(line) {
 const lot = ref(cloneLot(props.lot));
 const scoring = ref(cloneScoring(props.scoring));
 const lines = ref(props.lines.map(cloneLine));
+
+// Same reason as elsewhere: a working copy seeded once at setup would survive a navigation to
+// another lot and show that lot's predecessor while writing to the new one.
+watch(
+    () => props.lot.id,
+    () => {
+        lot.value = cloneLot(props.lot);
+        scoring.value = cloneScoring(props.scoring);
+        lines.value = props.lines.map(cloneLine);
+    }
+);
 
 /** Which of the five slots actually hold a candidate supplier - fixed for the page's lifetime. */
 const suppliers = props.suppliers;

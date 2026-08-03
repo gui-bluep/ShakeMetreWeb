@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, ref } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
@@ -23,6 +23,14 @@ const readOnly = () => page.props.auth?.canWrite === false;
 // Mutable local copy: LotManagerModal creates and edits lots in place (by reference), so
 // the sidebar list below reflects them immediately without a page visit.
 const lots = ref(props.lots.map((lot) => ({ ...lot })));
+
+// Re-seeded when the page is pointed at a different project: Inertia can reuse this component
+// across a navigation, and a working copy seeded once at setup would keep showing the previous
+// project's lots while every write targeted the new one.
+watch(
+    () => props.project.id,
+    () => { lots.value = props.lots.map((lot) => ({ ...lot })); }
+);
 
 // --- create métré ------------------------------------------------------------------------
 
@@ -121,8 +129,10 @@ function shortId(id) {
                             <tr v-for="metre in metres" :key="metre.id" class="border-b border-gray-100 hover:bg-blue-50/30">
                                 <td class="px-3 py-2 font-mono text-gray-400" :title="metre.id">{{ shortId(metre.id) }}</td>
                                 <td class="px-3 py-2">
+                                    <!-- The métré's own page, not straight to the line grid: the
+                                         grid is one of the views reachable from there. -->
                                     <Link
-                                        :href="`/metres/${metre.id}/lines`"
+                                        :href="`/metres/${metre.id}`"
                                         class="font-medium text-gray-900 hover:text-blue-600 hover:underline"
                                     >
                                         {{ metre.name || 'Métré sans nom' }}
