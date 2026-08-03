@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\SsoConsumeController;
+use App\Http\Controllers\LotController;
 use App\Http\Controllers\MetreLineComponentController;
 use App\Http\Controllers\MetreLineController;
 use App\Http\Controllers\ProfileController;
@@ -62,6 +63,27 @@ Route::middleware('auth')->group(function () {
 
         Route::delete('/api/metre-line-components/{metreLineComponent}', [MetreLineComponentController::class, 'destroy'])
             ->name('metre-line-components.destroy');
+    });
+});
+
+/*
+| Supplier tender comparison for one lot. Reading (the page itself and the scoring refresh)
+| is open to a readonly account like the rest of the app; the weighting patch and the award
+| both go through role.write, same guarantee as the grid.
+*/
+Route::middleware('auth')->group(function () {
+    Route::get('/lots/{lot}/tender-comparison', [LotController::class, 'show'])
+        ->name('lots.tender-comparison');
+
+    Route::get('/api/lots/{lot}/tender-scoring', [LotController::class, 'scoring'])
+        ->name('lots.tender-scoring');
+
+    Route::middleware('role.write')->group(function () {
+        Route::patch('/api/lots/{lot}', [LotController::class, 'update'])
+            ->name('lots.update');
+
+        Route::post('/api/lots/{lot}/tender-award', [LotController::class, 'award'])
+            ->name('lots.tender-award');
     });
 });
 

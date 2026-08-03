@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\MetreLine;
 use App\Models\SubReference;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -35,6 +36,19 @@ class UpdateMetreLineRequest extends FormRequest
         'price_ordered',
         'price_buy',
         'is_option_b',
+
+        // The five candidate suppliers' quotes on this line, edited from the tender
+        // comparison screen rather than the main grid.
+        'tender_supp1_price',
+        'tender_supp1_quantity',
+        'tender_supp2_price',
+        'tender_supp2_quantity',
+        'tender_supp3_price',
+        'tender_supp3_quantity',
+        'tender_supp4_price',
+        'tender_supp4_quantity',
+        'tender_supp5_price',
+        'tender_supp5_quantity',
     ];
 
     /** Derived per-line values: unstored calculations with no column behind them. */
@@ -46,7 +60,7 @@ class UpdateMetreLineRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        $rules = [
             'reference_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('metre_references', 'id')],
             'sub_reference_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('sub_references', 'id')],
             'description' => ['sometimes', 'nullable', 'string', 'max:65535'],
@@ -57,6 +71,13 @@ class UpdateMetreLineRequest extends FormRequest
             'price_buy' => ['sometimes', 'nullable', 'numeric', 'between:-99999999.9999,99999999.9999'],
             'is_option_b' => ['sometimes', 'boolean'],
         ];
+
+        foreach (MetreLine::SUPPLIER_SLOTS as $supplier) {
+            $rules["tender_supp{$supplier}_price"] = ['sometimes', 'nullable', 'numeric', 'between:-99999999.9999,99999999.9999'];
+            $rules["tender_supp{$supplier}_quantity"] = ['sometimes', 'nullable', 'numeric', 'between:-99999999.9999,99999999.9999'];
+        }
+
+        return $rules;
     }
 
     /**
