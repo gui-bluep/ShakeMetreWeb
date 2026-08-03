@@ -143,7 +143,16 @@ const DOCUMENTS = [
     'Fournisseur — budget achats',
 ];
 
-const VIEWS = ['Achats — Ventes', 'Achats — Commandes', 'Achats — Ventes — Commandes', 'Ventes'];
+/**
+ * `href` is set only for the views that exist. The rest render disabled, so the page shows the
+ * full set it will eventually offer instead of looking finished with three of them missing.
+ */
+const VIEWS = [
+    { label: 'Achats — Ventes', href: null },
+    { label: 'Achats — Commandes', href: null },
+    { label: 'Achats — Ventes — Commandes', href: `/metres/${props.metre.id}/lines/achats-ventes-commandes` },
+    { label: 'Ventes', href: null },
+];
 
 // --- display ------------------------------------------------------------------------------
 
@@ -350,9 +359,18 @@ function money(value) {
                         <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Vues du métré</h3>
 
                         <div class="mt-3 flex flex-col items-start gap-2">
-                            <SecondaryButton v-for="view in VIEWS" :key="view" disabled title="Pas encore disponible">
-                                {{ view }}
-                            </SecondaryButton>
+                            <template v-for="view in VIEWS" :key="view.label">
+                                <Link
+                                    v-if="view.href"
+                                    :href="view.href"
+                                    class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition hover:bg-gray-50"
+                                >
+                                    {{ view.label }}
+                                </Link>
+                                <SecondaryButton v-else disabled title="Pas encore disponible">
+                                    {{ view.label }}
+                                </SecondaryButton>
+                            </template>
                         </div>
                     </section>
                 </div>

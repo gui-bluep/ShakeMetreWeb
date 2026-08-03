@@ -65,6 +65,47 @@ class MetreLine extends Model
             : round((float) $this->price_ordered * (float) $this->quantity_ordered, 2));
     }
 
+    /**
+     * PriceTotalBuy_noOptions_c: Case ( isOption_b ; 0 ; Round ( PriceBuy * Quantity ; 2 ) )
+     *
+     * Note the multiplier is Quantity, the same column PriceTotalSales uses - PriceBuy has no
+     * quantity of its own. Only the ordered total has a separate one (QuantityOrdered).
+     */
+    protected function priceTotalBuyNoOptions(): Attribute
+    {
+        return Attribute::get(fn (): float => $this->is_option_b
+            ? 0.0
+            : round((float) $this->price_buy * (float) $this->quantity, 2));
+    }
+
+    /**
+     * The line's margin ratio: unit price sold to the client over unit purchase price.
+     *
+     * Derived, never stored. METL_MetreLines carries a `Ratio` column - a plain Number with no
+     * formula anywhere in the export, so nothing could say what maintained it - and this
+     * deliberately replaces it rather than reading it: a value computed from the two prices
+     * beside it cannot drift out of step with them, which a stored copy can. The column is left
+     * untouched in the database, holding whatever FileMaker put there.
+     *
+     * Null rather than a number when either price is absent, and null rather than an error when
+     * the purchase price is zero - the same guard, and the same reasoning, as MET_Metre::Ratio_c
+     * (`Case ( not IsEmpty ( a ) and not IsEmpty ( b ) ; ... ; "" )`). A sales price of exactly 0
+     * is a real answer, not an absent one, so it yields 0.
+     */
+    protected function priceRatio(): Attribute
+    {
+        return Attribute::get(function (): ?float {
+            $sales = $this->price_sales;
+            $buy = $this->price_buy;
+
+            if ($sales === null || $buy === null || (float) $buy === 0.0) {
+                return null;
+            }
+
+            return round((float) $sales / (float) $buy, 2);
+        });
+    }
+
     /** PriceTotalGain_noOptions_c: PriceTotalSales_noOptions_c - PriceTotalOrdered_noOptions_c */
     protected function priceTotalGainNoOptions(): Attribute
     {

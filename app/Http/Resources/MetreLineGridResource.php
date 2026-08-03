@@ -34,8 +34,17 @@ class MetreLineGridResource extends JsonResource
             'price_buy' => $this->number($this->price_buy),
             'is_option_b' => (bool) $this->is_option_b,
 
-            // Read-only: unstored FileMaker calculations, no column behind them.
+            /*
+             * Read-only: unstored FileMaker calculations, no column behind them.
+             *
+             * The buy total is here even though this grid does not show it, because this is the
+             * response the shared PATCH /api/metre-lines/{id} returns - and the Achats/Ventes/
+             * Commandes view, which does show it, replaces its whole `computed` block from that
+             * response. Omitting one made that view's Achats total blank itself on every save.
+             */
             'computed' => [
+                'price_ratio' => $this->price_ratio,
+                'price_total_buy_no_options' => $this->price_total_buy_no_options,
                 'price_total_sales_no_options' => $this->price_total_sales_no_options,
                 'price_total_ordered_no_options' => $this->price_total_ordered_no_options,
                 'price_total_gain_no_options' => $this->price_total_gain_no_options,

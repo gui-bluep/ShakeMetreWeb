@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Lot;
 use App\Models\MetreLine;
 use App\Models\SubReference;
 use Illuminate\Contracts\Validation\Validator;
@@ -37,6 +38,15 @@ class UpdateMetreLineRequest extends FormRequest
         'price_buy',
         'is_option_b',
 
+        // The Achats/Ventes/Commandes view edits these too.
+        'unit',
+        'is_estimated_price_b',
+        'is_delivered_b',
+        'comment_client',
+        'comment_supplier',
+        // Which lot the line belongs to; constrained to the métré's own project below.
+        'lot_id',
+
         // The five candidate suppliers' quotes on this line, edited from the tender
         // comparison screen rather than the main grid.
         'tender_supp1_price',
@@ -51,8 +61,18 @@ class UpdateMetreLineRequest extends FormRequest
         'tender_supp5_quantity',
     ];
 
+    /**
+     * The units the interface offers. METL_MetreLines::Unit is backed by the `c_Units` value
+     * list, which the export names but gives no values for - so this list is the interface
+     * spec's, and "pm" matters beyond labelling: it is the unit the auto-enter rule empties both
+     * quantities for (see MetreLineObserver::saving()).
+     */
+    public const UNITS = ['m\'', 'm2', 'm3', 'Ff', 'Pce', 'Pm'];
+
     /** Derived per-line values: unstored calculations with no column behind them. */
     private const COMPUTED = [
+        'price_ratio',
+        'price_total_buy_no_options',
         'price_total_sales_no_options',
         'price_total_ordered_no_options',
         'price_total_gain_no_options',
@@ -70,6 +90,14 @@ class UpdateMetreLineRequest extends FormRequest
             'price_ordered' => ['sometimes', 'nullable', 'numeric', 'between:-99999999.9999,99999999.9999'],
             'price_buy' => ['sometimes', 'nullable', 'numeric', 'between:-99999999.9999,99999999.9999'],
             'is_option_b' => ['sometimes', 'boolean'],
+            // The value list c_Units exists in the source but the export carries no values for
+            // it, so this set comes from the interface spec, not from the FileMaker file.
+            'unit' => ['sometimes', 'nullable', Rule::in(self::UNITS)],
+            'is_estimated_price_b' => ['sometimes', 'boolean'],
+            'is_delivered_b' => ['sometimes', 'boolean'],
+            'comment_client' => ['sometimes', 'nullable', 'string', 'max:65535'],
+            'comment_supplier' => ['sometimes', 'nullable', 'string', 'max:65535'],
+            'lot_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('lots', 'id')],
         ];
 
         foreach (MetreLine::SUPPLIER_SLOTS as $supplier) {
@@ -88,7 +116,40 @@ class UpdateMetreLineRequest extends FormRequest
         return [
             $this->rejectNonEditableKeys(),
             $this->rejectSubReferenceFromAnotherReference(),
+            $this->rejectLotFromAnotherProject(),
         ];
+    }
+
+    /**
+     * A line may only be assigned to a lot of its own métré's project.
+     *
+     * The picker offers exactly those, so this is not about the interface - it is that lot_id is
+     * how the tender scoring finds its lines (Lot::sumForSupplier sums every metre_line carrying
+     * the lot's id). A line attached across projects would silently enter another project's
+     * tender comparison and change what a supplier appears to have quoted.
+     */
+    private function rejectLotFromAnotherProject(): callable
+    {
+        return function (Validator $validator) {
+            $lotId = $this->input('lot_id');
+
+            if (! $this->has('lot_id') || $lotId === null) {
+                return;
+            }
+
+            $project = $this->route('metreLine')?->metre?->project_id;
+
+            if ($project === null) {
+                return;
+            }
+
+            if (! Lot::whereKey($lotId)->where('project_id', $project)->exists()) {
+                $validator->errors()->add(
+                    'lot_id',
+                    'The selected lot belongs to a different project than this line\'s métré.',
+                );
+            }
+        };
     }
 
     private function rejectNonEditableKeys(): callable

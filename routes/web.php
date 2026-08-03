@@ -6,6 +6,7 @@ use App\Http\Controllers\LotController;
 use App\Http\Controllers\MetreController;
 use App\Http\Controllers\MetreLineComponentController;
 use App\Http\Controllers\MetreLineController;
+use App\Http\Controllers\MetreLineDetailController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectSearchController;
@@ -65,6 +66,26 @@ Route::middleware('auth')->group(function () {
         Route::patch('/api/metres/{metre}', [MetreController::class, 'update'])->name('metres.update');
         Route::post('/metres/{metre}/duplicate', [MetreController::class, 'duplicate'])->name('metres.duplicate');
         Route::delete('/metres/{metre}', [MetreController::class, 'destroy'])->name('metres.destroy');
+    });
+});
+
+/*
+| The "Achats — Ventes — Commandes" view of a métré's lines. Cell edits go through the existing
+| PATCH /api/metre-lines/{id} below; only create/duplicate/delete are new here.
+*/
+Route::middleware('auth')->group(function () {
+    Route::get('/metres/{metre}/lines/achats-ventes-commandes', [MetreLineDetailController::class, 'show'])
+        ->name('metres.lines.detail');
+
+    Route::middleware('role.write')->group(function () {
+        Route::post('/api/metres/{metre}/lines', [MetreLineDetailController::class, 'store'])
+            ->name('metre-lines.store');
+
+        Route::post('/api/metre-lines/{metreLine}/duplicate', [MetreLineDetailController::class, 'duplicate'])
+            ->name('metre-lines.duplicate');
+
+        Route::delete('/api/metre-lines/{metreLine}', [MetreLineDetailController::class, 'destroy'])
+            ->name('metre-lines.destroy');
     });
 });
 
