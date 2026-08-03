@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Models\MetreLine;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Attributes\PreserveKeys;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
@@ -17,8 +18,15 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * `total` is MetreLine::totalPriceForSupplier(), read-only: quoting price and quantity are
  * editable through PATCH /api/metre-lines/{id}, the total is computed from them.
  *
+ * `quotes` is keyed 1-5 by supplier slot, not a plain list: without #[PreserveKeys],
+ * JsonResource::removeMissingValues() treats an all-numeric-keyed array as a list and
+ * renumbers it from 0, which would silently detach slot 3 (say) from key 3 and shift every
+ * slot after a gap - here there is no gap, but the corruption is the same either way, and it
+ * showed up as suppliers seeing each other's quotes in the browser before this was added.
+ *
  * @mixin MetreLine
  */
+#[PreserveKeys]
 class TenderMetreLineResource extends JsonResource
 {
     public function toArray(Request $request): array
