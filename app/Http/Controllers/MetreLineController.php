@@ -30,15 +30,24 @@ class MetreLineController extends Controller
             // hundreds of lines costs one extra query instead of one per line.
             ->withCount('metreLineComponents')
             /*
-             * L'ordre d'affichage d'un métré, celui de METL_Sort : section, sous-section, puis
-             * rang dans la sous-section (REF_Code, REFS_Code, REFS_Title, Order). Les lignes sans
-             * section passent à la fin et gardent leur propre ordre - `sort_order` reste le rang
-             * libre d'une ligne dans le métré, et sert ici de départage.
+             * L'ordre d'affichage d'un métré, celui de METL_Sort tel que l'appellent les écrans de
+             * travail (METL_TRI__OnLayoutEnter, METL_GoTo, METL_New) :
              *
-             * `ref_code is null` en tête du ORDER BY plutôt qu'un NULLS LAST : l'expression doit
-             * dire la même chose sur MySQL et sur SQLite.
+             *     REF_Code, REFS_Code, REFS_Title, Order, REFSL_Code_c
+             *
+             * Croissant et sans traitement particulier des vides, donc une ligne sans section
+             * passe en tête - c'est ce que fait FileMaker, où un nombre vide se trie avant 0.
+             * `sort_order` ne départage plus que les lignes de même rang.
+             *
+             * Les deux variantes du tri source ne sont PAS reprises ici : `isOption_b` en premier
+             * n'est utilisé que par l'offre client, la comptabilité et les impressions, et le tri
+             * par TAG_Choice1/2 dépend de MET::Sort_OrderTags, qui appartient au bascule
+             * Lots/Tags dont le rôle reste à définir.
              */
-            ->orderByRaw('ref_code is null, ref_code, refs_code, refs_title, ref_order')
+            ->orderBy('ref_code')
+            ->orderBy('refs_code')
+            ->orderBy('refs_title')
+            ->orderBy('ref_order')
             ->orderBy('sort_order')
             ->orderBy('sequence_number')
             ->get();

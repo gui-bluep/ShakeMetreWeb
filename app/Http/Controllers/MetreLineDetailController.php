@@ -49,6 +49,25 @@ class MetreLineDetailController extends Controller
     {
         $lines = $metre->metreLines()
             ->with('lot')
+            /*
+             * L'ordre d'affichage d'un métré, celui de METL_Sort tel que l'appellent les écrans de
+             * travail (METL_TRI__OnLayoutEnter, METL_GoTo, METL_New) :
+             *
+             *     REF_Code, REFS_Code, REFS_Title, Order, REFSL_Code_c
+             *
+             * Croissant et sans traitement particulier des vides, donc une ligne sans section
+             * passe en tête - c'est ce que fait FileMaker, où un nombre vide se trie avant 0.
+             * `sort_order` ne départage plus que les lignes de même rang.
+             *
+             * Les deux variantes du tri source ne sont PAS reprises ici : `isOption_b` en premier
+             * n'est utilisé que par l'offre client, la comptabilité et les impressions, et le tri
+             * par TAG_Choice1/2 dépend de MET::Sort_OrderTags, qui appartient au bascule
+             * Lots/Tags dont le rôle reste à définir.
+             */
+            ->orderBy('ref_code')
+            ->orderBy('refs_code')
+            ->orderBy('refs_title')
+            ->orderBy('ref_order')
             ->orderBy('sort_order')
             ->orderBy('sequence_number')
             ->get();

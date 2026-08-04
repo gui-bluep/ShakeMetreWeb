@@ -536,6 +536,31 @@ class MetreLineDetailViewTest extends TestCase
     }
 
     /**
+     * The order a métré's lines are listed in is METL_Sort's: section, sub-section, then rank.
+     * Not the order they were created in - a line added to section 20 belongs under 20, above
+     * everything in section 60, however late it was typed. Ascending with no special treatment
+     * of empties, so a sectionless line leads: that is what FileMaker does, an empty number
+     * sorting before 0.
+     */
+    public function test_the_lines_are_listed_in_section_order(): void
+    {
+        $this->actAsWriter();
+        $this->line(['description' => 'sans section', 'sort_order' => 1]);
+        $this->line(['description' => 'électricité', 'ref_code' => 60, 'refs_code' => 4, 'ref_order' => 1, 'sort_order' => 2]);
+        $this->line(['description' => 'sols, rang 2', 'ref_code' => 20, 'refs_code' => 8, 'ref_order' => 2, 'sort_order' => 3]);
+        $this->line(['description' => 'sols, rang 1', 'ref_code' => 20, 'refs_code' => 8, 'ref_order' => 1, 'sort_order' => 4]);
+
+        $this->get($this->url())->assertInertia(fn ($page) => $page
+            // Une ligne sans section passe en tête, comme dans FileMaker où un nombre vide se
+            // trie avant 0.
+            ->where('lines.0.description', 'sans section')
+            ->where('lines.1.description', 'sols, rang 1')
+            ->where('lines.2.description', 'sols, rang 2')
+            ->where('lines.3.description', 'électricité')
+            ->etc());
+    }
+
+    /**
      * @return array{0: Reference, 1: SubReference, 2: SubReferenceLine}
      */
     private function catalogue(): array
