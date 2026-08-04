@@ -51,6 +51,8 @@ class MetreController extends Controller
          */
         $gatesChanged = $metre->isDirty(['is_accepted_b', 'is_status_site_b']);
 
+        $this->stampAgreementDate($request, $metre);
+
         $metre->save();
 
         if ($gatesChanged) {
@@ -59,6 +61,40 @@ class MetreController extends Controller
         }
 
         return response()->json(['data' => $this->payload($metre)]);
+    }
+
+    /**
+     * Date_Agreement follows isAccepted_b: stamped with today's date when the box is ticked,
+     * emptied when it is unticked. Requested by the user - the date of an agreement is the day
+     * somebody says yes, and typing it by hand right after ticking the box was a second gesture
+     * for information the application already had.
+     *
+     * Three things this deliberately does NOT do:
+     *
+     *  - It does not remember. Unticking clears the date, and re-ticking stamps today rather
+     *    than restoring what was there: the previous date described an agreement that was taken
+     *    back, and bringing it back would assert a date nobody chose.
+     *  - It does not lock the field. The date stays editable - a métré accepted at a meeting
+     *    last Tuesday and recorded today has to be correctable.
+     *  - It does not overwrite a date sent in the same request. The page batches a row's edits
+     *    into one PATCH, so ticking the box and typing a date within the same 500 ms window
+     *    arrive together; an explicit value is a decision and wins over the stamp.
+     *
+     * Only on the transition, hence isDirty: a PATCH on an already-accepted métré that touches
+     * something else must not silently move its agreement date to today.
+     *
+     * Stamped in the business timezone, not the app's UTC: between midnight and 02:00 local,
+     * UTC is still yesterday, and this is a date a person reads as "the day we agreed".
+     */
+    private function stampAgreementDate(UpdateMetreRequest $request, Metre $metre): void
+    {
+        if (! $metre->isDirty('is_accepted_b') || $request->safe()->has('date_agreement')) {
+            return;
+        }
+
+        $metre->date_agreement = $metre->is_accepted_b
+            ? now()->setTimezone(config('app.business_timezone'))->toDateString()
+            : null;
     }
 
     /**

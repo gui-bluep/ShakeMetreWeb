@@ -217,6 +217,109 @@ class MetrePageTest extends TestCase
         $this->assertSame('note interne', $fresh->comment_internal);
     }
 
+    // --- the agreement date follows acceptance ---------------------------------------------
+
+    /**
+     * Ticking "Accepté" stamps the date of the agreement, because the day somebody says yes is
+     * the day the box gets ticked - typing it by hand right afterwards was a second gesture for
+     * information the application already had.
+     *
+     * Stamped in the business timezone rather than the app's UTC: between midnight and 02:00
+     * local, UTC is still yesterday and the date would read as the wrong day.
+     */
+    public function test_accepting_a_metre_stamps_todays_agreement_date(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre(['is_accepted_b' => false, 'date_agreement' => null]);
+
+        $today = now()->setTimezone(config('app.business_timezone'))->toDateString();
+
+        $this->patchJson("/api/metres/{$metre->id}", ['is_accepted_b' => true])
+            ->assertOk()
+            ->assertJsonPath('data.date_agreement', $today);
+
+        $this->assertSame($today, $metre->fresh()->date_agreement->toDateString());
+    }
+
+    public function test_unaccepting_a_metre_clears_the_agreement_date(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre(['is_accepted_b' => true, 'date_agreement' => '2026-03-01']);
+
+        $this->patchJson("/api/metres/{$metre->id}", ['is_accepted_b' => false])
+            ->assertOk()
+            ->assertJsonPath('data.date_agreement', null);
+
+        $this->assertNull($metre->fresh()->date_agreement);
+    }
+
+    /**
+     * No memory of the cleared date: re-ticking stamps today rather than restoring what was
+     * there. The old date described an agreement that was taken back, and bringing it back would
+     * assert a date nobody chose.
+     */
+    public function test_re_accepting_stamps_today_and_does_not_restore_the_old_date(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre(['is_accepted_b' => true, 'date_agreement' => '2020-01-01']);
+
+        $this->patchJson("/api/metres/{$metre->id}", ['is_accepted_b' => false])->assertOk();
+        $this->patchJson("/api/metres/{$metre->id}", ['is_accepted_b' => true])->assertOk();
+
+        $this->assertSame(
+            now()->setTimezone(config('app.business_timezone'))->toDateString(),
+            $metre->fresh()->date_agreement->toDateString(),
+        );
+    }
+
+    /**
+     * The date stays a field: a métré accepted at a meeting last Tuesday and recorded today has
+     * to be correctable, and a later edit must not be undone by the stamp.
+     */
+    public function test_the_agreement_date_remains_editable_after_it_is_stamped(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre(['is_accepted_b' => false]);
+
+        $this->patchJson("/api/metres/{$metre->id}", ['is_accepted_b' => true])->assertOk();
+        $this->patchJson("/api/metres/{$metre->id}", ['date_agreement' => '2026-02-10'])->assertOk();
+
+        $this->assertSame('2026-02-10', $metre->fresh()->date_agreement->toDateString());
+    }
+
+    /**
+     * The page batches a row's edits into one PATCH, so ticking the box and typing a date within
+     * the same debounce window arrive together. An explicit value is a decision and wins.
+     */
+    public function test_a_date_sent_with_the_flag_wins_over_the_stamp(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre(['is_accepted_b' => false]);
+
+        $this->patchJson("/api/metres/{$metre->id}", [
+            'is_accepted_b' => true,
+            'date_agreement' => '2026-01-20',
+        ])->assertOk();
+
+        $this->assertSame('2026-01-20', $metre->fresh()->date_agreement->toDateString());
+    }
+
+    /**
+     * Only on the transition: a PATCH that touches something else on an already-accepted métré
+     * must not silently move its agreement date to today.
+     */
+    public function test_editing_another_field_leaves_the_agreement_date_alone(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre(['is_accepted_b' => true, 'date_agreement' => '2026-03-01']);
+
+        $this->patchJson("/api/metres/{$metre->id}", ['name' => 'Autre nom'])->assertOk();
+        // Re-sending the same value is not a transition either.
+        $this->patchJson("/api/metres/{$metre->id}", ['is_accepted_b' => true])->assertOk();
+
+        $this->assertSame('2026-03-01', $metre->fresh()->date_agreement->toDateString());
+    }
+
     public function test_an_unknown_language_is_rejected(): void
     {
         $this->actAsWriter();

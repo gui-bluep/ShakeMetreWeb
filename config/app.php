@@ -69,6 +69,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Business Timezone
+    |--------------------------------------------------------------------------
+    |
+    | The timezone the working day is read in, distinct from `timezone` above,
+    | which stays UTC because that is what the timestamp columns are stored in.
+    | Used where a DATE column has to hold the day a person in the office would
+    | call today - the agreement date stamped when a métré is accepted. In UTC
+    | that date is still yesterday between midnight and 02:00 local time.
+    |
+    */
+
+    'business_timezone' => env('APP_BUSINESS_TIMEZONE', 'Europe/Brussels'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

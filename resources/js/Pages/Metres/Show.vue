@@ -15,6 +15,10 @@ import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
  * One métré's own page. Header fields save as they are edited, through the same debounced
  * mechanism as the grids; the totals and the real ratio are read-only, materialized by
  * RecalculateMetreTotals and MET_Metre::Ratio_c respectively.
+ *
+ * La date d'accord est un champ modifiable ET une valeur posée par le serveur quand on coche
+ * « Accepté » : les deux sont normales ici, ce qui explique que `toggle()` réapplique toute la
+ * réponse plutôt que le seul champ qu'on vient de changer.
  */
 const props = defineProps({
     metre: { type: Object, required: true },
@@ -84,8 +88,11 @@ function text(field, raw) {
 }
 
 /**
- * Les deux drapeaux conditionnent les totaux stockés côté serveur, donc l'enregistrement est
- * envoyé tout de suite au lieu d'attendre les 500 ms et la réponse est réappliquée en entier.
+ * Les deux drapeaux ne sont pas de simples étiquettes : ils conditionnent les totaux stockés
+ * côté serveur, et cocher « Accepté » estampille en plus la date d'accord (la décocher la vide).
+ * L'enregistrement est donc envoyé tout de suite au lieu d'attendre les 500 ms, et la réponse
+ * est réappliquée en entier — sans quoi la date resterait celle d'avant à l'écran alors qu'elle
+ * a changé en base.
  *
  * Les quatre tuiles, elles, ne bougent pas avec les drapeaux : elles lisent les colonnes non
  * conditionnées (voir MetreController::payload()).
