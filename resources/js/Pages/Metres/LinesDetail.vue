@@ -136,6 +136,16 @@ const visibleRows = computed(() => {
  * Calculés ici et non sur le serveur : les cellules se recalculent déjà à la frappe, donc un
  * sous-total qui attendrait la réponse serait le seul chiffre en retard de l'écran.
  */
+/**
+ * La clé d'un groupe, construite ici et nulle part ailleurs : le repliage la retrouve à partir
+ * d'une ligne (voir `reveal()`), et deux façons de la fabriquer finiraient par ne plus se
+ * répondre. Celle d'une sous-section porte celle de sa section, parce qu'un même couple
+ * code/titre peut se retrouver sous deux sections et que le repliage a besoin d'une clé unique
+ * dans toute la vue.
+ */
+const sectionKeyOf = (row) => `${row.ref_code ?? ''}`;
+const subSectionKeyOf = (row) => `${sectionKeyOf(row)}::${row.refs_code ?? ''}|${row.refs_title ?? ''}`;
+
 const groupedRows = computed(() => {
     const zero = () => ({ buy: 0, sales: 0, ordered: 0 });
     const add = (into, row) => {
@@ -149,11 +159,14 @@ const groupedRows = computed(() => {
     let subSection = null;
 
     for (const row of visibleRows.value) {
-        const sectionKey = `${row.ref_code ?? ''}`;
-        const subKey = `${row.refs_code ?? ''}|${row.refs_title ?? ''}`;
+        const sectionKey = sectionKeyOf(row);
+        const subKey = subSectionKeyOf(row);
 
         if (section === null || section.key !== sectionKey) {
-            section = { key: sectionKey, code: row.ref_code, title: row.ref_title, totals: zero(), subSections: [] };
+            section = {
+                key: sectionKey, code: row.ref_code, title: row.ref_title,
+                totals: zero(), count: 0, subSections: [],
+            };
             sections.push(section);
             subSection = null;
         }
@@ -164,12 +177,69 @@ const groupedRows = computed(() => {
         }
 
         subSection.rows.push(row);
+        section.count += 1;
         add(subSection.totals, row);
         add(section.totals, row);
     }
 
     return sections;
 });
+
+// --- repliage -----------------------------------------------------------------------------
+
+/**
+ * Les groupes repliés, par clé. Un ensemble de replis plutôt qu'un drapeau « ouvert » par groupe :
+ * tout est déroulé, donc l'ensemble vide est l'état de départ, et un groupe qui apparaît — une
+ * recherche qu'on efface, une section inventée sur le champ — arrive déroulé sans qu'il y ait
+ * quoi que ce soit à initialiser.
+ *
+ * Le repliage ne touche ni les sous-totaux ni le total général : ils sont calculés sur
+ * `groupedRows`, qui ignore les replis. Replier n'est pas filtrer — c'est bien ce qu'on veut,
+ * sinon replier une section pour lire l'écran ferait bouger les montants.
+ *
+ * La sélection suit la même règle : elle porte sur ce que la recherche laisse passer, pas sur ce
+ * qui est déplié. Une ligne sélectionnée puis masquée par un repli reste sélectionnée, et le
+ * compteur du bouton la compte toujours.
+ */
+const collapsed = ref(new Set());
+
+const isCollapsed = (key) => collapsed.value.has(key);
+
+function toggleCollapsed(key) {
+    const next = new Set(collapsed.value);
+    next.has(key) ? next.delete(key) : next.add(key);
+    collapsed.value = next;
+}
+
+/** Ce qu'il faut dessiner : rien sous un groupe replié. */
+const subSectionsOf = (section) => (isCollapsed(section.key) ? [] : section.subSections);
+const rowsOf = (subSection) => (isCollapsed(subSection.key) ? [] : subSection.rows);
+
+const allCollapsed = computed(
+    () => groupedRows.value.length > 0 && groupedRows.value.every((section) => isCollapsed(section.key))
+);
+
+/** Tout replier ne replie que les sections : leurs sous-sections réapparaissent déroulées. */
+function toggleCollapseAll() {
+    collapsed.value = allCollapsed.value
+        ? new Set()
+        : new Set(groupedRows.value.map((section) => section.key));
+}
+
+/**
+ * Déplie ce qu'il faut pour qu'une ligne qu'on vient de créer soit visible. Sans cela, « + Ligne »
+ * sur une sous-section repliée n'aurait l'air de rien faire.
+ */
+function reveal(row) {
+    if (collapsed.value.size === 0) {
+        return;
+    }
+
+    const next = new Set(collapsed.value);
+    next.delete(sectionKeyOf(row));
+    next.delete(subSectionKeyOf(row));
+    collapsed.value = next;
+}
 
 /** Le total général du pied — la « trailing grand summary » du même écran. */
 const grandTotals = computed(() =>
@@ -361,6 +431,7 @@ async function addLine(section = null) {
         const body = await request(`/api/metres/${props.metre.id}/lines`, 'POST', section ?? {});
         rows.value.push(clone(body.data));
         sortRows();
+        reveal(body.data);
 
         return body.data;
     } catch (e) {
@@ -425,6 +496,7 @@ async function insertFromCatalogue(ids) {
 
         rows.value.push(...(body.data ?? []).map(clone));
         sortRows();
+        (body.data ?? []).forEach(reveal);
         showCatalogue.value = false;
     } catch (e) {
         notify(null, e.message);
@@ -691,6 +763,16 @@ const breadcrumbs = computed(() => [
                 />
             </div>
 
+            <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                :title="allCollapsed ? 'Dérouler toutes les sections' : 'Replier toutes les sections'"
+                @click="toggleCollapseAll"
+            >
+                <Icon :name="allCollapsed ? 'chevron-down' : 'chevron-right'" :size="3.5" />
+                {{ allCollapsed ? 'Tout dérouler' : 'Tout replier' }}
+            </button>
+
             <button type="button" class="btn btn-secondary btn-sm" @click="toggleSelectAll">
                 {{ allVisibleSelected ? 'Tout désélectionner' : 'Tout sélectionner' }}
                 <span v-if="selected.size" class="badge badge-accent">{{ selected.size }}</span>
@@ -805,12 +887,33 @@ const breadcrumbs = computed(() => [
                         class="grid items-center border-y border-sand-300 bg-sand-100 text-xs"
                         :style="{ gridTemplateColumns: TEMPLATE }"
                     >
-                        <div class="px-1.5 py-1.5 tabular-nums text-sand-700" style="font-variation-settings: 'wght' 650">
+                        <div class="flex items-center gap-0.5 px-1.5 py-1.5 tabular-nums text-sand-700" style="font-variation-settings: 'wght' 650">
+                            <button
+                                type="button"
+                                class="btn btn-ghost shrink-0 rounded p-0.5"
+                                :aria-expanded="!isCollapsed(section.key)"
+                                :title="isCollapsed(section.key) ? 'Dérouler la section' : 'Replier la section'"
+                                @click="toggleCollapsed(section.key)"
+                            >
+                                <Icon :name="isCollapsed(section.key) ? 'chevron-right' : 'chevron-down'" :size="3.5" />
+                            </button>
                             {{ section.code ?? '—' }}
                         </div>
                         <div class="col-span-4 flex min-w-0 items-center gap-2 px-1.5 py-1.5">
-                            <span class="truncate uppercase tracking-[0.04em] text-sand-900" style="font-variation-settings: 'wght' 650">
+                            <span
+                                class="cursor-pointer truncate uppercase tracking-[0.04em] text-sand-900"
+                                style="font-variation-settings: 'wght' 650"
+                                :title="isCollapsed(section.key) ? 'Dérouler la section' : 'Replier la section'"
+                                @click="toggleCollapsed(section.key)"
+                            >
                                 {{ section.title || (section.code === null ? 'Sans section' : 'Section sans titre') }}
+                            </span>
+
+                            <!-- Ce qui est caché se dit, sinon une section repliée ne se distingue
+                                 pas d'une section vide. -->
+                            <span v-if="isCollapsed(section.key)" class="shrink-0 text-[10px] text-sand-600">
+                                {{ section.count }} ligne{{ section.count === 1 ? '' : 's' }}
+                                dans {{ section.subSections.length }} sous-section{{ section.subSections.length === 1 ? '' : 's' }}
                             </span>
 
                             <template v-if="!readOnly">
@@ -866,18 +969,36 @@ const breadcrumbs = computed(() => [
                         <div class="col-span-6" />
                     </div>
 
-                    <template v-for="sub in section.subSections" :key="sub.key">
+                    <template v-for="sub in subSectionsOf(section)" :key="sub.key">
                         <!-- Intitulé de sous-section — « sub-summary by REFS_Title ». -->
                         <div
                             class="grid items-center border-b border-sand-200 bg-sand-50 text-xs"
                             :style="{ gridTemplateColumns: TEMPLATE }"
                         >
-                            <div class="px-1.5 py-1 tabular-nums text-sand-600">
+                            <div class="flex items-center gap-0.5 px-1.5 py-1 tabular-nums text-sand-600">
+                                <button
+                                    type="button"
+                                    class="btn btn-ghost shrink-0 rounded p-0.5"
+                                    :aria-expanded="!isCollapsed(sub.key)"
+                                    :title="isCollapsed(sub.key) ? 'Dérouler la sous-section' : 'Replier la sous-section'"
+                                    @click="toggleCollapsed(sub.key)"
+                                >
+                                    <Icon :name="isCollapsed(sub.key) ? 'chevron-right' : 'chevron-down'" :size="3" />
+                                </button>
                                 {{ section.code ?? '—' }}.{{ sub.code ?? '—' }}
                             </div>
                             <div class="col-span-4 flex min-w-0 items-center gap-2 px-1.5 py-1">
-                                <span class="truncate text-sand-800" style="font-variation-settings: 'wght' 600">
+                                <span
+                                    class="cursor-pointer truncate text-sand-800"
+                                    style="font-variation-settings: 'wght' 600"
+                                    :title="isCollapsed(sub.key) ? 'Dérouler la sous-section' : 'Replier la sous-section'"
+                                    @click="toggleCollapsed(sub.key)"
+                                >
                                     {{ sub.title || 'Sous-section sans titre' }}
+                                </span>
+
+                                <span v-if="isCollapsed(sub.key)" class="shrink-0 text-[10px] text-sand-600">
+                                    {{ sub.rows.length }} ligne{{ sub.rows.length === 1 ? '' : 's' }}
                                 </span>
                                 <button
                                     v-if="!readOnly"
@@ -914,7 +1035,7 @@ const breadcrumbs = computed(() => [
                         </div>
 
                 <div
-                    v-for="row in sub.rows"
+                    v-for="row in rowsOf(sub)"
                     :key="row.id"
                     class="grid items-center border-b border-sand-200/70 text-xs transition-colors"
                     :class="selected.has(row.id)
