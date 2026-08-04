@@ -62,9 +62,17 @@ class MetreLineDetailResource extends JsonResource
             'tag2' => $this->tag2,
 
             'lot_id' => $this->lot_id,
-            'lot_name' => $this->lot === null
-                ? null
-                : ($this->lot->title_custom ?: $this->lot->title_fr ?: $this->lot->title_en ?: $this->lot->title_nl),
+
+            /*
+             * Le nom du lot dans la langue DU MÉTRÉ, comme `LOT_Lot::TitleFull`, qui lit
+             * `lot_MET::Language` - donc la langue du document, pas celle de l'interface ni un
+             * ordre fixe. Voir `Lot::displayTitle()` pour le repli (l'anglais) et pour le sort de
+             * `title_custom`.
+             *
+             * `metre` est chargé d'avance là où cette ressource est construite : toutes les lignes
+             * d'un écran partagent un métré, donc une requête, pas une par ligne.
+             */
+            'lot_name' => $this->lot?->displayTitle($this->metre?->language),
 
             /*
              * Le code du lot, à part de son nom : la colonne Lot les affiche tous les deux, et un

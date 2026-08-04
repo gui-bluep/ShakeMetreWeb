@@ -23,14 +23,26 @@ namespace App\Models\Concerns;
  */
 trait HasLocalisedTitle
 {
-    /** @var list<string> */
-    private const TITLE_FALLBACK = ['fr', 'en', 'nl'];
+    /**
+     * L'ordre de repli, quand la langue demandée n'a pas de titre.
+     *
+     * Surchargeable parce que les deux tables qui portent ces trois colonnes ne se replient pas de
+     * la même façon dans la source : le catalogue n'a pas de formule de repli du tout (d'où le
+     * choix documenté ci-dessus), tandis que `LOT_Lot::TitleFull` désigne explicitement l'anglais
+     * comme langue de secours. Voir `Lot::titleFallback()`.
+     *
+     * @return list<string>
+     */
+    protected static function titleFallback(): array
+    {
+        return ['fr', 'en', 'nl'];
+    }
 
     public function localisedTitle(?string $language): ?string
     {
         $wanted = mb_strtolower(trim((string) $language));
 
-        foreach ([$wanted, ...self::TITLE_FALLBACK] as $code) {
+        foreach ([$wanted, ...static::titleFallback()] as $code) {
             $value = $this->{"title_{$code}"} ?? null;
 
             if (filled($value)) {

@@ -51,7 +51,7 @@ class MetreLineDetailController extends Controller
     public function show(Metre $metre, string $view): Response
     {
         $lines = $metre->metreLines()
-            ->with('lot')
+            ->with(['lot', 'metre'])
             /*
              * L'ordre d'affichage d'un métré, celui de METL_Sort tel que l'appellent les écrans de
              * travail (METL_TRI__OnLayoutEnter, METL_GoTo, METL_New) :
@@ -97,7 +97,9 @@ class MetreLineDetailController extends Controller
                 ->map(fn (Lot $lot) => [
                     'id' => $lot->id,
                     'code' => $lot->code,
-                    'name' => $lot->title_custom ?: $lot->title_fr ?: $lot->title_en ?: $lot->title_nl,
+                    // Même règle que le nom porté par une ligne, sinon le sélecteur et la
+                    // colonne pourraient nommer le même lot différemment.
+                    'name' => $lot->displayTitle($metre->language),
                 ])->values(),
         ]);
     }
@@ -134,7 +136,7 @@ class MetreLineDetailController extends Controller
         $line->save();
 
         return response()->json([
-            'data' => (new MetreLineDetailResource($line->fresh(['lot'])))->resolve(),
+            'data' => (new MetreLineDetailResource($line->fresh(['lot', 'metre'])))->resolve(),
         ], 201);
     }
 
@@ -203,7 +205,7 @@ class MetreLineDetailController extends Controller
 
         return response()->json([
             'data' => MetreLineDetailResource::collection(
-                collect($created)->map(fn (MetreLine $line) => $line->fresh(['lot']))
+                collect($created)->map(fn (MetreLine $line) => $line->fresh(['lot', 'metre']))
             )->resolve(),
         ], 201);
     }
@@ -250,7 +252,7 @@ class MetreLineDetailController extends Controller
 
         return response()->json([
             'data' => MetreLineDetailResource::collection(
-                $metre->metreLines()->with('lot')->whereKey($ids)->get()
+                $metre->metreLines()->with(['lot', 'metre'])->whereKey($ids)->get()
             )->resolve(),
         ]);
     }
@@ -304,7 +306,7 @@ class MetreLineDetailController extends Controller
         });
 
         return response()->json([
-            'data' => (new MetreLineDetailResource($copy->fresh(['lot'])))->resolve(),
+            'data' => (new MetreLineDetailResource($copy->fresh(['lot', 'metre'])))->resolve(),
         ], 201);
     }
 

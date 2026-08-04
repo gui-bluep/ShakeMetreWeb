@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasLocalisedTitle;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,6 +11,7 @@ use InvalidArgumentException;
 
 class Lot extends Model
 {
+    use HasLocalisedTitle;
     use HasUuids;
 
     public $incrementing = false;
@@ -19,6 +21,45 @@ class Lot extends Model
     public function metreLines(): HasMany
     {
         return $this->hasMany(MetreLine::class);
+    }
+
+    /**
+     * L'anglais est la langue de secours d'un lot, et non le français.
+     *
+     * `LOT_Lot::TitleFull` le dit :
+     *
+     *     Code & " - " & Upper ( Case (
+     *         lot_MET::Language = "FR" and not IsEmpty ( Title_FR ) ; Title_FR ;
+     *         lot_MET::Language = "NL" and not IsEmpty ( Title_NL ) ; Title_NL ;
+     *         Title_EN ) )
+     *
+     * Le titre anglais est la branche par défaut : demandé pour un métré anglais, et servi aussi
+     * quand la langue du métré n'a pas de titre. C'est l'inverse du catalogue, où le repli
+     * français a été retenu faute de formule dans la source.
+     *
+     * Le français et le néerlandais restent derrière l'anglais plutôt que d'être abandonnés : là
+     * où la source rendrait une chaîne vide (un lot sans titre anglais), un lot nommé s'afficherait
+     * « Lot sans nom » alors qu'il porte un nom. C'est le même raisonnement que le repli du
+     * catalogue, et il ne s'écarte de la source que dans ce cas.
+     *
+     * @return list<string>
+     */
+    protected static function titleFallback(): array
+    {
+        return ['en', 'fr', 'nl'];
+    }
+
+    /**
+     * Le nom à afficher pour un lot, dans la langue d'un métré.
+     *
+     * `title_custom` passe devant : c'est un titre saisi à la main, sans langue, donc une décision
+     * explicite sur ce lot-là. `LOT_Lot::TitleFull` l'ignore - divergence assumée, déjà en place
+     * avant cette traduction (voir `ProjectController`) : le retirer renommerait en silence les
+     * lots que FileMaker a laissés avec un titre personnalisé.
+     */
+    public function displayTitle(?string $language): ?string
+    {
+        return $this->title_custom ?: $this->localisedTitle($language);
     }
 
     /*

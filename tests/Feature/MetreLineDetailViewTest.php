@@ -292,6 +292,101 @@ class MetreLineDetailViewTest extends TestCase
             ->where('lines.2.lot_name', null));
     }
 
+    /**
+     * Le nom d'un lot suit la langue DU MÉTRÉ - `LOT_Lot::TitleFull` lit `lot_MET::Language`.
+     *
+     * Trois langues, trois titres : le même lot se nomme autrement selon le document qui l'affiche.
+     */
+    #[DataProvider('lotLanguages')]
+    public function test_a_lot_is_named_in_the_metres_language(?string $language, string $expected): void
+    {
+        $this->actAsWriter();
+
+        $metre = Metre::forceCreate([
+            'project_id' => self::PROJECT,
+            'name' => 'Métré traduit',
+            'language' => $language,
+        ]);
+
+        $lot = Lot::forceCreate([
+            'project_id' => self::PROJECT,
+            'code' => 5,
+            'title_fr' => 'Toiture',
+            'title_en' => 'Roof',
+            'title_nl' => 'Dak',
+        ]);
+
+        MetreLine::forceCreate(['metre_id' => $metre->id, 'lot_id' => $lot->id]);
+
+        $this->get("/metres/{$metre->id}/lines/achats-ventes-commandes")
+            ->assertInertia(fn ($page) => $page
+                ->where('lines.0.lot_name', $expected)
+                // Le sélecteur nomme le lot comme la colonne : une seule règle.
+                ->where('lots.0.name', $expected));
+    }
+
+    /** @return array<string, array{0: ?string, 1: string}> */
+    public static function lotLanguages(): array
+    {
+        return [
+            'français' => ['FR', 'Toiture'],
+            'anglais' => ['EN', 'Roof'],
+            'néerlandais' => ['NL', 'Dak'],
+            // Branche par défaut de la formule source : Title_EN.
+            'sans langue' => [null, 'Roof'],
+            'langue inconnue' => ['DE', 'Roof'],
+            'casse indifférente' => ['nl', 'Dak'],
+        ];
+    }
+
+    /**
+     * Là où la source rendrait vide - la langue demandée manque ET l'anglais manque - le nom
+     * existant est servi plutôt qu'un blanc. Seule divergence, et elle ne perd aucune information.
+     */
+    public function test_a_lot_falls_back_rather_than_going_unnamed(): void
+    {
+        $this->actAsWriter();
+
+        $metre = Metre::forceCreate(['project_id' => self::PROJECT, 'name' => 'M', 'language' => 'NL']);
+        $lot = Lot::forceCreate(['project_id' => self::PROJECT, 'code' => 6, 'title_fr' => 'Toiture']);
+        MetreLine::forceCreate(['metre_id' => $metre->id, 'lot_id' => $lot->id]);
+
+        $this->get("/metres/{$metre->id}/lines/achats-ventes-commandes")
+            ->assertInertia(fn ($page) => $page->where('lines.0.lot_name', 'Toiture'));
+    }
+
+    /** L'anglais passe avant les autres replis, comme la branche par défaut de TitleFull. */
+    public function test_english_is_the_fallback_before_the_other_languages(): void
+    {
+        $this->actAsWriter();
+
+        $metre = Metre::forceCreate(['project_id' => self::PROJECT, 'name' => 'M', 'language' => 'NL']);
+        $lot = Lot::forceCreate([
+            'project_id' => self::PROJECT, 'code' => 7,
+            'title_fr' => 'Toiture', 'title_en' => 'Roof',
+        ]);
+        MetreLine::forceCreate(['metre_id' => $metre->id, 'lot_id' => $lot->id]);
+
+        $this->get("/metres/{$metre->id}/lines/achats-ventes-commandes")
+            ->assertInertia(fn ($page) => $page->where('lines.0.lot_name', 'Roof'));
+    }
+
+    /** `title_custom` est un choix explicite sur ce lot : il passe devant les trois langues. */
+    public function test_a_custom_title_wins_over_every_language(): void
+    {
+        $this->actAsWriter();
+
+        $metre = Metre::forceCreate(['project_id' => self::PROJECT, 'name' => 'M', 'language' => 'FR']);
+        $lot = Lot::forceCreate([
+            'project_id' => self::PROJECT, 'code' => 8,
+            'title_custom' => 'Sur mesure', 'title_fr' => 'Toiture', 'title_en' => 'Roof',
+        ]);
+        MetreLine::forceCreate(['metre_id' => $metre->id, 'lot_id' => $lot->id]);
+
+        $this->get("/metres/{$metre->id}/lines/achats-ventes-commandes")
+            ->assertInertia(fn ($page) => $page->where('lines.0.lot_name', 'Sur mesure'));
+    }
+
     public function test_a_readonly_account_may_view_the_page(): void
     {
         $this->actingAs(User::factory()->readOnly()->create());
