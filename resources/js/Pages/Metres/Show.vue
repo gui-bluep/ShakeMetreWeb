@@ -170,14 +170,15 @@ const DOCUMENTS = [
 ];
 
 /**
- * `href` is set only for the views that exist. The rest render disabled, so the page shows the
- * full set it will eventually offer instead of looking finished with three of them missing.
+ * Les quatre vues monétaires des lignes, toutes construites : une seule page les rend, la coupe
+ * étant portée par le slug (MetreLineDetailController::VIEWS). Les libellés sont ceux que la vue
+ * affiche elle-même dans son fil d'Ariane et son titre d'onglet.
  */
 const VIEWS = [
-    { label: 'Achats — Ventes', href: null },
-    { label: 'Achats — Commandes', href: null },
+    { label: 'Achats — Ventes', href: `/metres/${props.metre.id}/lines/achats-ventes` },
+    { label: 'Achats — Commandes', href: `/metres/${props.metre.id}/lines/achats-commandes` },
     { label: 'Achats — Ventes — Commandes', href: `/metres/${props.metre.id}/lines/achats-ventes-commandes` },
-    { label: 'Ventes', href: null },
+    { label: 'Ventes', href: `/metres/${props.metre.id}/lines/ventes` },
 ];
 
 // --- display ------------------------------------------------------------------------------

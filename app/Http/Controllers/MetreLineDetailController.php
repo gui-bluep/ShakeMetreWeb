@@ -14,16 +14,36 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The "Achats — Ventes — Commandes" view of a métré's lines: one row per METL, with the
- * purchase, client-sale and order figures side by side.
+ * The four money views of a métré's lines: one row per METL, with the purchase, client-sale
+ * and order figures side by side - and the three narrower cuts of the same grid.
+ *
+ * One controller, one page, one payload for all four: they differ only in which money blocks
+ * are on screen, never in what a row is or in what may be written to it. The alternative -
+ * four near-identical pages - is four places to fix the next grid bug in.
  *
  * Cell edits reuse PATCH /api/metre-lines/{id} and its whitelist - the same write surface as
- * the other grid - so the two views cannot disagree about what is editable. Only creating,
+ * the other grid - so no view can disagree with another about what is editable. Only creating,
  * duplicating and deleting a line are new here.
  */
 class MetreLineDetailController extends Controller
 {
-    public function show(Metre $metre): Response
+    /**
+     * The four views, and what each one is: its money blocks, in the order they appear.
+     *
+     * The mapping lives here rather than in the page because it is what a view *is*, not how it
+     * looks - the URL whitelist and the block list are then one fact instead of two that can
+     * drift. The page owns only the appearance of a block (its tint, its labels).
+     *
+     * Slugs are the URLs, and the view named for all three blocks keeps its own URL unchanged.
+     */
+    public const VIEWS = [
+        'achats-ventes-commandes' => ['achats', 'ventes', 'commandes'],
+        'achats-ventes' => ['achats', 'ventes'],
+        'achats-commandes' => ['achats', 'commandes'],
+        'ventes' => ['ventes'],
+    ];
+
+    public function show(Metre $metre, string $view): Response
     {
         $lines = $metre->metreLines()
             ->with('lot')
@@ -32,6 +52,9 @@ class MetreLineDetailController extends Controller
             ->get();
 
         return Inertia::render('Metres/LinesDetail', [
+            'view' => $view,
+            'blocks' => self::VIEWS[$view],
+
             'metre' => [
                 'id' => $metre->id,
                 'name' => $metre->name,

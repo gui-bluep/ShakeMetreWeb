@@ -70,11 +70,18 @@ Route::middleware('auth')->group(function () {
 });
 
 /*
-| The "Achats — Ventes — Commandes" view of a métré's lines. Cell edits go through the existing
-| PATCH /api/metre-lines/{id} below; only create/duplicate/delete are new here.
+| The four money views of a métré's lines - achats-ventes-commandes and its three narrower
+| cuts. One route, one page: the slug says which blocks are on screen and nothing else, so a
+| view cannot acquire its own idea of what a line is. The whitelist is the controller's VIEWS
+| map, which is also what the page reads its block list from; an unknown slug is a 404 rather
+| than an empty grid.
+|
+| Cell edits go through the existing PATCH /api/metre-lines/{id} below; only create, duplicate
+| and delete are new here.
 */
 Route::middleware('auth')->group(function () {
-    Route::get('/metres/{metre}/lines/achats-ventes-commandes', [MetreLineDetailController::class, 'show'])
+    Route::get('/metres/{metre}/lines/{view}', [MetreLineDetailController::class, 'show'])
+        ->whereIn('view', array_keys(MetreLineDetailController::VIEWS))
         ->name('metres.lines.detail');
 
     Route::middleware('role.write')->group(function () {

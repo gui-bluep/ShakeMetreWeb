@@ -7,22 +7,33 @@ import Icon from '@/Components/Icon.vue';
 import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
 
 /**
- * "Achats — Ventes — Commandes": one row per métré line, with the purchase, client-sale and
- * order figures side by side.
+ * Les quatre vues monétaires des lignes d'un métré : « Achats — Ventes — Commandes » et ses trois
+ * coupes plus étroites (Achats — Ventes, Achats — Commandes, Ventes).
+ *
+ * Une seule page pour les quatre, parce qu'elles ne diffèrent que par les blocs à l'écran : une
+ * ligne, ce qu'elle contient et ce qu'on peut y écrire sont les mêmes partout. `blocks` arrive du
+ * serveur (MetreLineDetailController::VIEWS) et commande le gabarit de colonnes, les deux niveaux
+ * d'en-tête et les cellules ; la page ne connaît que l'apparence d'un bloc — sa teinte, ses
+ * libellés, ses champs — dans BLOCKS ci-dessous.
  *
  * Cell edits go through PATCH /api/metre-lines/{id}, the same endpoint and whitelist as the
- * other grid, so the two views cannot disagree about what is writable.
+ * other grid, so no view can disagree with another about what is writable.
  *
  * The Achats and Vendu client blocks share one quantity field, and that is the data model, not
  * a shortcut: PriceTotalBuy and PriceTotalSales both multiply by METL::Quantity in the source -
  * only the order total has its own (QuantityOrdered). Both inputs bind to `quantity`, so editing
- * either visibly moves the other rather than hiding the sharing.
+ * either visibly moves the other rather than hiding the sharing. Cela ne se dit à l'écran que
+ * dans les vues qui montrent les deux : ailleurs, il n'y a pas de partage visible à expliquer.
  *
  * L'écran prend toute la hauteur et ne passe donc pas par AuthenticatedLayout ; il monte la
  * barre supérieure lui-même, pour que la vue la plus utilisée de l'application ne soit pas la
  * seule à ne pas porter la marque.
  */
 const props = defineProps({
+    /** Le slug de la vue, tel qu'il est dans l'URL. */
+    view: { type: String, required: true },
+    /** Les blocs monétaires à afficher, dans l'ordre : `['achats', 'ventes', 'commandes']`. */
+    blocks: { type: Array, required: true },
     metre: { type: Object, required: true },
     lines: { type: Array, required: true },
     units: { type: Array, required: true },
@@ -43,8 +54,11 @@ const rows = ref(props.lines.map(clone));
 
 // Re-seeded if the page is pointed at another métré - Inertia can reuse this component, and a
 // copy seeded once at setup would show the previous métré's lines while writing to the new one.
+// La vue compte aussi : passer d'une coupe à l'autre est une navigation, qui ramène des lignes
+// fraîches du serveur ; garder la copie locale de la visite précédente afficherait un état plus
+// vieux que les props qui viennent d'arriver.
 watch(
-    () => props.metre.id,
+    () => [props.metre.id, props.view],
     () => {
         rows.value = props.lines.map(clone);
         selected.value = new Set();
@@ -345,21 +359,99 @@ function money(value) {
     return value === null || value === undefined ? '—' : `${currency.format(value)}\u00a0€`;
 }
 
+/**
+ * L'apparence d'un bloc monétaire : son bandeau, ses trois colonnes, ses deux champs et son
+ * total. Seule cette table connaît les teintes ; le serveur ne dit que quels blocs afficher.
+ *
+ * Les classes sont écrites en clair et jamais composées (`bg-clay-50/70`, pas
+ * `bg-${tone}-50/70`) : Tailwind lit les fichiers sources comme du texte, une classe calculée
+ * ne serait donc jamais générée. Même raison que dans Icon.vue.
+ *
+ * Le trio est le code couleur du domaine, identique sur tous les écrans : achats → argile,
+ * vendu client → olive, commande → mauve.
+ */
+const BLOCKS = {
+    achats: {
+        key: 'achats',
+        label: 'Estimation achat',
+        bandClass: 'bg-clay-100 text-clay-700',
+        headClass: 'bg-clay-50',
+        cellClass: 'bg-clay-50/70',
+        quantityField: 'quantity',
+        priceField: 'price_buy',
+        totalKey: 'price_total_buy_no_options',
+    },
+    ventes: {
+        key: 'ventes',
+        label: 'Vendu client',
+        bandClass: 'bg-olive-100 text-olive-700',
+        headClass: 'bg-olive-50',
+        cellClass: 'bg-olive-50/70',
+        quantityField: 'quantity',
+        priceField: 'price_sales',
+        totalKey: 'price_total_sales_no_options',
+    },
+    commandes: {
+        key: 'commandes',
+        label: 'Commande',
+        bandClass: 'bg-mallow-100 text-mallow-700',
+        headClass: 'bg-mallow-50',
+        cellClass: 'bg-mallow-50/70',
+        quantityField: 'quantity_ordered',
+        priceField: 'price_ordered',
+        totalKey: 'price_total_ordered_no_options',
+    },
+};
+
+const blocks = computed(() => props.blocks.map((key) => BLOCKS[key]));
+
+/**
+ * Le ratio est P.U. vendu client ÷ P.U. estimation achat : il n'a de sens que là où les deux
+ * prix sont à l'écran. Ailleurs, une colonne qui divise un chiffre absent par un autre serait
+ * un chiffre qu'on ne peut pas vérifier. Il reste calculé côté serveur pour toutes les vues,
+ * simplement non affiché.
+ */
+const showRatio = computed(() => props.blocks.includes('achats') && props.blocks.includes('ventes'));
+
+/** Même condition : le partage de METL::Quantity ne se dit que là où il se voit. */
+const sharedQuantity = showRatio;
+
 /** Column widths, so the header and the rows stay aligned across the horizontal scroll. */
-const TEMPLATE = [
-    'minmax(15rem, 1.4fr)', // titre
-    '2.5rem', '2.5rem',     // est. / option
-    '5.5rem',               // unité
-    '5rem', '6rem', '7rem', // achats
-    '4rem',                 // ratio
-    '5rem', '6rem', '7rem', // vendu client
-    '5rem', '6rem', '7rem', // commande
-    '2.5rem',               // select
-    '2rem', '2rem',         // actions / comments
-    '6.5rem',               // delivered
-    'minmax(8rem, 0.8fr)',  // lot / tag
-    'minmax(8rem, 0.8fr)',  // SOR
-].join(' ');
+const TEMPLATE = computed(() => [
+    'minmax(15rem, 1.4fr)',                 // titre
+    '2.5rem', '2.5rem',                     // est. / option
+    '5.5rem',                               // unité
+    ...blocks.value.flatMap((block) => [
+        '5rem', '6rem', '7rem',             // qté / p.u. / total
+        // Le ratio se glisse juste après le bloc achats, entre les deux prix qu'il divise.
+        ...(showRatio.value && block.key === 'achats' ? ['4rem'] : []),
+    ]),
+    '2.5rem',                               // select
+    '2rem', '2rem',                         // actions / comments
+    '6.5rem',                               // delivered
+    'minmax(8rem, 0.8fr)',                  // lot / tag
+    'minmax(8rem, 0.8fr)',                  // SOR
+].join(' '));
+
+/**
+ * Largeur plancher de la grille, en rem, pour que les colonnes ne se compriment pas sous leur
+ * lisibilité : 92 pour les trois blocs, moins 18 par bloc retiré et 4 si le ratio ne s'affiche
+ * pas. Sans ce calcul, la vue « Ventes » garderait un plancher prévu pour trois fois plus de
+ * colonnes et traînerait un défilement horizontal sur du vide.
+ */
+const minWidth = computed(
+    () => `${92 - 18 * (3 - blocks.value.length) - (showRatio.value ? 0 : 4)}rem`
+);
+
+/** Le titre de chaque vue, celui-là même que la page du métré affiche dans sa liste. */
+const VIEW_LABELS = {
+    'achats-ventes-commandes': 'Achats — Ventes — Commandes',
+    'achats-ventes': 'Achats — Ventes',
+    'achats-commandes': 'Achats — Commandes',
+    ventes: 'Ventes',
+};
+
+const viewLabel = computed(() => VIEW_LABELS[props.view] ?? 'Lignes du métré');
 
 /**
  * Le fil d'Ariane s'arrête au métré : le nom du projet vit dans ShakeDesign, et l'aller
@@ -369,12 +461,12 @@ const TEMPLATE = [
 const breadcrumbs = computed(() => [
     { label: 'Projets', href: route('dashboard') },
     { label: props.metre.name || 'Métré', href: `/metres/${props.metre.id}` },
-    { label: 'Achats — Ventes — Commandes' },
+    { label: viewLabel.value },
 ]);
 </script>
 
 <template>
-    <Head :title="`Achats — Ventes — Commandes · ${metre.name ?? 'Métré'}`" />
+    <Head :title="`${viewLabel} · ${metre.name ?? 'Métré'}`" />
 
     <div class="flex h-screen flex-col bg-sand-100" @click="popover = null">
         <AppTopBar :breadcrumbs="breadcrumbs" />
@@ -443,28 +535,26 @@ const breadcrumbs = computed(() => [
         </div>
 
         <div class="min-h-0 flex-1 overflow-auto">
-            <div class="min-w-[92rem]">
+            <div :style="{ minWidth }">
                 <!-- Les deux niveaux d'en-tête dans un seul conteneur collant : c'est ce qui
                      supprime le `top-[22px]` qu'il fallait sinon recalculer à chaque changement
                      de hauteur de la première ligne. -->
                 <div class="sticky top-0 z-20 border-b border-sand-300 bg-white">
-                    <!-- Les trois blocs monétaires -->
+                    <!-- Le bandeau des blocs monétaires : un par bloc de la vue -->
                     <div
                         class="grid text-[10px] uppercase tracking-[0.06em]"
                         :style="{ gridTemplateColumns: TEMPLATE, fontVariationSettings: `'wght' 650` }"
                     >
                         <div class="px-1.5 py-1" />
                         <div class="col-span-3" />
-                        <div class="col-span-3 bg-clay-100 px-1.5 py-1 text-center text-clay-700">
-                            Estimation achat
-                        </div>
-                        <div />
-                        <div class="col-span-3 bg-olive-100 px-1.5 py-1 text-center text-olive-700">
-                            Vendu client
-                        </div>
-                        <div class="col-span-3 bg-mallow-100 px-1.5 py-1 text-center text-mallow-700">
-                            Commande
-                        </div>
+                        <template v-for="block in blocks" :key="block.key">
+                            <div class="col-span-3 px-1.5 py-1 text-center" :class="block.bandClass">
+                                {{ block.label }}
+                            </div>
+                            <!-- La colonne du ratio n'appartient à aucun bloc : elle sépare les
+                                 deux prix qu'elle divise. -->
+                            <div v-if="showRatio && block.key === 'achats'" />
+                        </template>
                         <div class="col-span-6" />
                     </div>
 
@@ -477,26 +567,32 @@ const breadcrumbs = computed(() => [
                         <div class="px-1 py-1 text-center" title="Prix estimé">Est.</div>
                         <div class="px-1 py-1 text-center" title="Option">Opt.</div>
                         <div class="px-1.5 py-1">Unité</div>
-                        <div
-                            class="bg-clay-50 px-1.5 py-1 text-right"
-                            title="Partagée avec Vendu client (METL::Quantity)"
-                        >
-                            Qté
-                        </div>
-                        <div class="bg-clay-50 px-1.5 py-1 text-right" title="Prix unitaire, en euros">P.U. (€)</div>
-                        <div class="bg-clay-50 px-1.5 py-1 text-right" title="Quantité × prix unitaire, en euros">Total (€)</div>
-                        <div class="px-1.5 py-1 text-right">Ratio</div>
-                        <div
-                            class="bg-olive-50 px-1.5 py-1 text-right"
-                            title="Partagée avec Estimation achat (METL::Quantity)"
-                        >
-                            Qté
-                        </div>
-                        <div class="bg-olive-50 px-1.5 py-1 text-right" title="Prix unitaire, en euros">P.U. (€)</div>
-                        <div class="bg-olive-50 px-1.5 py-1 text-right" title="Quantité × prix unitaire, en euros">Total (€)</div>
-                        <div class="bg-mallow-50 px-1.5 py-1 text-right">Qté</div>
-                        <div class="bg-mallow-50 px-1.5 py-1 text-right" title="Prix unitaire, en euros">P.U. (€)</div>
-                        <div class="bg-mallow-50 px-1.5 py-1 text-right" title="Quantité × prix unitaire, en euros">Total (€)</div>
+                        <template v-for="block in blocks" :key="block.key">
+                            <div
+                                class="px-1.5 py-1 text-right"
+                                :class="block.headClass"
+                                :title="sharedQuantity && block.quantityField === 'quantity'
+                                    ? `Partagée avec ${block.key === 'achats' ? 'Vendu client' : 'Estimation achat'} (METL::Quantity)`
+                                    : undefined"
+                            >
+                                Qté
+                            </div>
+                            <div
+                                class="px-1.5 py-1 text-right"
+                                :class="block.headClass"
+                                title="Prix unitaire, en euros"
+                            >
+                                P.U. (€)
+                            </div>
+                            <div
+                                class="px-1.5 py-1 text-right"
+                                :class="block.headClass"
+                                title="Quantité × prix unitaire, en euros"
+                            >
+                                Total (€)
+                            </div>
+                            <div v-if="showRatio && block.key === 'achats'" class="px-1.5 py-1 text-right">Ratio</div>
+                        </template>
                         <div class="px-1 py-1 text-center">Sél.</div>
                         <div class="px-1 py-1" />
                         <div class="px-1 py-1" />
@@ -557,88 +653,50 @@ const breadcrumbs = computed(() => [
                         <option v-for="unit in units" :key="unit" :value="unit">{{ unit }}</option>
                     </select>
 
-                    <!-- Estimation achat -->
-                    <input
-                        type="number" step="any"
-                        :value="row.quantity"
-                        :disabled="readOnly"
-                        class="cell-input bg-clay-50/70 text-right tabular-nums focus:bg-white"
-                        title="METL::Quantity — partagée avec Vendu client"
-                        @input="editNumber(row, 'quantity', $event.target.value)"
-                        @blur="flushRow(row)"
-                    />
-                    <div class="relative bg-clay-50/70">
+                    <!-- Les blocs monétaires de la vue, dans l'ordre, et le ratio entre les
+                         deux prix qu'il divise. Une ligne ne connaît pas la vue : elle porte
+                         toujours les mêmes champs, seuls les blocs affichés changent. -->
+                    <template v-for="block in blocks" :key="block.key">
                         <input
                             type="number" step="any"
-                            :value="row.price_buy"
+                            :value="row[block.quantityField]"
                             :disabled="readOnly"
-                            class="cell-input pr-4 text-right tabular-nums focus:bg-white"
-                            @input="editNumber(row, 'price_buy', $event.target.value)"
+                            class="cell-input text-right tabular-nums focus:bg-white"
+                            :class="block.cellClass"
+                            :title="sharedQuantity && block.quantityField === 'quantity'
+                                ? `METL::Quantity — partagée avec ${block.key === 'achats' ? 'Vendu client' : 'Estimation achat'}`
+                                : undefined"
+                            @input="editNumber(row, block.quantityField, $event.target.value)"
                             @blur="flushRow(row)"
                         />
-                        <span class="euro-suffix">€</span>
-                    </div>
-                    <div class="bg-clay-50/70 px-1.5 py-1 text-right tabular-nums text-sand-700">
-                        {{ money(row.computed.price_total_buy_no_options) }}
-                    </div>
+                        <div class="relative" :class="block.cellClass">
+                            <input
+                                type="number" step="any"
+                                :value="row[block.priceField]"
+                                :disabled="readOnly"
+                                class="cell-input pr-4 text-right tabular-nums focus:bg-white"
+                                @input="editNumber(row, block.priceField, $event.target.value)"
+                                @blur="flushRow(row)"
+                            />
+                            <span class="euro-suffix">€</span>
+                        </div>
+                        <div
+                            class="px-1.5 py-1 text-right tabular-nums text-sand-700"
+                            :class="block.cellClass"
+                        >
+                            {{ money(row.computed[block.totalKey]) }}
+                        </div>
 
-                    <!-- Derived from the two unit prices either side of it, so it cannot drift
-                         out of step with them. Read-only by construction: there is nothing to write. -->
-                    <div
-                        class="px-1.5 py-1 text-right tabular-nums text-sand-600"
-                        title="P.U. vendu client ÷ P.U. estimation achat — calculé, non modifiable"
-                    >
-                        {{ row.computed.price_ratio ?? '—' }}
-                    </div>
-
-                    <!-- Vendu client -->
-                    <input
-                        type="number" step="any"
-                        :value="row.quantity"
-                        :disabled="readOnly"
-                        class="cell-input bg-olive-50/70 text-right tabular-nums focus:bg-white"
-                        title="METL::Quantity — partagée avec Estimation achat"
-                        @input="editNumber(row, 'quantity', $event.target.value)"
-                        @blur="flushRow(row)"
-                    />
-                    <div class="relative bg-olive-50/70">
-                        <input
-                            type="number" step="any"
-                            :value="row.price_sales"
-                            :disabled="readOnly"
-                            class="cell-input pr-4 text-right tabular-nums focus:bg-white"
-                            @input="editNumber(row, 'price_sales', $event.target.value)"
-                            @blur="flushRow(row)"
-                        />
-                        <span class="euro-suffix">€</span>
-                    </div>
-                    <div class="bg-olive-50/70 px-1.5 py-1 text-right tabular-nums text-sand-700">
-                        {{ money(row.computed.price_total_sales_no_options) }}
-                    </div>
-
-                    <!-- Commande -->
-                    <input
-                        type="number" step="any"
-                        :value="row.quantity_ordered"
-                        :disabled="readOnly"
-                        class="cell-input bg-mallow-50/70 text-right tabular-nums focus:bg-white"
-                        @input="editNumber(row, 'quantity_ordered', $event.target.value)"
-                        @blur="flushRow(row)"
-                    />
-                    <div class="relative bg-mallow-50/70">
-                        <input
-                            type="number" step="any"
-                            :value="row.price_ordered"
-                            :disabled="readOnly"
-                            class="cell-input pr-4 text-right tabular-nums focus:bg-white"
-                            @input="editNumber(row, 'price_ordered', $event.target.value)"
-                            @blur="flushRow(row)"
-                        />
-                        <span class="euro-suffix">€</span>
-                    </div>
-                    <div class="bg-mallow-50/70 px-1.5 py-1 text-right tabular-nums text-sand-700">
-                        {{ money(row.computed.price_total_ordered_no_options) }}
-                    </div>
+                        <!-- Derived from the two unit prices either side of it, so it cannot drift
+                             out of step with them. Read-only by construction: there is nothing to write. -->
+                        <div
+                            v-if="showRatio && block.key === 'achats'"
+                            class="px-1.5 py-1 text-right tabular-nums text-sand-600"
+                            title="P.U. vendu client ÷ P.U. estimation achat — calculé, non modifiable"
+                        >
+                            {{ row.computed.price_ratio ?? '—' }}
+                        </div>
+                    </template>
 
                     <!-- Selection -->
                     <div class="flex justify-center">
@@ -817,7 +875,7 @@ const breadcrumbs = computed(() => [
             <span v-if="selected.size" class="text-sand-900">
                 {{ selected.size }} sélectionnée{{ selected.size === 1 ? '' : 's' }}
             </span>
-            <span class="ml-auto flex items-center gap-1.5">
+            <span v-if="sharedQuantity" class="ml-auto flex items-center gap-1.5">
                 <span class="size-2 rounded-full bg-clay-500" aria-hidden="true" />
                 <span class="size-2 rounded-full bg-olive-500" aria-hidden="true" />
                 Qté « Estimation achat » et « Vendu client » sont le même champ (METL::Quantity)

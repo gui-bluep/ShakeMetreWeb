@@ -8,10 +8,12 @@ use App\Models\MetreLine;
 use App\Models\MetreLineComponent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * The "Achats — Ventes — Commandes" view: what the page carries, the line create/duplicate/
+ * The four money views of a métré's lines - "Achats — Ventes — Commandes" and its three narrower
+ * cuts, all rendered by one page: what the page carries, the line create/duplicate/
  * delete actions, and the fields it adds to the shared metre-line whitelist.
  */
 class MetreLineDetailViewTest extends TestCase
@@ -42,9 +44,74 @@ class MetreLineDetailViewTest extends TestCase
         return MetreLine::forceCreate($attributes + ['metre_id' => $this->metre->id]);
     }
 
-    private function url(): string
+    private function url(string $view = 'achats-ventes-commandes'): string
     {
-        return "/metres/{$this->metre->id}/lines/achats-ventes-commandes";
+        return "/metres/{$this->metre->id}/lines/{$view}";
+    }
+
+    // --- the four views --------------------------------------------------------------------
+
+    /**
+     * One page, four cuts of it: the slug says which money blocks are on screen and nothing
+     * else. Pinned here rather than in the template because it is what a view *is* - the page
+     * only decides how a block looks.
+     */
+    public static function viewProvider(): array
+    {
+        return [
+            'all three' => ['achats-ventes-commandes', ['achats', 'ventes', 'commandes']],
+            'achats — ventes' => ['achats-ventes', ['achats', 'ventes']],
+            'achats — commandes' => ['achats-commandes', ['achats', 'commandes']],
+            'ventes' => ['ventes', ['ventes']],
+        ];
+    }
+
+    #[DataProvider('viewProvider')]
+    public function test_each_view_renders_with_its_own_blocks(string $view, array $blocks): void
+    {
+        $this->actAsWriter();
+        $this->line(['description' => 'Terrassement', 'quantity' => 2, 'price_buy' => 50]);
+
+        $this->get($this->url($view))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Metres/LinesDetail')
+                ->where('view', $view)
+                ->where('blocks', $blocks)
+                ->has('lines', 1));
+    }
+
+    /**
+     * The payload does not change with the view: a line carries the same fields and the same
+     * computed values everywhere, so switching cut cannot change what a row means - only which
+     * columns are drawn. It is also what lets the narrow views reuse the wide one's resource.
+     */
+    #[DataProvider('viewProvider')]
+    public function test_every_view_carries_the_same_line_payload(string $view): void
+    {
+        $this->actAsWriter();
+        $this->line([
+            'description' => 'Terrassement',
+            'quantity' => 10, 'price_buy' => 70, 'price_sales' => 100,
+            'quantity_ordered' => 8, 'price_ordered' => 80,
+        ]);
+
+        $this->get($this->url($view))
+            ->assertInertia(fn ($page) => $page
+                ->where('lines.0.computed.price_total_buy_no_options', 700)
+                ->where('lines.0.computed.price_total_sales_no_options', 1000)
+                ->where('lines.0.computed.price_total_ordered_no_options', 640)
+                // Computed for every view, displayed only where both prices are on screen.
+                ->where('lines.0.computed.price_ratio', 1.43)
+                ->etc());
+    }
+
+    public function test_an_unknown_view_is_not_a_page(): void
+    {
+        $this->actAsWriter();
+
+        $this->get($this->url('achats-gains'))->assertNotFound();
+        $this->get($this->url('commandes'))->assertNotFound();
     }
 
     // --- the page --------------------------------------------------------------------------
