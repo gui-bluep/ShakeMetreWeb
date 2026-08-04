@@ -64,4 +64,38 @@ return [
         'token_ttl' => 840,
     ],
 
+    /*
+    | TEMPORAIRE — À SUPPRIMER À LA FIN DE LA MIGRATION.
+    |
+    | L'ancienne application ShakeMetre, hébergée sur serveur FileMaker, lue pendant
+    | le développement pour établir ce que la version web doit reproduire : le corps
+    | des scripts n'est pas la seule chose que l'export ne dit pas, et une copie de
+    | fichier posée sur un disque dérive de la réalité.
+    |
+    | Ce n'est PAS une dépendance de l'application. ShakeMetre devient purement web et
+    | ses données vivent dans la base de ce projet ; rien dans app/ ne doit lire ce
+    | bloc. Seuls des outils d'investigation jetables s'en servent, et il disparaît -
+    | avec ses variables d'environnement - quand la migration est finie. C'est aussi
+    | pourquoi ces clés ne sont pas dans .env.example : rien ne doit suggérer qu'une
+    | installation en a besoin.
+    |
+    | À l'inverse, `shakedesign` ci-dessus est permanent : cette frontière-là reste.
+    |
+    | Le compte doit porter le privilège étendu « Accès via FileMaker Data API
+    | (fmrest) ». Un compte en accès complet SANS ce privilège se fait refuser par
+    | l'API avec une erreur 9, ce qui se lit comme un mauvais mot de passe.
+    */
+    'shakemetre_filemaker' => [
+        'host' => env('SHAKEMETRE_FM_HOST'),
+        'database' => env('SHAKEMETRE_FM_DATABASE'),
+        'username' => env('SHAKEMETRE_FM_USERNAME'),
+        'password' => env('SHAKEMETRE_FM_PASSWORD'),
+
+        'version' => env('SHAKEMETRE_FM_API_VERSION', 'vLatest'),
+
+        'timeout' => env('SHAKEMETRE_FM_TIMEOUT', 30),
+        'connect_timeout' => env('SHAKEMETRE_FM_CONNECT_TIMEOUT', 5),
+        'verify' => env('SHAKEMETRE_FM_VERIFY_TLS', true),
+    ],
+
 ];
