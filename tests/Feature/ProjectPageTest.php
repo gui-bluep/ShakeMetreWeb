@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Lot;
 use App\Models\Metre;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -193,6 +194,137 @@ class ProjectPageTest extends TestCase
 
         $this->get('/projects/'.self::PROJECT)
             ->assertInertia(fn ($page) => $page->where('totals.total_ratio', null));
+    }
+
+    // --- the métré's ID within its project ---------------------------------------------------
+
+    public function test_a_metre_row_carries_its_id_within_the_project(): void
+    {
+        $this->actAsWriter();
+        $this->fakeProjectFound();
+
+        $this->metre(['ind_project' => 7, 'name' => 'Métré A']);
+
+        $this->get('/projects/'.self::PROJECT)
+            ->assertInertia(fn ($page) => $page->where('metres.0.ind_project', 7));
+    }
+
+    public function test_created_metres_are_numbered_from_one_within_the_project(): void
+    {
+        $this->actAsWriter();
+
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'Premier']);
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'Deuxième']);
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'Troisième']);
+
+        $this->assertDatabaseHas('metres', ['name' => 'Premier', 'ind_project' => 1]);
+        $this->assertDatabaseHas('metres', ['name' => 'Deuxième', 'ind_project' => 2]);
+        $this->assertDatabaseHas('metres', ['name' => 'Troisième', 'ind_project' => 3]);
+    }
+
+    /**
+     * The number is scoped to the project: the second project starts again at 1. That is the
+     * whole point of it rather than a global counter.
+     */
+    public function test_the_numbering_restarts_at_one_for_another_project(): void
+    {
+        $this->actAsWriter();
+
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'A1']);
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'A2']);
+        $this->post('/projects/PRJ-OTHER/metres', ['name' => 'B1']);
+
+        $this->assertDatabaseHas('metres', ['name' => 'A2', 'project_id' => self::PROJECT, 'ind_project' => 2]);
+        $this->assertDatabaseHas('metres', ['name' => 'B1', 'project_id' => 'PRJ-OTHER', 'ind_project' => 1]);
+    }
+
+    /**
+     * Not count + 1: deleting the middle métré of three must not hand the next one a number
+     * that is already taken.
+     */
+    public function test_a_gap_in_the_numbering_is_not_filled_in(): void
+    {
+        $this->actAsWriter();
+
+        $this->metre(['ind_project' => 1]);
+        $this->metre(['ind_project' => 3]);
+
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'Suivant']);
+
+        $this->assertDatabaseHas('metres', ['name' => 'Suivant', 'ind_project' => 4]);
+    }
+
+    /**
+     * The case the maximum of the surviving métrés cannot answer: delete the highest one and it
+     * drops, so "max + 1" would hand its number out a second time. A spent number stays spent -
+     * people refer to a métré by it.
+     */
+    public function test_deleting_the_last_metre_does_not_free_its_number(): void
+    {
+        $this->actAsWriter();
+
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'Un']);
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'Deux']);
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'Trois']);
+
+        $three = Metre::where('name', 'Trois')->sole();
+        $this->delete("/metres/{$three->id}")->assertRedirect();
+
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'Quatre']);
+
+        $this->assertDatabaseHas('metres', ['name' => 'Quatre', 'ind_project' => 4]);
+        $this->assertDatabaseMissing('metres', ['ind_project' => 3]);
+    }
+
+    /**
+     * And the same once every métré of the project is gone: the numbering does not restart,
+     * because the high-water mark is kept per project rather than derived from the rows.
+     */
+    public function test_emptying_a_project_does_not_restart_the_numbering(): void
+    {
+        $this->actAsWriter();
+
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'Un']);
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'Deux']);
+
+        foreach (Metre::all() as $metre) {
+            $this->delete("/metres/{$metre->id}");
+        }
+
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'Trois']);
+
+        $this->assertDatabaseHas('metres', ['name' => 'Trois', 'ind_project' => 3]);
+    }
+
+    /**
+     * The mark alone is not enough: a métré inserted with an explicit number - an import, or
+     * the test suite - never went through the allocator, so the highest live number is
+     * consulted too and the higher of the two wins.
+     */
+    public function test_a_number_inserted_outside_the_allocator_is_not_handed_out_again(): void
+    {
+        $this->actAsWriter();
+
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'Un']);
+        $this->metre(['ind_project' => 9]);
+
+        $this->post('/projects/'.self::PROJECT.'/metres', ['name' => 'Suivant']);
+
+        $this->assertDatabaseHas('metres', ['name' => 'Suivant', 'ind_project' => 10]);
+    }
+
+    /**
+     * The uniqueness is a database constraint, not just a convention the allocator follows -
+     * that is what makes two simultaneous creations fail loudly instead of both reading the
+     * same maximum and handing out the same ID.
+     */
+    public function test_two_metres_of_one_project_cannot_share_an_id(): void
+    {
+        $this->metre(['ind_project' => 1]);
+
+        $this->expectException(QueryException::class);
+
+        $this->metre(['ind_project' => 1]);
     }
 
     public function test_the_page_lists_the_project_lots(): void

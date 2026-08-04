@@ -299,6 +299,23 @@ class MetrePageTest extends TestCase
     }
 
     /**
+     * The copy takes the next ID in the project rather than the original's. Copying it verbatim
+     * made a métré and its duplicate both read as the same ID on the project page, which is
+     * exactly what a per-project number exists to prevent.
+     */
+    public function test_duplicating_gives_the_copy_the_next_id_in_the_project(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre(['ind_project' => 2]);
+
+        $this->post("/metres/{$metre->id}/duplicate");
+
+        $copy = Metre::where('id', '!=', $metre->id)->sole();
+        $this->assertSame(2, (int) $metre->fresh()->ind_project);
+        $this->assertSame(3, (int) $copy->ind_project);
+    }
+
+    /**
      * The site flag travels with the copy - it is an internal status, not a claim about a
      * client - which is also what keeps the copied totals legible, since Sales/Ordered/Gain are
      * gated on it.

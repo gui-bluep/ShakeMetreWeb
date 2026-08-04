@@ -84,6 +84,10 @@ class MetreController extends Controller
      * Tot_Sum_TotalBuy is gated on isAccepted_b, so "achats" on a fresh duplicate reads empty
      * until it is accepted. That is correct, not a bug.
      *
+     * ind_project is NOT copied: it is the métré's number within its project and has to stay
+     * unique there, so the copy takes the next one. Copying it made two métrés of the same
+     * project both answer to "ID 1", which is the whole thing that number exists to prevent.
+     *
      * Carts and tags are not copied either: nothing in the export says a duplicate should
      * inherit them, and inventing that is a guess about a feature not yet built here.
      */
@@ -96,7 +100,7 @@ class MetreController extends Controller
                 'language' => $metre->language,
                 'ratio_markup' => $metre->ratio_markup,
                 'is_status_site_b' => (bool) $metre->is_status_site_b,
-                'ind_project' => $metre->ind_project,
+                'ind_project' => Metre::nextIndProject($metre->project_id),
                 'sequence_number' => $metre->sequence_number,
                 'comment_client' => $metre->comment_client,
                 'comment_supplier' => $metre->comment_supplier,

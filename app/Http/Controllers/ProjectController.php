@@ -9,6 +9,7 @@ use App\Models\Metre;
 use App\Services\ShakeDesign\ShakeDesignClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -48,12 +49,18 @@ class ProjectController extends Controller
         ]);
     }
 
+    /**
+     * ind_project is allocated here rather than defaulted in the schema: it counts within one
+     * project, which no column default can express. In a transaction because the allocation
+     * reads the current maximum under a lock - see Metre::nextIndProject().
+     */
     public function storeMetre(StoreMetreRequest $request, string $project): RedirectResponse
     {
-        Metre::forceCreate([
+        DB::transaction(fn () => Metre::forceCreate([
             'project_id' => $project,
             'name' => $request->validated('name'),
-        ]);
+            'ind_project' => Metre::nextIndProject($project),
+        ]));
 
         return redirect()->route('projects.show', $project);
     }
@@ -82,8 +89,15 @@ class ProjectController extends Controller
     }
 
     /**
+     * `ind_project` is what the page shows as the métré's ID: its number within this project,
+     * from 1 up. The UUID stays in the payload because every link on the row is keyed on it,
+     * but it is never displayed - it is a ShakeDesign key, not a number anyone reads out.
+     *
+     * Null for a métré created before the numbering existed and never backfilled; the page
+     * shows an em dash rather than inventing a number that would collide with a real one.
+     *
      * @return array{
-     *     id: string, name: ?string, ratio: ?float,
+     *     id: string, ind_project: ?int, name: ?string, ratio: ?float,
      *     date_creation: ?string, date_agreement: ?string,
      *     is_accepted_b: bool, is_status_site_b: bool,
      *     total_offers: ?float, total_ordered: ?float, total_works: ?float, total_gain: ?float,
@@ -93,7 +107,9 @@ class ProjectController extends Controller
     {
         return [
             'id' => $metre->id,
+            'ind_project' => $metre->ind_project === null ? null : (int) $metre->ind_project,
             'name' => $metre->name,
+
             'ratio' => $metre->ratio(),
             'date_creation' => $metre->date_creation?->toDateString(),
             'date_agreement' => $metre->date_agreement?->toDateString(),

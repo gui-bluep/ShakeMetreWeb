@@ -76,10 +76,6 @@ function date(value) {
     return value ? dateFormat.format(new Date(value)) : '—';
 }
 
-function shortId(id) {
-    return id ? `${id.slice(0, 8)}…` : '—';
-}
-
 /**
  * Les mêmes chiffres que la ligne de total du tableau, remontés en tête d'écran.
  *
@@ -147,7 +143,10 @@ const tiles = computed(() => [
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th class="w-24">Réf.</th>
+                                    <!-- L'ID du métré dans son projet (1, 2, 3…), pas son UUID :
+                                         celui-ci est une clé ShakeDesign, illisible et jamais
+                                         affichée. -->
+                                    <th class="w-14">ID</th>
                                     <th>Nom</th>
                                     <th class="text-right">Ratio</th>
                                     <th class="text-right">Créé le</th>
@@ -164,7 +163,8 @@ const tiles = computed(() => [
                             <tbody>
                                 <tr v-for="metre in metres" :key="metre.id">
                                     <td>
-                                        <span class="code-chip" :title="metre.id">{{ shortId(metre.id) }}</span>
+                                        <span v-if="metre.ind_project !== null" class="code-chip">{{ metre.ind_project }}</span>
+                                        <span v-else class="text-sand-300">—</span>
                                     </td>
                                     <td>
                                         <!-- The métré's own page, not straight to the line grid: the

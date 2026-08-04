@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class Metre extends Model
 {
@@ -54,6 +55,7 @@ class Metre extends Model
      * FileMaker returns empty when either operand is empty, so null here. Division by zero
      * is guarded the same way: the source formula only checks for emptiness because
      * FileMaker yields an error rather than a value, which surfaces as empty in the portal.
+
      *
      * The single source of truth for this formula - both the ShakeDesign portal replica
      * (ProjectMetreResource) and the project page read it from here rather than each
@@ -78,6 +80,61 @@ class Metre extends Model
         }
 
         return round((float) $sales / (float) $purchase, 2);
+    }
+
+    /**
+     * The next `ind_project` for a project: MET_Metre::IndProject, the métré's number *within
+     * its own project*, starting at 1 and restarting at 1 for the next project. It is the
+     * identity the project page shows as "ID" - the UUID is a ShakeDesign key, unreadable and
+     * not project-scoped.
+     *
+     * The rule is stated by the user, not read off the export: IndProject is a plain Number
+     * field with no calculation, and no formula in the whole export references it, so one of
+     * the 274 scripts maintained it and script bodies are absent (`Has_DDR_INFO="False"`).
+     *
+     * A number that has been handed out is never handed out again, deleted or not: a métré's ID
+     * is how people refer to it, so three métrés numbered 1, 2, 3 minus the third means the
+     * next one is 4, not 3. That cannot be read off the métrés that exist - deleting the last
+     * one lowers their maximum - so the high-water mark is kept per project in
+     * `metre_number_sequences` and only ever moves up.
+     *
+     * The mark and the current maximum are both consulted, and the higher wins. The mark alone
+     * would miss a métré inserted with an explicit ind_project (an import, or the test suite);
+     * the maximum alone is the reuse bug. Together, neither can hand out a live number.
+     *
+     * Call inside a transaction: the row lock is what stops two simultaneous creations reading
+     * the same mark, and the (project_id, ind_project) unique index is the backstop if they do.
+     *
+     * A métré with no project has no project to be numbered within - only the test suite gets
+     * there - and falls back to max + 1 rather than inventing a sequence row keyed on null,
+     * which MySQL would not keep unique anyway.
+     */
+    public static function nextIndProject(?string $projectId): int
+    {
+        if ($projectId === null) {
+            return 1 + (int) static::query()->whereNull('project_id')->lockForUpdate()->max('ind_project');
+        }
+
+        $mark = DB::table('metre_number_sequences')
+            ->where('project_id', $projectId)
+            ->lockForUpdate()
+            ->value('last_ind_project');
+
+        $highest = (int) static::query()->where('project_id', $projectId)->max('ind_project');
+        $next = max((int) $mark, $highest) + 1;
+
+        DB::table('metre_number_sequences')->upsert(
+            [[
+                'project_id' => $projectId,
+                'last_ind_project' => $next,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]],
+            ['project_id'],
+            ['last_ind_project', 'updated_at'],
+        );
+
+        return $next;
     }
 
     /**
