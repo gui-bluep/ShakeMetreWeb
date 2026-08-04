@@ -1,7 +1,9 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
+import AppTopBar from '@/Components/AppTopBar.vue';
 import GridToasts from '@/Components/GridToasts.vue';
+import Icon from '@/Components/Icon.vue';
 import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
 
 /**
@@ -15,6 +17,10 @@ import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
  * a shortcut: PriceTotalBuy and PriceTotalSales both multiply by METL::Quantity in the source -
  * only the order total has its own (QuantityOrdered). Both inputs bind to `quantity`, so editing
  * either visibly moves the other rather than hiding the sharing.
+ *
+ * L'écran prend toute la hauteur et ne passe donc pas par AuthenticatedLayout ; il monte la
+ * barre supérieure lui-même, pour que la vue la plus utilisée de l'application ne soit pas la
+ * seule à ne pas porter la marque.
  */
 const props = defineProps({
     metre: { type: Object, required: true },
@@ -26,7 +32,7 @@ const props = defineProps({
 const page = usePage();
 const readOnly = computed(() => props.metre.is_locked_b || page.props.auth?.canWrite === false);
 const readOnlyReason = computed(() =>
-    props.metre.is_locked_b ? 'métré verrouillé' : 'compte en lecture seule'
+    props.metre.is_locked_b ? 'Métré verrouillé' : 'Compte en lecture seule'
 );
 
 function clone(line) {
@@ -344,129 +350,159 @@ const TEMPLATE = [
     'minmax(8rem, 0.8fr)',  // lot / tag
     'minmax(8rem, 0.8fr)',  // SOR
 ].join(' ');
+
+/**
+ * Le fil d'Ariane s'arrête au métré : le nom du projet vit dans ShakeDesign, et l'aller
+ * chercher par l'API de données pour un seul libellé ferait payer un appel distant à l'écran
+ * le plus chargé de l'application. La page du métré, elle, porte le chemin complet.
+ */
+const breadcrumbs = computed(() => [
+    { label: 'Projets', href: route('dashboard') },
+    { label: props.metre.name || 'Métré', href: `/metres/${props.metre.id}` },
+    { label: 'Achats — Ventes — Commandes' },
+]);
 </script>
 
 <template>
     <Head :title="`Achats — Ventes — Commandes · ${metre.name ?? 'Métré'}`" />
 
-    <div class="flex h-screen flex-col bg-gray-50" @click="popover = null">
-        <header class="flex shrink-0 flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-2">
-            <!-- Home -->
-            <Link href="/dashboard" class="shrink-0 rounded p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700" title="Accueil">
-                <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 10.5 12 3l9 7.5" stroke-linecap="round" stroke-linejoin="round" />
-                    <path d="M5 9.5V21h14V9.5" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+    <div class="flex h-screen flex-col bg-sand-100" @click="popover = null">
+        <AppTopBar :breadcrumbs="breadcrumbs" />
+
+        <!-- Barre d'outils : ce qu'on fait de la grille, séparé de où l'on se trouve. -->
+        <div class="flex shrink-0 flex-wrap items-center gap-2 border-b border-sand-200 bg-white px-3 py-2">
+            <Link :href="`/metres/${metre.id}`" class="btn btn-ghost btn-sm">
+                <Icon name="arrow-left" :size="3.5" />
+                Métré
             </Link>
 
-            <h1 class="shrink-0 text-sm font-semibold text-gray-900">{{ metre.name || 'Métré' }}</h1>
+            <span class="h-5 w-px bg-sand-200" aria-hidden="true" />
 
             <!-- Tags / Lots switch -->
-            <div class="flex shrink-0 rounded-md border border-gray-300 p-0.5 text-xs">
+            <div class="flex shrink-0 rounded-md border border-sand-300 bg-white p-0.5 text-xs">
                 <button
+                    v-for="mode in [{ key: 'lots', label: 'Lots' }, { key: 'tags', label: 'Tags' }]"
+                    :key="mode.key"
                     type="button"
-                    class="rounded px-2 py-0.5 transition"
-                    :class="grouping === 'lots' ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'"
-                    @click="grouping = 'lots'"
+                    class="rounded px-2.5 py-1 transition-colors"
+                    :class="grouping === mode.key
+                        ? 'bg-accent-400 text-sand-950'
+                        : 'text-sand-600 hover:bg-sand-100 hover:text-sand-900'"
+                    style="font-variation-settings: 'wght' 550"
+                    @click="grouping = mode.key"
                 >
-                    Lots
-                </button>
-                <button
-                    type="button"
-                    class="rounded px-2 py-0.5 transition"
-                    :class="grouping === 'tags' ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'"
-                    @click="grouping = 'tags'"
-                >
-                    Tags
+                    {{ mode.label }}
                 </button>
             </div>
 
-            <input
-                type="search"
-                :value="search"
-                placeholder="Rechercher une ligne…"
-                class="min-w-0 flex-1 rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                @input="search = $event.target.value"
-            />
+            <div class="relative min-w-0 flex-1">
+                <Icon
+                    name="search"
+                    :size="3.5"
+                    class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sand-400"
+                />
+                <input
+                    type="search"
+                    :value="search"
+                    placeholder="Rechercher une ligne…"
+                    class="block w-full py-1.5 pl-8 pr-2.5 text-xs"
+                    @input="search = $event.target.value"
+                />
+            </div>
 
-            <button
-                type="button"
-                class="shrink-0 rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 transition hover:bg-gray-50"
-                @click="toggleSelectAll"
-            >
+            <button type="button" class="btn btn-secondary btn-sm" @click="toggleSelectAll">
                 {{ allVisibleSelected ? 'Tout désélectionner' : 'Tout sélectionner' }}
-                <span v-if="selected.size" class="ml-1 text-gray-400">({{ selected.size }})</span>
+                <span v-if="selected.size" class="badge badge-accent">{{ selected.size }}</span>
             </button>
-
-            <Link
-                :href="`/metres/${metre.id}`"
-                class="shrink-0 rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 transition hover:bg-gray-50"
-            >
-                ← Métré
-            </Link>
 
             <button
                 v-if="!readOnly"
                 type="button"
-                class="shrink-0 rounded border border-transparent bg-gray-800 px-2 py-1 text-xs font-medium text-white transition hover:bg-gray-700 disabled:opacity-50"
+                class="btn btn-accent btn-sm"
                 :disabled="busy"
                 @click="addLine"
             >
-                + Ligne
+                <Icon name="plus" :size="3.5" />
+                Ligne
             </button>
 
-            <span v-if="readOnly" class="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
+            <span v-if="readOnly" class="badge badge-warning shrink-0">
+                <Icon name="lock" :size="3" />
                 {{ readOnlyReason }}
             </span>
-        </header>
+        </div>
 
         <div class="min-h-0 flex-1 overflow-auto">
             <div class="min-w-[92rem]">
-                <!-- Two-level header: the three money blocks, then the field labels. -->
-                <div
-                    class="sticky top-0 z-10 grid gap-px border-b border-gray-300 bg-white text-[10px] font-semibold uppercase tracking-wide"
-                    :style="{ gridTemplateColumns: TEMPLATE }"
-                >
-                    <div class="px-1 py-1" />
-                    <div class="col-span-3" />
-                    <div class="col-span-3 bg-red-100 px-1 py-1 text-center text-red-800">Estimation achat</div>
-                    <div />
-                    <div class="col-span-3 bg-green-100 px-1 py-1 text-center text-green-800">Vendu client</div>
-                    <div class="col-span-3 bg-blue-100 px-1 py-1 text-center text-blue-800">Commande</div>
-                    <div class="col-span-6" />
-                </div>
+                <!-- Les deux niveaux d'en-tête dans un seul conteneur collant : c'est ce qui
+                     supprime le `top-[22px]` qu'il fallait sinon recalculer à chaque changement
+                     de hauteur de la première ligne. -->
+                <div class="sticky top-0 z-20 border-b border-sand-300 bg-white">
+                    <!-- Les trois blocs monétaires -->
+                    <div
+                        class="grid text-[10px] uppercase tracking-[0.06em]"
+                        :style="{ gridTemplateColumns: TEMPLATE, fontVariationSettings: `'wght' 650` }"
+                    >
+                        <div class="px-1.5 py-1" />
+                        <div class="col-span-3" />
+                        <div class="col-span-3 bg-clay-100 px-1.5 py-1 text-center text-clay-700">
+                            Estimation achat
+                        </div>
+                        <div />
+                        <div class="col-span-3 bg-olive-100 px-1.5 py-1 text-center text-olive-700">
+                            Vendu client
+                        </div>
+                        <div class="col-span-3 bg-mallow-100 px-1.5 py-1 text-center text-mallow-700">
+                            Commande
+                        </div>
+                        <div class="col-span-6" />
+                    </div>
 
-                <div
-                    class="sticky top-[22px] z-10 grid gap-px border-b border-gray-300 bg-gray-100 text-[10px] font-medium uppercase tracking-wide text-gray-500"
-                    :style="{ gridTemplateColumns: TEMPLATE }"
-                >
-                    <div class="px-1 py-1">Titre</div>
-                    <div class="px-1 py-1 text-center" title="Prix estimé">Est.</div>
-                    <div class="px-1 py-1 text-center" title="Option">Opt.</div>
-                    <div class="px-1 py-1">Unité</div>
-                    <div class="bg-red-50 px-1 py-1 text-right" title="Partagée avec Vendu client (METL::Quantity)">Qté</div>
-                    <div class="bg-red-50 px-1 py-1 text-right">P.U.</div>
-                    <div class="bg-red-50 px-1 py-1 text-right">Total</div>
-                    <div class="px-1 py-1 text-right">Ratio</div>
-                    <div class="bg-green-50 px-1 py-1 text-right" title="Partagée avec Estimation achat (METL::Quantity)">Qté</div>
-                    <div class="bg-green-50 px-1 py-1 text-right">P.U.</div>
-                    <div class="bg-green-50 px-1 py-1 text-right">Total</div>
-                    <div class="bg-blue-50 px-1 py-1 text-right">Qté</div>
-                    <div class="bg-blue-50 px-1 py-1 text-right">P.U.</div>
-                    <div class="bg-blue-50 px-1 py-1 text-right">Total</div>
-                    <div class="px-1 py-1 text-center">Sél.</div>
-                    <div class="px-1 py-1" />
-                    <div class="px-1 py-1" />
-                    <div class="px-1 py-1 text-center">Livraison</div>
-                    <div class="px-1 py-1">{{ grouping === 'lots' ? 'Lot' : 'Tag' }}</div>
-                    <div class="px-1 py-1">Commande fourn.</div>
+                    <!-- Les libellés de colonne -->
+                    <div
+                        class="grid bg-sand-100 text-[10px] uppercase tracking-[0.06em] text-sand-600"
+                        :style="{ gridTemplateColumns: TEMPLATE, fontVariationSettings: `'wght' 600` }"
+                    >
+                        <div class="px-1.5 py-1">Titre</div>
+                        <div class="px-1 py-1 text-center" title="Prix estimé">Est.</div>
+                        <div class="px-1 py-1 text-center" title="Option">Opt.</div>
+                        <div class="px-1.5 py-1">Unité</div>
+                        <div
+                            class="bg-clay-50 px-1.5 py-1 text-right"
+                            title="Partagée avec Vendu client (METL::Quantity)"
+                        >
+                            Qté
+                        </div>
+                        <div class="bg-clay-50 px-1.5 py-1 text-right">P.U.</div>
+                        <div class="bg-clay-50 px-1.5 py-1 text-right">Total</div>
+                        <div class="px-1.5 py-1 text-right">Ratio</div>
+                        <div
+                            class="bg-olive-50 px-1.5 py-1 text-right"
+                            title="Partagée avec Estimation achat (METL::Quantity)"
+                        >
+                            Qté
+                        </div>
+                        <div class="bg-olive-50 px-1.5 py-1 text-right">P.U.</div>
+                        <div class="bg-olive-50 px-1.5 py-1 text-right">Total</div>
+                        <div class="bg-mallow-50 px-1.5 py-1 text-right">Qté</div>
+                        <div class="bg-mallow-50 px-1.5 py-1 text-right">P.U.</div>
+                        <div class="bg-mallow-50 px-1.5 py-1 text-right">Total</div>
+                        <div class="px-1 py-1 text-center">Sél.</div>
+                        <div class="px-1 py-1" />
+                        <div class="px-1 py-1" />
+                        <div class="px-1.5 py-1 text-center">Livraison</div>
+                        <div class="px-1.5 py-1">{{ grouping === 'lots' ? 'Lot' : 'Tag' }}</div>
+                        <div class="px-1.5 py-1">Commande fourn.</div>
+                    </div>
                 </div>
 
                 <div
                     v-for="row in visibleRows"
                     :key="row.id"
-                    class="grid items-center gap-px border-b border-gray-100 bg-white text-xs hover:bg-yellow-50/40"
-                    :class="selected.has(row.id) ? 'bg-blue-50/60' : ''"
+                    class="grid items-center border-b border-sand-200/70 text-xs transition-colors"
+                    :class="selected.has(row.id)
+                        ? 'bg-accent-100 shadow-[inset_2px_0_0_0_var(--color-accent-500)]'
+                        : 'bg-white hover:bg-accent-100/40'"
                     :style="{ gridTemplateColumns: TEMPLATE }"
                 >
                     <!-- Titre -->
@@ -474,7 +510,7 @@ const TEMPLATE = [
                         type="text"
                         :value="row.description"
                         :disabled="readOnly"
-                        class="w-full min-w-0 border-none bg-transparent px-1 py-1 text-xs focus:bg-white focus:ring-1 focus:ring-indigo-500 disabled:text-gray-500"
+                        class="cell-input focus:bg-white"
                         @input="editText(row, 'description', $event.target.value)"
                         @blur="flushRow(row)"
                     />
@@ -484,7 +520,7 @@ const TEMPLATE = [
                             type="checkbox"
                             :checked="row.is_estimated_price_b"
                             :disabled="readOnly"
-                            class="size-3.5 rounded border-gray-300 text-indigo-600"
+                            class="size-3.5"
                             title="Prix estimé"
                             @change="toggleField(row, 'is_estimated_price_b', $event.target.checked)"
                         />
@@ -495,7 +531,7 @@ const TEMPLATE = [
                             type="checkbox"
                             :checked="row.is_option_b"
                             :disabled="readOnly"
-                            class="size-3.5 rounded border-gray-300 text-indigo-600"
+                            class="size-3.5"
                             title="Option"
                             @change="toggleField(row, 'is_option_b', $event.target.checked)"
                         />
@@ -504,7 +540,7 @@ const TEMPLATE = [
                     <select
                         :value="row.unit ?? ''"
                         :disabled="readOnly"
-                        class="w-full border-none bg-transparent px-1 py-1 text-xs focus:bg-white focus:ring-1 focus:ring-indigo-500 disabled:text-gray-500"
+                        class="cell-input focus:bg-white"
                         @change="editText(row, 'unit', $event.target.value); flushRow(row)"
                     >
                         <option value="">—</option>
@@ -516,7 +552,7 @@ const TEMPLATE = [
                         type="number" step="any"
                         :value="row.quantity"
                         :disabled="readOnly"
-                        class="w-full border-none bg-red-50/60 px-1 py-1 text-right text-xs tabular-nums focus:bg-white focus:ring-1 focus:ring-indigo-500 disabled:text-gray-500"
+                        class="cell-input bg-clay-50/70 text-right tabular-nums focus:bg-white"
                         title="METL::Quantity — partagée avec Vendu client"
                         @input="editNumber(row, 'quantity', $event.target.value)"
                         @blur="flushRow(row)"
@@ -525,18 +561,18 @@ const TEMPLATE = [
                         type="number" step="any"
                         :value="row.price_buy"
                         :disabled="readOnly"
-                        class="w-full border-none bg-red-50/60 px-1 py-1 text-right text-xs tabular-nums focus:bg-white focus:ring-1 focus:ring-indigo-500 disabled:text-gray-500"
+                        class="cell-input bg-clay-50/70 text-right tabular-nums focus:bg-white"
                         @input="editNumber(row, 'price_buy', $event.target.value)"
                         @blur="flushRow(row)"
                     />
-                    <div class="bg-red-50/60 px-1 py-1 text-right tabular-nums text-gray-600">
+                    <div class="bg-clay-50/70 px-1.5 py-1 text-right tabular-nums text-sand-700">
                         {{ money(row.computed.price_total_buy_no_options) }}
                     </div>
 
                     <!-- Derived from the two unit prices either side of it, so it cannot drift
                          out of step with them. Read-only by construction: there is nothing to write. -->
                     <div
-                        class="px-1 py-1 text-right tabular-nums text-gray-500"
+                        class="px-1.5 py-1 text-right tabular-nums text-sand-600"
                         title="P.U. vendu client ÷ P.U. estimation achat — calculé, non modifiable"
                     >
                         {{ row.computed.price_ratio ?? '—' }}
@@ -547,7 +583,7 @@ const TEMPLATE = [
                         type="number" step="any"
                         :value="row.quantity"
                         :disabled="readOnly"
-                        class="w-full border-none bg-green-50/60 px-1 py-1 text-right text-xs tabular-nums focus:bg-white focus:ring-1 focus:ring-indigo-500 disabled:text-gray-500"
+                        class="cell-input bg-olive-50/70 text-right tabular-nums focus:bg-white"
                         title="METL::Quantity — partagée avec Estimation achat"
                         @input="editNumber(row, 'quantity', $event.target.value)"
                         @blur="flushRow(row)"
@@ -556,11 +592,11 @@ const TEMPLATE = [
                         type="number" step="any"
                         :value="row.price_sales"
                         :disabled="readOnly"
-                        class="w-full border-none bg-green-50/60 px-1 py-1 text-right text-xs tabular-nums focus:bg-white focus:ring-1 focus:ring-indigo-500 disabled:text-gray-500"
+                        class="cell-input bg-olive-50/70 text-right tabular-nums focus:bg-white"
                         @input="editNumber(row, 'price_sales', $event.target.value)"
                         @blur="flushRow(row)"
                     />
-                    <div class="bg-green-50/60 px-1 py-1 text-right tabular-nums text-gray-600">
+                    <div class="bg-olive-50/70 px-1.5 py-1 text-right tabular-nums text-sand-700">
                         {{ money(row.computed.price_total_sales_no_options) }}
                     </div>
 
@@ -569,7 +605,7 @@ const TEMPLATE = [
                         type="number" step="any"
                         :value="row.quantity_ordered"
                         :disabled="readOnly"
-                        class="w-full border-none bg-blue-50/60 px-1 py-1 text-right text-xs tabular-nums focus:bg-white focus:ring-1 focus:ring-indigo-500 disabled:text-gray-500"
+                        class="cell-input bg-mallow-50/70 text-right tabular-nums focus:bg-white"
                         @input="editNumber(row, 'quantity_ordered', $event.target.value)"
                         @blur="flushRow(row)"
                     />
@@ -577,11 +613,11 @@ const TEMPLATE = [
                         type="number" step="any"
                         :value="row.price_ordered"
                         :disabled="readOnly"
-                        class="w-full border-none bg-blue-50/60 px-1 py-1 text-right text-xs tabular-nums focus:bg-white focus:ring-1 focus:ring-indigo-500 disabled:text-gray-500"
+                        class="cell-input bg-mallow-50/70 text-right tabular-nums focus:bg-white"
                         @input="editNumber(row, 'price_ordered', $event.target.value)"
                         @blur="flushRow(row)"
                     />
-                    <div class="bg-blue-50/60 px-1 py-1 text-right tabular-nums text-gray-600">
+                    <div class="bg-mallow-50/70 px-1.5 py-1 text-right tabular-nums text-sand-700">
                         {{ money(row.computed.price_total_ordered_no_options) }}
                     </div>
 
@@ -590,7 +626,7 @@ const TEMPLATE = [
                         <input
                             type="checkbox"
                             :checked="selected.has(row.id)"
-                            class="size-3.5 rounded border-gray-300 text-indigo-600"
+                            class="size-3.5"
                             @change="toggleSelected(row)"
                         />
                     </div>
@@ -599,19 +635,16 @@ const TEMPLATE = [
                     <div class="relative flex justify-center" @click.stop>
                         <button
                             type="button"
-                            class="rounded px-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+                            class="btn btn-ghost rounded px-1 py-0.5"
                             title="Actions"
                             @click="togglePopover(row, 'actions')"
                         >
-                            ⋯
+                            <Icon name="ellipsis" :size="4" />
                         </button>
-                        <div
-                            v-if="isOpen(row, 'actions')"
-                            class="absolute right-0 top-6 z-20 w-40 rounded-md border border-gray-200 bg-white py-1 shadow-lg"
-                        >
+                        <div v-if="isOpen(row, 'actions')" class="popover absolute right-0 top-6 w-44">
                             <button
                                 type="button"
-                                class="block w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                                class="popover-item"
                                 :disabled="readOnly || busy"
                                 @click="duplicateLine(row)"
                             >
@@ -619,7 +652,7 @@ const TEMPLATE = [
                             </button>
                             <button
                                 type="button"
-                                class="block w-full px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-40"
+                                class="popover-item popover-item-danger"
                                 :disabled="readOnly || busy"
                                 @click="deleteLine(row)"
                             >
@@ -632,50 +665,48 @@ const TEMPLATE = [
                     <div class="relative flex justify-center" @click.stop>
                         <button
                             type="button"
-                            class="rounded px-1 transition hover:bg-gray-100"
-                            :class="row.comment_client || row.comment_supplier ? 'text-blue-600' : 'text-gray-300 hover:text-gray-600'"
+                            class="btn btn-ghost rounded px-1 py-0.5"
+                            :class="row.comment_client || row.comment_supplier ? 'text-mallow-600' : 'text-sand-400'"
                             title="Commentaires"
                             @click="togglePopover(row, 'comments')"
                         >
-                            ✎
+                            <Icon name="pencil" :size="3.5" />
                         </button>
-                        <div
-                            v-if="isOpen(row, 'comments')"
-                            class="absolute right-0 top-6 z-20 w-80 space-y-2 rounded-md border border-gray-200 bg-white p-3 shadow-lg"
-                        >
-                            <label class="block text-[11px] text-gray-500">
-                                Commentaire client
+                        <div v-if="isOpen(row, 'comments')" class="popover absolute right-0 top-6 w-80 space-y-2 p-3">
+                            <div>
+                                <label class="field-label">Commentaire client</label>
                                 <textarea
                                     rows="3"
                                     :value="row.comment_client"
                                     :disabled="readOnly"
-                                    class="mt-1 block w-full rounded border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-50"
+                                    class="block w-full px-2 py-1.5 text-xs"
                                     @input="editText(row, 'comment_client', $event.target.value)"
                                     @blur="flushRow(row)"
                                 />
-                            </label>
-                            <label class="block text-[11px] text-gray-500">
-                                Commentaire fournisseur
+                            </div>
+                            <div>
+                                <label class="field-label">Commentaire fournisseur</label>
                                 <textarea
                                     rows="3"
                                     :value="row.comment_supplier"
                                     :disabled="readOnly"
-                                    class="mt-1 block w-full rounded border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-50"
+                                    class="block w-full px-2 py-1.5 text-xs"
                                     @input="editText(row, 'comment_supplier', $event.target.value)"
                                     @blur="flushRow(row)"
                                 />
-                            </label>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Delivered: a status that is also the control that changes it. -->
-                    <div class="flex justify-center px-1">
+                    <div class="flex justify-center px-1.5">
                         <button
                             type="button"
-                            class="w-full rounded-full px-2 py-0.5 text-[10px] font-medium transition disabled:opacity-60"
+                            class="w-full rounded-full border px-2 py-0.5 text-[10px] transition-colors disabled:opacity-60"
                             :class="row.is_delivered_b
-                                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'"
+                                ? 'border-success-200 bg-success-50 text-success-700 hover:bg-success-100'
+                                : 'border-sand-200 bg-sand-100 text-sand-600 hover:bg-sand-200'"
+                            style="font-variation-settings: 'wght' 550"
                             :disabled="readOnly"
                             :title="row.is_delivered_b ? 'Livré — cliquer pour annuler' : 'Non livré — cliquer pour marquer livré'"
                             @click="toggleField(row, 'is_delivered_b', !row.is_delivered_b)"
@@ -688,8 +719,8 @@ const TEMPLATE = [
                     <div v-if="grouping === 'lots'" class="relative min-w-0 px-1" @click.stop>
                         <button
                             type="button"
-                            class="w-full truncate rounded px-1 py-0.5 text-left text-xs transition hover:bg-gray-100 disabled:hover:bg-transparent"
-                            :class="row.lot_name ? 'text-gray-900' : 'text-gray-400'"
+                            class="w-full truncate rounded px-1 py-0.5 text-left text-xs transition-colors hover:bg-sand-100 disabled:hover:bg-transparent"
+                            :class="row.lot_name ? 'text-sand-900' : 'text-sand-400'"
                             :disabled="readOnly"
                             :title="row.lot_name || 'Aucun lot'"
                             @click="togglePopover(row, 'lot')"
@@ -698,27 +729,23 @@ const TEMPLATE = [
                         </button>
                         <div
                             v-if="isOpen(row, 'lot')"
-                            class="absolute right-0 top-6 z-20 max-h-64 w-56 overflow-y-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg"
+                            class="popover absolute right-0 top-6 max-h-64 w-56 overflow-y-auto"
                         >
-                            <button
-                                type="button"
-                                class="block w-full px-3 py-1.5 text-left text-xs text-gray-500 hover:bg-gray-50"
-                                @click="assignLot(row, null)"
-                            >
+                            <button type="button" class="popover-item text-sand-600" @click="assignLot(row, null)">
                                 Aucun lot
                             </button>
                             <button
                                 v-for="lot in lots"
                                 :key="lot.id"
                                 type="button"
-                                class="block w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50"
-                                :class="lot.id === row.lot_id ? 'bg-blue-50' : ''"
+                                class="popover-item flex items-center gap-1.5"
+                                :class="lot.id === row.lot_id ? 'bg-accent-100' : ''"
                                 @click="assignLot(row, lot)"
                             >
-                                <span v-if="lot.code" class="tabular-nums text-gray-400">#{{ lot.code }}</span>
-                                {{ lot.name || 'Lot sans titre' }}
+                                <span v-if="lot.code" class="code-chip shrink-0">{{ lot.code }}</span>
+                                <span class="min-w-0 truncate">{{ lot.name || 'Lot sans titre' }}</span>
                             </button>
-                            <p v-if="lots.length === 0" class="px-3 py-2 text-xs text-gray-400">
+                            <p v-if="lots.length === 0" class="px-3 py-2 text-xs text-sand-600">
                                 Aucun lot sur ce projet.
                             </p>
                         </div>
@@ -727,7 +754,7 @@ const TEMPLATE = [
                     <!-- Tags mode: the stored tag, read-only until the switch's meaning is settled. -->
                     <div
                         v-else
-                        class="min-w-0 truncate px-1 py-1 text-xs text-gray-500"
+                        class="min-w-0 truncate px-1.5 py-1 text-xs text-sand-600"
                         title="METL::Tag1 — le rôle exact du bascule Tags reste à définir"
                     >
                         {{ row.tag1 || '—' }}
@@ -735,28 +762,47 @@ const TEMPLATE = [
 
                     <!-- Linked ShakeDesign supplier order. Displayed only: opening it in the
                          FileMaker client needs a confirmed fmp:// target - see the page note. -->
-                    <div class="min-w-0 truncate px-1 py-1 text-xs">
+                    <div class="min-w-0 truncate px-1.5 py-1 text-xs">
                         <span
                             v-if="row.sor_title_ref"
-                            class="text-gray-700"
+                            class="text-sand-700"
                             :title="`${row.sor_title_ref} — l'ouverture dans FileMaker n'est pas encore branchée`"
                         >
                             {{ row.sor_title_ref }}
                         </span>
-                        <span v-else class="text-gray-300">—</span>
+                        <span v-else class="text-sand-300">—</span>
                     </div>
                 </div>
 
-                <p v-if="visibleRows.length === 0" class="p-8 text-center text-sm text-gray-400">
-                    {{ rows.length === 0 ? "Ce métré n'a aucune ligne." : 'Aucune ligne ne correspond à la recherche.' }}
-                </p>
+                <div v-if="visibleRows.length === 0" class="flex flex-col items-center gap-2 bg-white py-16 text-center">
+                    <Icon name="table" :size="6" class="text-sand-300" />
+                    <p class="text-[13px] text-sand-700">
+                        {{ rows.length === 0 ? "Ce métré n'a aucune ligne." : 'Aucune ligne ne correspond à la recherche.' }}
+                    </p>
+                    <button
+                        v-if="rows.length === 0 && !readOnly"
+                        type="button"
+                        class="btn btn-secondary btn-sm mt-1"
+                        :disabled="busy"
+                        @click="addLine"
+                    >
+                        <Icon name="plus" :size="3.5" />
+                        Ajouter une ligne
+                    </button>
+                </div>
             </div>
         </div>
 
-        <footer class="flex shrink-0 items-center gap-4 border-t border-gray-200 bg-white px-4 py-1 text-[11px] text-gray-400">
+        <footer class="flex shrink-0 items-center gap-3 border-t border-sand-200 bg-white px-3 py-1.5 text-[11px] text-sand-600">
             <span>{{ visibleRows.length }} / {{ rows.length }} ligne{{ rows.length === 1 ? '' : 's' }}</span>
-            <span v-if="selected.size">{{ selected.size }} sélectionnée{{ selected.size === 1 ? '' : 's' }}</span>
-            <span class="ml-auto">Qté « Estimation achat » et « Vendu client » sont le même champ (METL::Quantity)</span>
+            <span v-if="selected.size" class="text-sand-900">
+                {{ selected.size }} sélectionnée{{ selected.size === 1 ? '' : 's' }}
+            </span>
+            <span class="ml-auto flex items-center gap-1.5">
+                <span class="size-2 rounded-full bg-clay-500" aria-hidden="true" />
+                <span class="size-2 rounded-full bg-olive-500" aria-hidden="true" />
+                Qté « Estimation achat » et « Vendu client » sont le même champ (METL::Quantity)
+            </span>
         </footer>
     </div>
 

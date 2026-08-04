@@ -351,7 +351,7 @@ function csrfToken() {
                             :type="column.type"
                             :value="lot[column.key]"
                             :disabled="readOnly"
-                            class="w-full min-w-0 rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-50"
+                            class="block w-full min-w-0 px-2 py-1.5"
                             :class="column.type === 'number' ? 'text-right tabular-nums' : ''"
                             @input="edit(lot, column, $event.target.value)"
                             @blur="flush(lot.id)"
@@ -361,7 +361,7 @@ function csrfToken() {
                              gets stored. -->
                         <button
                             type="button"
-                            class="w-full min-w-0 truncate rounded-md border border-gray-300 bg-white px-2 py-1.5 text-left text-sm shadow-sm hover:bg-gray-50 disabled:bg-gray-50 disabled:text-gray-400"
+                            class="w-full min-w-0 truncate rounded-md border border-sand-300 bg-white px-2 py-1.5 text-left text-[13px] text-sand-800 transition-colors hover:border-sand-400 hover:bg-sand-50 disabled:bg-sand-100 disabled:text-sand-500"
                             :disabled="readOnly"
                             :title="lot.company_name || 'Choisir un fournisseur'"
                             @click="openPicker(lot, 'company')"
@@ -375,7 +375,7 @@ function csrfToken() {
                              JCPYCTC, so without one there is no list to choose from. -->
                         <button
                             type="button"
-                            class="w-full min-w-0 truncate rounded-md border border-gray-300 bg-white px-2 py-1.5 text-left text-sm shadow-sm hover:bg-gray-50 disabled:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-gray-50"
+                            class="w-full min-w-0 truncate rounded-md border border-sand-300 bg-white px-2 py-1.5 text-left text-[13px] text-sand-800 transition-colors hover:border-sand-400 hover:bg-sand-50 disabled:bg-sand-100 disabled:text-sand-500 disabled:hover:border-sand-300"
                             :disabled="readOnly || !lot.company_id"
                             :title="
                                 !lot.company_id

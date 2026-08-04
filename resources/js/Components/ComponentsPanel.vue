@@ -291,7 +291,7 @@ function money(value) {
             </div>
             <button
                 type="button"
-                class="ml-2 shrink-0 rounded px-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                class="btn btn-ghost btn-sm ml-2 px-1"
                 aria-label="Fermer le panneau"
                 @click="$emit('close')"
             >
@@ -300,7 +300,7 @@ function money(value) {
         </header>
 
         <div
-            class="grid shrink-0 items-center gap-px border-b border-gray-200 bg-gray-100 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-gray-500"
+            class="grid shrink-0 items-center gap-px border-b border-sand-300 bg-sand-100 px-2 py-1 text-[10px] uppercase tracking-[0.06em] text-sand-600"
             :style="{ gridTemplateColumns: gridTemplate }"
         >
             <div />
@@ -348,7 +348,7 @@ function money(value) {
                         :step="column.type === 'number' ? 'any' : null"
                         :value="row[column.key]"
                         :disabled="readOnly"
-                        class="w-full rounded border-none bg-transparent px-1 py-0.5 text-xs focus:bg-white focus:ring-2 focus:ring-blue-500 disabled:text-gray-400"
+                        class="cell-input focus:bg-white"
                         :class="column.type === 'number' ? 'text-right tabular-nums' : ''"
                         @input="edit(row, column.key, $event.target.value)"
                         @blur="flushRow(row)"
@@ -390,7 +390,7 @@ function money(value) {
         <footer v-if="!readOnly" class="shrink-0 border-t border-gray-200 px-3 py-2">
             <button
                 type="button"
-                class="rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                class="btn btn-secondary btn-sm"
                 :disabled="busy"
                 @click="addRow"
             >

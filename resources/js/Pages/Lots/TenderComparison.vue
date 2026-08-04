@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { Head, usePage } from '@inertiajs/vue3';
+import AppTopBar from '../../Components/AppTopBar.vue';
 import { useDebouncedRowSave } from '../../composables/useDebouncedRowSave';
 
 /**
@@ -400,19 +401,25 @@ function shortId(id) {
 <template>
     <Head :title="`Appel d'offres — ${lot.title ?? 'Lot ' + lot.code}`" />
 
-    <div class="min-h-screen bg-gray-50 pb-16">
-        <header class="border-b border-gray-200 bg-white px-6 py-4">
-            <h1 class="text-sm font-semibold text-gray-900">
+    <div class="min-h-screen bg-sand-100 pb-16">
+        <AppTopBar
+            :breadcrumbs="[
+                { label: 'Projets', href: route('dashboard') },
+                { label: `Appel d'offres — ${lot.title ?? 'Lot ' + lot.code}` },
+            ]"
+        />
+
+        <!-- Le badge « lecture seule » est dans la barre supérieure : c'est une propriété du
+             compte, pas de cet écran. -->
+        <header class="border-b border-sand-200 bg-white px-6 py-3">
+            <h1 class="text-[17px] leading-tight text-sand-900" style="font-variation-settings: 'wght' 600">
                 Comparaison fournisseurs — {{ lot.title ?? `Lot ${lot.code}` }}
             </h1>
-            <p v-if="readOnly" class="mt-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
-                compte en lecture seule
-            </p>
         </header>
 
         <!-- Weighting: shared across every supplier. Notes per supplier live in the panels below. -->
-        <section class="mx-6 mt-4 rounded border border-gray-200 bg-white p-4">
-            <h2 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Pondération</h2>
+        <section class="surface mx-6 mt-4 p-4">
+            <h2 class="eyebrow">Pondération</h2>
 
             <div class="mt-3 grid grid-cols-[120px_1fr_90px] items-center gap-x-3 gap-y-2 text-xs">
                 <label class="text-gray-600">Prix</label>
@@ -422,7 +429,7 @@ function shortId(id) {
                     step="any"
                     :value="lot.weighting.price"
                     :disabled="readOnly"
-                    class="w-full rounded border border-gray-200 px-2 py-1 text-right tabular-nums focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                    class="block w-full px-2 py-1 text-right tabular-nums"
                     @input="editWeightingPrice($event.target.value)"
                     @blur="flushLotRow"
                 />
@@ -434,7 +441,7 @@ function shortId(id) {
                         :value="lot.weighting.criteria[criterion].description"
                         :disabled="readOnly"
                         placeholder="Description du critère"
-                        class="w-full rounded border border-gray-200 px-2 py-1 focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                        class="block w-full px-2 py-1"
                         @input="editCriterionDescription(criterion, $event.target.value)"
                         @blur="flushLotRow"
                     />
@@ -443,7 +450,7 @@ function shortId(id) {
                         step="any"
                         :value="lot.weighting.criteria[criterion].weight"
                         :disabled="readOnly"
-                        class="w-full rounded border border-gray-200 px-2 py-1 text-right tabular-nums focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                        class="block w-full px-2 py-1 text-right tabular-nums"
                         @input="editCriterionWeight(criterion, $event.target.value)"
                         @blur="flushLotRow"
                     />
@@ -456,10 +463,10 @@ function shortId(id) {
         </section>
 
         <!-- Lines of the tender, one price + quantity column pair per assigned supplier. -->
-        <section class="mx-6 mt-4 overflow-x-auto rounded border border-gray-200 bg-white">
+        <section class="surface mx-6 mt-4 overflow-x-auto">
             <table class="w-full border-collapse text-xs">
                 <thead>
-                    <tr class="border-b border-gray-200 bg-gray-100 text-[11px] uppercase tracking-wide text-gray-500">
+                    <tr class="border-b border-sand-200 bg-sand-100 text-[10px] uppercase tracking-[0.06em] text-sand-600">
                         <th class="px-2 py-2 text-left" rowspan="2">Désignation</th>
                         <th
                             v-for="supplier in suppliers"
@@ -470,7 +477,7 @@ function shortId(id) {
                             Fournisseur {{ supplier.slot }}
                         </th>
                     </tr>
-                    <tr class="border-b border-gray-200 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-400">
+                    <tr class="border-b border-sand-200 bg-sand-50 text-[10px] uppercase tracking-[0.06em] text-sand-500">
                         <template v-for="supplier in suppliers" :key="supplier.slot">
                             <th class="border-l border-gray-200 px-2 py-1 text-right">P.U.</th>
                             <th class="px-2 py-1 text-right">Qté</th>
@@ -482,7 +489,7 @@ function shortId(id) {
                     <tr v-for="line in lines" :key="line.id" class="border-b border-gray-100 hover:bg-blue-50/30">
                         <td class="px-2 py-1">
                             <span :class="line.is_option_b ? 'text-gray-400' : ''">{{ line.description || '—' }}</span>
-                            <span v-if="line.is_option_b" class="ml-1 rounded bg-gray-100 px-1 text-[10px] text-gray-500">option</span>
+                            <span v-if="line.is_option_b" class="badge badge-neutral ml-1">option</span>
                         </td>
                         <template v-for="supplier in suppliers" :key="supplier.slot">
                             <td class="border-l border-gray-100 px-1 py-1">
@@ -537,7 +544,9 @@ function shortId(id) {
                     </div>
                     <span
                         class="rounded-full px-2 py-0.5 text-[11px] font-medium"
-                        :class="scoring.suppliers[supplier.slot]?.rank === 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'"
+                        :class="scoring.suppliers[supplier.slot]?.rank === 1
+                            ? 'border border-accent-500 bg-accent-200 text-sand-900'
+                            : 'bg-sand-100 text-sand-600'"
                     >
                         {{ ordinal(scoring.suppliers[supplier.slot]?.rank) }}
                     </span>
@@ -570,7 +579,7 @@ function shortId(id) {
                             max="100"
                             :value="lot.weighting.criteria[criterion].notes[supplier.slot]"
                             :disabled="readOnly"
-                            class="w-14 shrink-0 rounded border border-gray-200 px-1 py-0.5 text-right text-xs tabular-nums focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                            class="w-14 shrink-0 px-1 py-0.5 text-right text-xs tabular-nums"
                             @input="editNote(criterion, supplier.slot, $event.target.value)"
                             @blur="flushLotRow"
                         />
@@ -594,7 +603,7 @@ function shortId(id) {
                 <button
                     v-else-if="!readOnly"
                     type="button"
-                    class="mt-3 rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                    class="btn btn-secondary btn-sm mt-3"
                     :disabled="awarding === supplier.slot"
                     @click="award(supplier)"
                 >

@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { Head, usePage } from '@inertiajs/vue3';
 import { useVirtualizer } from '@tanstack/vue-virtual';
+import AppTopBar from '../../Components/AppTopBar.vue';
 import ComponentsPanel from '../../Components/ComponentsPanel.vue';
 import GridToasts from '../../Components/GridToasts.vue';
 import { useDebouncedRowSave } from '../../composables/useDebouncedRowSave';
@@ -297,27 +298,40 @@ function money(value) {
 <template>
     <Head :title="`Lignes — ${metre.name ?? 'Métré'}`" />
 
-    <div class="flex h-screen">
+    <div class="flex h-screen flex-col bg-sand-100">
+      <AppTopBar
+          :breadcrumbs="[
+              { label: 'Projets', href: route('dashboard') },
+              { label: metre.name || 'Métré', href: `/metres/${metre.id}` },
+              { label: 'Lignes du métré' },
+          ]"
+      />
+
+      <div class="flex min-h-0 flex-1">
       <div class="flex min-w-0 flex-1 flex-col">
-        <header class="flex items-baseline justify-between border-b border-gray-200 bg-white px-4 py-3">
-            <div>
-                <h1 class="text-sm font-semibold text-gray-900">{{ metre.name ?? 'Métré' }}</h1>
-                <p class="mt-0.5 text-xs text-gray-500">
-                    {{ rows.length }} ligne{{ rows.length === 1 ? '' : 's' }}
-                    <span v-if="readOnly" class="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">
-                        {{ readOnlyReason }}
-                    </span>
-                </p>
-            </div>
-            <p class="text-xs text-gray-400">
+        <header class="flex shrink-0 flex-wrap items-center gap-3 border-b border-sand-200 bg-white px-4 py-2">
+            <span class="text-[13px] text-sand-700">
+                {{ rows.length }} ligne{{ rows.length === 1 ? '' : 's' }}
+            </span>
+
+            <!-- Le badge « compte en lecture seule » est dans la barre supérieure ; celui-ci
+                 reste ici parce qu'il peut aussi dire « métré verrouillé », qui est une
+                 propriété de l'écran et non du compte. -->
+            <span v-if="readOnly" class="badge badge-warning">{{ readOnlyReason }}</span>
+
+            <p class="ml-auto text-xs text-sand-600">
                 Flèches / Tab / Entrée pour naviguer · sauvegarde automatique
             </p>
         </header>
 
         <!-- Column headers, outside the scroller so they stay put; same template as the rows. -->
         <div
-            class="grid shrink-0 items-center gap-px border-b border-gray-200 bg-gray-100 px-2 text-[11px] font-medium uppercase tracking-wide text-gray-500"
-            :style="{ gridTemplateColumns: gridTemplate, height: `${ROW_HEIGHT}px` }"
+            class="grid shrink-0 items-center gap-px border-b border-sand-300 bg-sand-100 px-2 text-[10px] uppercase tracking-[0.06em] text-sand-600"
+            :style="{
+                gridTemplateColumns: gridTemplate,
+                height: `${ROW_HEIGHT}px`,
+                fontVariationSettings: `'wght' 600`,
+            }"
         >
             <div class="text-right tabular-nums">#</div>
             <div v-for="column in EDITABLE_COLUMNS" :key="column.key" class="truncate px-1">
@@ -326,7 +340,7 @@ function money(value) {
             <div
                 v-for="column in COMPUTED_COLUMNS"
                 :key="column.key"
-                class="truncate px-1 text-right text-gray-400"
+                class="truncate px-1 text-right text-sand-500"
                 :title="`${column.label} — calculé, non modifiable`"
             >
                 {{ column.label }}
@@ -340,10 +354,10 @@ function money(value) {
                 <div
                     v-for="virtualRow in virtualRows"
                     :key="rows[virtualRow.index].id"
-                    class="absolute left-0 top-0 grid w-full items-center gap-px border-b border-gray-100 px-2 hover:bg-blue-50/40"
+                    class="absolute left-0 top-0 grid w-full items-center gap-px border-b border-sand-200/70 px-2 hover:bg-accent-100/40"
                     :class="
                         rows[virtualRow.index].id === selectedLineId
-                            ? 'bg-blue-50 ring-1 ring-inset ring-blue-200'
+                            ? 'bg-accent-100 shadow-[inset_2px_0_0_0_var(--color-accent-500)]'
                             : ''
                     "
                     :style="{
@@ -367,7 +381,7 @@ function money(value) {
                     >
                         <span
                             v-if="rows[virtualRow.index].has_components"
-                            class="size-1.5 rounded-full bg-blue-400"
+                            class="size-1.5 rounded-full bg-mallow-500"
                             aria-hidden="true"
                         />
                         {{ virtualRow.index + 1 }}
@@ -380,7 +394,7 @@ function money(value) {
                             :value="rows[virtualRow.index].reference_id ?? ''"
                             :data-cell="`${virtualRow.index}-${colIndex}`"
                             :disabled="readOnly"
-                            class="w-full rounded border-none bg-transparent px-1 py-0.5 text-xs focus:bg-white focus:ring-2 focus:ring-blue-500"
+                            class="cell-input focus:bg-white"
                             @change="edit(rows[virtualRow.index], column.key, $event.target.value)"
                             @blur="flushRow(rows[virtualRow.index])"
                             @keydown="onCellKeydown($event, virtualRow.index, colIndex)"
@@ -397,7 +411,7 @@ function money(value) {
                             :value="rows[virtualRow.index].sub_reference_id ?? ''"
                             :data-cell="`${virtualRow.index}-${colIndex}`"
                             :disabled="readOnly || !rows[virtualRow.index].reference_id"
-                            class="w-full rounded border-none bg-transparent px-1 py-0.5 text-xs focus:bg-white focus:ring-2 focus:ring-blue-500 disabled:text-gray-300"
+                            class="cell-input focus:bg-white disabled:text-sand-400"
                             @change="edit(rows[virtualRow.index], column.key, $event.target.value)"
                             @blur="flushRow(rows[virtualRow.index])"
                             @keydown="onCellKeydown($event, virtualRow.index, colIndex)"
@@ -419,7 +433,7 @@ function money(value) {
                                 :checked="rows[virtualRow.index].is_option_b"
                                 :data-cell="`${virtualRow.index}-${colIndex}`"
                                 :disabled="readOnly"
-                                class="size-3.5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                                class="size-3.5"
                                 @change="edit(rows[virtualRow.index], column.key, $event.target.checked)"
                                 @blur="flushRow(rows[virtualRow.index])"
                                 @keydown="onCellKeydown($event, virtualRow.index, colIndex)"
@@ -435,7 +449,7 @@ function money(value) {
                             :data-cell="`${virtualRow.index}-${colIndex}`"
                             :disabled="isCellDisabled(rows[virtualRow.index], column.key)"
                             :title="disabledReason(rows[virtualRow.index], column.key)"
-                            class="w-full rounded border-none bg-transparent px-1 py-0.5 text-right text-xs tabular-nums focus:bg-white focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-300"
+                            class="cell-input text-right tabular-nums focus:bg-white disabled:text-sand-400"
                             @input="edit(rows[virtualRow.index], column.key, $event.target.value)"
                             @blur="flushRow(rows[virtualRow.index])"
                             @keydown="onCellKeydown($event, virtualRow.index, colIndex)"
@@ -448,7 +462,7 @@ function money(value) {
                             :value="rows[virtualRow.index][column.key]"
                             :data-cell="`${virtualRow.index}-${colIndex}`"
                             :disabled="readOnly"
-                            class="w-full rounded border-none bg-transparent px-1 py-0.5 text-xs focus:bg-white focus:ring-2 focus:ring-blue-500"
+                            class="cell-input focus:bg-white"
                             @input="edit(rows[virtualRow.index], column.key, $event.target.value)"
                             @blur="flushRow(rows[virtualRow.index])"
                             @keydown="onCellKeydown($event, virtualRow.index, colIndex)"
@@ -463,8 +477,8 @@ function money(value) {
                         :class="
                             column.key === 'price_total_gain_no_options' &&
                             rows[virtualRow.index].computed[column.key] < 0
-                                ? 'text-red-600'
-                                : 'text-gray-500'
+                                ? 'text-danger-600'
+                                : 'text-sand-600'
                         "
                     >
                         {{ money(rows[virtualRow.index].computed[column.key]) }}
@@ -474,24 +488,24 @@ function money(value) {
                     <div class="flex justify-center">
                         <span
                             v-if="status[rows[virtualRow.index].id] === 'saving'"
-                            class="size-1.5 rounded-full bg-blue-400"
+                            class="size-1.5 rounded-full bg-info-500"
                             title="Sauvegarde…"
                         />
                         <span
                             v-else-if="status[rows[virtualRow.index].id] === 'error'"
-                            class="size-1.5 rounded-full bg-red-500"
+                            class="size-1.5 rounded-full bg-danger-500"
                             title="Échec de sauvegarde"
                         />
                         <span
                             v-else-if="status[rows[virtualRow.index].id] === 'saved'"
-                            class="size-1.5 rounded-full bg-emerald-400"
+                            class="size-1.5 rounded-full bg-success-500"
                             title="Enregistré"
                         />
                     </div>
                 </div>
             </div>
 
-            <p v-if="rows.length === 0" class="p-8 text-center text-sm text-gray-400">
+            <p v-if="rows.length === 0" class="p-10 text-center text-[13px] text-sand-600">
                 Ce métré n'a aucune ligne.
             </p>
         </div>
@@ -504,6 +518,7 @@ function money(value) {
           @line-updated="applyLineUpdate"
           @error="(message) => notify(selectedLineId, message)"
       />
+      </div>
     </div>
 
     <GridToasts :toasts="toasts" @dismiss="dismiss" />

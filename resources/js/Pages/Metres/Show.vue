@@ -1,9 +1,13 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import AppCard from '@/Components/AppCard.vue';
+import Badge from '@/Components/Badge.vue';
 import DangerButton from '@/Components/DangerButton.vue';
+import Icon from '@/Components/Icon.vue';
 import Modal from '@/Components/Modal.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import StatTile from '@/Components/StatTile.vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
 
@@ -129,9 +133,12 @@ function destroy() {
 // --- not yet wired up ---------------------------------------------------------------------
 
 /**
- * Rendered as disabled buttons rather than omitted: the set of documents and views a métré
+ * Rendered as disabled rows rather than omitted: the set of documents and views a métré
  * offers is part of what this screen is, and hiding them would make the page look finished
  * when it is not. Each is enabled as it gets built.
+ *
+ * Chacun porte l'étiquette « Bientôt » plutôt qu'un simple bouton grisé : grisé seul, l'écran
+ * se lit comme cassé ou comme un droit manquant.
  */
 const DOCUMENTS = [
     'Budget client — complet',
@@ -161,264 +168,346 @@ const currency = new Intl.NumberFormat('fr-BE', { minimumFractionDigits: 2, maxi
 function money(value) {
     return value === null || value === undefined ? '—' : `${currency.format(value)} €`;
 }
+
+/**
+ * Les quatre totaux, dans le code couleur du domaine : argile pour les achats, olive pour les
+ * ventes, mauve pour les commandes — les mêmes que les trois blocs de la grille de lignes.
+ */
+const TOTALS = [
+    { label: 'Total des achats', key: 'purchases', tone: 'clay' },
+    { label: 'Total des ventes', key: 'sales', tone: 'olive' },
+    { label: 'Total des commandes', key: 'ordered', tone: 'mallow' },
+    { label: 'Gains', key: 'gain', tone: 'accent' },
+];
+
+const COMMENTS = [
+    { label: 'Commentaires client', key: 'comment_client' },
+    { label: 'Commentaires fournisseur', key: 'comment_supplier' },
+    { label: 'Commentaires internes', key: 'comment_internal' },
+];
+
+/** Un état actif se voit : bordure et fond marqués, plutôt qu'une case cochée de 14 px. */
+function statusClasses(active) {
+    return active
+        ? 'border-accent-500 bg-accent-100 text-sand-900'
+        : 'border-sand-300 bg-white text-sand-700 hover:border-sand-400';
+}
 </script>
 
 <template>
     <Head :title="form.name || 'Métré'" />
 
-    <AuthenticatedLayout>
-        <template #header>
-            <div class="grid grid-cols-3 items-center">
-                <div>
-                    <span
-                        v-if="readOnly"
-                        class="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800"
-                        title="Votre compte ShakeDesign est en lecture seule : les champs sont désactivés."
-                    >
-                        compte en lecture seule
-                    </span>
-                </div>
-
-                <h2 class="justify-self-center text-xl font-semibold leading-tight text-gray-800">
-                    {{ project.name || 'Projet sans nom' }}
-                </h2>
-
-                <div class="justify-self-end">
-                    <Link
-                        v-if="project.id"
-                        :href="`/projects/${project.id}`"
-                        class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition hover:bg-gray-50"
-                    >
-                        ← Retour au projet
-                    </Link>
-                </div>
-            </div>
+    <AuthenticatedLayout
+        :title="form.name || 'Métré sans nom'"
+        :breadcrumbs="[
+            { label: 'Projets', href: route('dashboard') },
+            { label: project.name || 'Projet sans nom', href: project.id ? `/projects/${project.id}` : null },
+            { label: form.name || 'Métré sans nom' },
+        ]"
+    >
+        <template #meta>
+            <Badge :tone="form.is_accepted_b ? 'success' : 'neutral'">
+                <Icon v-if="form.is_accepted_b" name="check" :size="3" />
+                {{ form.is_accepted_b ? 'Accepté' : 'Non accepté' }}
+            </Badge>
+            <Badge v-if="form.is_status_site_b" tone="info">Site</Badge>
+            <span>{{ lineCount }} ligne{{ lineCount === 1 ? '' : 's' }}</span>
+            <span>Ratio réel {{ form.ratio ?? '—' }}</span>
         </template>
 
-        <div class="py-8">
-            <div class="mx-auto max-w-screen-2xl space-y-4 px-4 sm:px-6 lg:px-8">
-                <p v-if="error" class="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+        <template #actions>
+            <Link v-if="project.id" :href="`/projects/${project.id}`" class="btn btn-secondary">
+                <Icon name="arrow-left" :size="4" />
+                Retour au projet
+            </Link>
+        </template>
 
-                <!-- Totals and comments live outside the cards. -->
-                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div v-for="total in [
-                        { label: 'Total des achats', key: 'purchases' },
-                        { label: 'Total des ventes', key: 'sales' },
-                        { label: 'Total des commandes', key: 'ordered' },
-                        { label: 'Gains', key: 'gain' },
-                    ]" :key="total.key" class="rounded-lg bg-white px-4 py-3 shadow-sm">
-                        <p class="text-[11px] font-medium uppercase tracking-wide text-gray-400">{{ total.label }}</p>
-                        <p
-                            class="mt-1 text-lg font-semibold tabular-nums"
-                            :class="form.totals[total.key] < 0 ? 'text-red-600' : 'text-gray-900'"
-                        >
-                            {{ money(form.totals[total.key]) }}
-                        </p>
-                    </div>
-                </div>
+        <div class="space-y-4">
+            <p v-if="error" class="banner banner-danger">
+                <Icon name="alert" :size="4" class="mt-px" />
+                <span>{{ error }}</span>
+            </p>
 
-                <div class="grid gap-4 lg:grid-cols-3">
-                    <!-- Informations -->
-                    <section class="rounded-lg bg-white p-4 shadow-sm">
-                        <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Informations</h3>
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <StatTile
+                    v-for="total in TOTALS"
+                    :key="total.key"
+                    :label="total.label"
+                    :value="money(form.totals[total.key])"
+                    :numeric="form.totals[total.key]"
+                    :tone="total.tone"
+                />
+            </div>
 
-                        <div class="mt-3 space-y-3">
-                            <label class="block text-xs text-gray-500">
-                                Nom du métré
+            <div class="grid gap-4 lg:grid-cols-12">
+                <!-- Informations -->
+                <AppCard title="Informations" class="lg:col-span-5">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="field-label" for="metre-name">Nom du métré</label>
+                            <input
+                                id="metre-name"
+                                type="text"
+                                :value="form.name"
+                                :disabled="readOnly"
+                                class="block w-full px-2.5 py-1.5"
+                                @input="text('name', $event.target.value)"
+                                @blur="flushField"
+                            />
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="field-label" for="metre-ratio">Ratio par défaut</label>
                                 <input
-                                    type="text"
-                                    :value="form.name"
+                                    id="metre-ratio"
+                                    type="number"
+                                    step="any"
+                                    :value="form.ratio_markup"
                                     :disabled="readOnly"
-                                    class="mt-1 block w-full rounded-md border-gray-300 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-50"
-                                    @input="text('name', $event.target.value)"
+                                    class="block w-full px-2.5 py-1.5 text-right tabular-nums"
+                                    @input="number('ratio_markup', $event.target.value)"
                                     @blur="flushField"
                                 />
-                            </label>
-
-                            <div class="grid grid-cols-2 gap-3">
-                                <label class="block text-xs text-gray-500">
-                                    Ratio par défaut
-                                    <input
-                                        type="number"
-                                        step="any"
-                                        :value="form.ratio_markup"
-                                        :disabled="readOnly"
-                                        class="mt-1 block w-full rounded-md border-gray-300 text-right text-sm tabular-nums text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-50"
-                                        @input="number('ratio_markup', $event.target.value)"
-                                        @blur="flushField"
-                                    />
-                                </label>
-
-                                <label class="block text-xs text-gray-500">
-                                    Langue
-                                    <select
-                                        :value="form.language"
-                                        :disabled="readOnly"
-                                        class="mt-1 block w-full rounded-md border-gray-300 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-50"
-                                        @change="edit('language', $event.target.value || null); flushField()"
-                                    >
-                                        <option value="">—</option>
-                                        <option v-for="lang in languages" :key="lang" :value="lang">{{ lang }}</option>
-                                    </select>
-                                </label>
                             </div>
 
-                            <div class="grid grid-cols-2 gap-3">
-                                <label class="block text-xs text-gray-500">
-                                    Date accord
-                                    <input
-                                        type="date"
-                                        :value="form.date_agreement"
-                                        :disabled="readOnly"
-                                        class="mt-1 block w-full rounded-md border-gray-300 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-50"
-                                        @change="text('date_agreement', $event.target.value); flushField()"
-                                    />
-                                </label>
+                            <div>
+                                <label class="field-label" for="metre-language">Langue</label>
+                                <select
+                                    id="metre-language"
+                                    :value="form.language"
+                                    :disabled="readOnly"
+                                    class="block w-full px-2.5 py-1.5"
+                                    @change="edit('language', $event.target.value || null); flushField()"
+                                >
+                                    <option value="">—</option>
+                                    <option v-for="lang in languages" :key="lang" :value="lang">{{ lang }}</option>
+                                </select>
+                            </div>
+                        </div>
 
-                                <!-- MET_Metre::Ratio_c - a calculation, so there is nothing to write. -->
-                                <div class="text-xs text-gray-500">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="field-label" for="metre-agreement">Date accord</label>
+                                <input
+                                    id="metre-agreement"
+                                    type="date"
+                                    :value="form.date_agreement"
+                                    :disabled="readOnly"
+                                    class="block w-full px-2.5 py-1.5"
+                                    @change="text('date_agreement', $event.target.value); flushField()"
+                                />
+                            </div>
+
+                            <!-- MET_Metre::Ratio_c - a calculation, so there is nothing to write.
+                                 Volontairement dessiné autrement qu'un champ désactivé : le pointillé
+                                 dit « calculé », le gris dirait « momentanément bloqué ». -->
+                            <div>
+                                <span class="field-label flex items-center gap-1">
                                     Ratio réel
-                                    <p
-                                        class="mt-1 rounded-md bg-gray-50 px-3 py-2 text-right text-sm tabular-nums text-gray-900"
-                                        title="Calculé depuis les totaux du métré — non modifiable"
-                                    >
-                                        {{ form.ratio ?? '—' }}
-                                    </p>
-                                </div>
+                                    <Icon name="lock" :size="3" class="text-sand-400" />
+                                </span>
+                                <p
+                                    class="readonly-value"
+                                    title="Calculé depuis les totaux du métré — non modifiable"
+                                >
+                                    {{ form.ratio ?? '—' }}
+                                </p>
                             </div>
+                        </div>
 
-                            <div class="flex gap-6 pt-1">
-                                <label class="flex items-center gap-2 text-xs text-gray-600">
+                        <div>
+                            <span class="field-label">Statut</span>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label
+                                    class="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-[13px] transition-colors"
+                                    :class="statusClasses(form.is_accepted_b)"
+                                >
                                     <input
                                         type="checkbox"
                                         :checked="form.is_accepted_b"
                                         :disabled="readOnly"
-                                        class="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        class="size-4"
                                         @change="toggle('is_accepted_b', $event.target.checked)"
                                     />
                                     Accepté
                                 </label>
 
-                                <label class="flex items-center gap-2 text-xs text-gray-600">
+                                <label
+                                    class="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-[13px] transition-colors"
+                                    :class="statusClasses(form.is_status_site_b)"
+                                >
                                     <input
                                         type="checkbox"
                                         :checked="form.is_status_site_b"
                                         :disabled="readOnly"
-                                        class="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        class="size-4"
                                         @change="toggle('is_status_site_b', $event.target.checked)"
                                     />
                                     Site
                                 </label>
                             </div>
                         </div>
-                    </section>
+                    </div>
+                </AppCard>
 
-                    <!-- Actions -->
-                    <section class="rounded-lg bg-white p-4 shadow-sm">
-                        <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Actions</h3>
+                <!-- Vues du métré : la raison d'être de l'écran, donc la carte la plus en avant. -->
+                <AppCard title="Vues du métré" flush class="lg:col-span-4">
+                    <ul class="divide-y divide-sand-200/70">
+                        <li v-for="view in VIEWS" :key="view.label">
+                            <Link
+                                v-if="view.href"
+                                :href="view.href"
+                                class="group flex items-center justify-between gap-2 px-4 py-2.5 text-[13px] text-sand-900 transition-colors hover:bg-accent-100"
+                                style="font-variation-settings: 'wght' 550"
+                            >
+                                <span class="flex min-w-0 items-center gap-2">
+                                    <Icon name="table" :size="4" class="text-sand-500" />
+                                    <span class="truncate">{{ view.label }}</span>
+                                </span>
+                                <Icon
+                                    name="chevron-right"
+                                    :size="4"
+                                    class="text-sand-400 transition-transform group-hover:translate-x-0.5"
+                                />
+                            </Link>
 
-                        <div class="mt-3 flex flex-col items-start gap-2">
-                            <SecondaryButton disabled title="Pas encore disponible">
-                                Nouvelle offre client
-                            </SecondaryButton>
-
-                            <SecondaryButton v-if="!readOnly" :disabled="busy" @click="duplicate">
-                                Dupliquer le métré
-                            </SecondaryButton>
-
-                            <DangerButton v-if="!readOnly" :disabled="busy" @click="confirmingDelete = true">
-                                Supprimer le métré
-                            </DangerButton>
-                        </div>
-                    </section>
-
-                    <!-- Fournisseur - deliberately empty for now. -->
-                    <section class="rounded-lg bg-white p-4 shadow-sm">
-                        <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Fournisseur</h3>
-                        <p class="mt-3 text-xs text-gray-400">—</p>
-                    </section>
-
-                    <!-- Documents -->
-                    <section class="rounded-lg bg-white p-4 shadow-sm lg:col-span-2">
-                        <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Documents</h3>
-
-                        <div class="mt-3 flex flex-wrap gap-2">
-                            <SecondaryButton
-                                v-for="document in DOCUMENTS"
-                                :key="document"
-                                disabled
+                            <div
+                                v-else
+                                class="flex items-center justify-between gap-2 px-4 py-2.5 text-[13px] text-sand-500"
                                 title="Pas encore disponible"
                             >
-                                {{ document }}
-                            </SecondaryButton>
-                        </div>
-                    </section>
+                                <span class="flex min-w-0 items-center gap-2">
+                                    <Icon name="table" :size="4" class="text-sand-300" />
+                                    <span class="truncate">{{ view.label }}</span>
+                                </span>
+                                <Badge tone="soon">Bientôt</Badge>
+                            </div>
+                        </li>
+                    </ul>
+                </AppCard>
 
-                    <!-- Vues du métré -->
-                    <section class="rounded-lg bg-white p-4 shadow-sm">
-                        <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Vues du métré</h3>
+                <!-- Actions -->
+                <AppCard title="Actions" class="lg:col-span-3">
+                    <div class="flex flex-col gap-2">
+                        <SecondaryButton class="btn-block" disabled title="Pas encore disponible">
+                            <Icon name="document" :size="4" />
+                            Nouvelle offre client
+                            <Badge tone="soon" class="ml-auto">Bientôt</Badge>
+                        </SecondaryButton>
 
-                        <div class="mt-3 flex flex-col items-start gap-2">
-                            <template v-for="view in VIEWS" :key="view.label">
-                                <Link
-                                    v-if="view.href"
-                                    :href="view.href"
-                                    class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition hover:bg-gray-50"
-                                >
-                                    {{ view.label }}
-                                </Link>
-                                <SecondaryButton v-else disabled title="Pas encore disponible">
-                                    {{ view.label }}
-                                </SecondaryButton>
-                            </template>
-                        </div>
-                    </section>
-                </div>
+                        <SecondaryButton
+                            v-if="!readOnly"
+                            class="btn-block"
+                            :disabled="busy"
+                            @click="duplicate"
+                        >
+                            <Icon name="copy" :size="4" />
+                            Dupliquer le métré
+                        </SecondaryButton>
 
-                <!-- Comments, outside the cards. -->
-                <div class="grid gap-4 lg:grid-cols-3">
-                    <label
-                        v-for="comment in [
-                            { label: 'Commentaires client', key: 'comment_client' },
-                            { label: 'Commentaires fournisseur', key: 'comment_supplier' },
-                            { label: 'Commentaires internes', key: 'comment_internal' },
-                        ]"
-                        :key="comment.key"
-                        class="block text-xs text-gray-500"
-                    >
-                        {{ comment.label }}
-                        <textarea
-                            rows="4"
-                            :value="form[comment.key]"
-                            :disabled="readOnly"
-                            class="mt-1 block w-full rounded-md border-gray-300 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-50"
-                            @input="text(comment.key, $event.target.value)"
-                            @blur="flushField"
+                        <!-- Variante sourde : le rouge plein est gardé pour la confirmation. -->
+                        <button
+                            v-if="!readOnly"
+                            type="button"
+                            class="btn btn-danger-quiet btn-block"
+                            :disabled="busy"
+                            @click="confirmingDelete = true"
+                        >
+                            <Icon name="trash" :size="4" />
+                            Supprimer le métré
+                        </button>
+
+                        <p v-if="readOnly" class="text-[13px] text-sand-600">
+                            Aucune action disponible : votre compte est en lecture seule.
+                        </p>
+                    </div>
+                </AppCard>
+
+                <!-- Documents -->
+                <AppCard title="Documents" flush class="lg:col-span-8">
+                    <!-- Grille séparée par le fond plutôt que par `divide-y` : sur deux colonnes,
+                         `divide-y` ne trace des filets qu'entre frères successifs et laisse la
+                         grille dépareillée. -->
+                    <ul class="grid gap-px bg-sand-200 sm:grid-cols-2">
+                        <li
+                            v-for="document in DOCUMENTS"
+                            :key="document"
+                            class="flex items-center justify-between gap-2 bg-white px-4 py-2.5 text-[13px] text-sand-500"
+                            title="Pas encore disponible"
+                        >
+                            <span class="flex min-w-0 items-center gap-2">
+                                <Icon name="document" :size="4" class="text-sand-300" />
+                                <span class="truncate">{{ document }}</span>
+                            </span>
+                            <Badge tone="soon">Bientôt</Badge>
+                        </li>
+
+                        <!-- Sept documents sur deux colonnes : sans ce bouche-trou, la case
+                             manquante laisse voir le fond qui sert de filet et se lit comme un
+                             bloc gris posé là par erreur. -->
+                        <li
+                            v-if="DOCUMENTS.length % 2 === 1"
+                            class="hidden bg-white sm:block"
+                            aria-hidden="true"
                         />
-                    </label>
-                </div>
+                    </ul>
+                </AppCard>
+
+                <!-- Fournisseur - deliberately empty for now. -->
+                <AppCard title="Fournisseur" class="lg:col-span-4">
+                    <div class="flex flex-col items-center gap-1.5 py-6 text-center">
+                        <Icon name="user" :size="6" class="text-sand-300" />
+                        <p class="text-[13px] text-sand-600">Aucun fournisseur lié à ce métré.</p>
+                    </div>
+                </AppCard>
+
+                <!-- Commentaires : rassemblés dans une carte plutôt que posés nus sur le fond,
+                     sinon trois zones de texte flottent sans qu'on sache à quoi elles tiennent. -->
+                <AppCard title="Commentaires" class="lg:col-span-12">
+                    <div class="grid gap-4 lg:grid-cols-3">
+                        <div v-for="comment in COMMENTS" :key="comment.key">
+                            <label class="field-label" :for="`metre-${comment.key}`">{{ comment.label }}</label>
+                            <textarea
+                                :id="`metre-${comment.key}`"
+                                rows="4"
+                                :value="form[comment.key]"
+                                :disabled="readOnly"
+                                class="block w-full px-2.5 py-1.5"
+                                @input="text(comment.key, $event.target.value)"
+                                @blur="flushField"
+                            />
+                        </div>
+                    </div>
+                </AppCard>
             </div>
         </div>
 
         <!-- Deleting a métré destroys its lines too, so the count is stated rather than left
              to be discovered afterwards. -->
         <Modal :show="confirmingDelete" max-width="md" @close="confirmingDelete = false">
-            <div class="p-6">
-                <h2 class="text-lg font-medium text-gray-900">Supprimer le métré</h2>
+            <div>
+                <header class="surface-head">
+                    <h2 class="text-[15px] text-sand-900" style="font-variation-settings: 'wght' 600">Supprimer le métré</h2>
+                </header>
 
-                <p class="mt-2 text-sm text-gray-600">
-                    Supprimer définitivement
-                    <span class="font-medium text-gray-900">{{ form.name || 'ce métré' }}</span>
-                    <span v-if="lineCount > 0">
-                        et ses {{ lineCount }} ligne{{ lineCount === 1 ? '' : 's' }} de métré</span>
-                    ? Cette action est irréversible.
-                </p>
+                <div class="flex gap-3 p-5">
+                    <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-danger-100 text-danger-600">
+                        <Icon name="alert" :size="5" />
+                    </span>
 
-                <div class="mt-6 flex justify-end gap-3">
+                    <p class="text-[13px] text-sand-700">
+                        Supprimer définitivement
+                        <span class="text-sand-900" style="font-variation-settings: 'wght' 600">
+                            {{ form.name || 'ce métré' }}</span><span v-if="lineCount > 0">
+                            et ses {{ lineCount }} ligne{{ lineCount === 1 ? '' : 's' }} de métré</span>
+                        ? Cette action est irréversible.
+                    </p>
+                </div>
+
+                <div class="flex justify-end gap-2 border-t border-sand-200 bg-sand-50 px-5 py-3">
                     <SecondaryButton @click="confirmingDelete = false">Annuler</SecondaryButton>
-                    <DangerButton :class="{ 'opacity-25': busy }" :disabled="busy" @click="destroy">
-                        Supprimer
-                    </DangerButton>
+                    <DangerButton :disabled="busy" @click="destroy">Supprimer</DangerButton>
                 </div>
             </div>
         </Modal>

@@ -136,7 +136,7 @@ function detail(row) {
                 type="search"
                 :value="query"
                 placeholder="Rechercher…"
-                class="mt-3 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                class="mt-3 block w-full px-2.5 py-1.5"
                 @input="onInput($event.target.value)"
             />
 
@@ -144,7 +144,7 @@ function detail(row) {
                 Seuls les {{ limit }} premiers résultats sont affichés — affinez la recherche.
             </p>
 
-            <div class="mt-3 max-h-80 divide-y divide-gray-100 overflow-y-auto rounded border border-gray-200">
+            <div class="mt-3 max-h-80 divide-y divide-sand-200/70 overflow-y-auto rounded-md border border-sand-200">
                 <p v-if="loading" class="p-4 text-center text-sm text-gray-400">Chargement…</p>
 
                 <p v-else-if="error" class="p-4 text-sm text-red-600">{{ error }}</p>

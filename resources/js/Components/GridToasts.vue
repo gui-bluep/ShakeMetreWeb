@@ -1,4 +1,6 @@
 <script setup>
+import Icon from '@/Components/Icon.vue';
+
 /**
  * Non-blocking failure notices, stacked bottom-right. Deliberately not a modal: a save
  * failure must never interrupt typing in the grid.
@@ -21,26 +23,26 @@ defineEmits(['dismiss']);
             <div
                 v-for="toast in toasts"
                 :key="toast.id"
-                class="pointer-events-auto rounded-md border border-red-200 bg-white px-3 py-2 shadow-sm"
+                class="pointer-events-auto rounded-lg border border-danger-200 bg-white px-3 py-2 shadow-pop"
                 role="status"
             >
                 <div class="flex items-start gap-2">
-                    <span class="mt-0.5 size-2 shrink-0 rounded-full bg-red-500" aria-hidden="true" />
+                    <Icon name="alert" :size="4" class="mt-px text-danger-500" />
                     <div class="min-w-0 flex-1">
-                        <p class="text-xs font-medium text-gray-900">
+                        <p class="text-[13px] text-sand-900" style="font-variation-settings: 'wght' 550">
                             Ligne {{ toast.rowLabel }} — modification annulée
                         </p>
-                        <p class="mt-0.5 truncate text-xs text-gray-500" :title="toast.message">
+                        <p class="mt-0.5 truncate text-xs text-sand-600" :title="toast.message">
                             {{ toast.message }}
                         </p>
                     </div>
                     <button
                         type="button"
-                        class="shrink-0 text-gray-400 transition hover:text-gray-600"
+                        class="btn btn-ghost btn-sm shrink-0 px-1 py-0.5"
                         aria-label="Fermer"
                         @click="$emit('dismiss', toast.id)"
                     >
-                        &times;
+                        <Icon name="x" :size="3.5" />
                     </button>
                 </div>
             </div>

@@ -99,6 +99,21 @@ Inertia can reuse a component across a navigation between two records of the sam
 
 `Modal.vue` has two fixes that must not regress (commit `544de5a`): the content box carries `relative z-10`, without which the `fixed` backdrop stacks above it and swallows every click; and Escape is handled through the dialog's own `cancel` event, not a document listener, so nested modals close one at a time.
 
+### Direction artistique
+
+`resources/css/app.css` **is** the design system: read its header before styling anything. It carries the palette taken from shakedesign.be (declared there in `@property`), the role each colour plays, and a closed vocabulary of component classes — `.surface` / `.surface-head`, `.eyebrow` / `.field-label`, `.btn` + variants, `.badge-*`, `.data-table`, `.cell-input`, `.popover*`, `.banner*`, `.code-chip`, `.readonly-value`, `.num`.
+
+- **Encre `sand-950` (#35160e), fond `sand-100`, accent lime `accent-400` (#c9f862).** The lime is never a text colour on light (1.23:1) — it marks the active state and the selection. Focus rings are ink. Labels are `sand-600` or darker (`sand-500` is 4.13:1 and decorative only).
+- **The money trio is a domain colour code, the same on every screen:** achats → `clay`, vendu client → `olive`, commande → `mallow`. The métré page's stat tiles and the grids' column blocks must keep agreeing.
+- **The Tailwind ramps are remapped to the DA** (`gray`/`zinc`/`indigo`/`red`/`green`/`blue`/`emerald`/`amber`/`yellow` → sand / accent / clay / olive / mallow / semantics). A screen written by reflex in `text-gray-500` therefore stays on brand. In new code use the DA names: they say the role.
+- **The shell is `AppTopBar.vue`** — ink bar, brand, breadcrumb, account menu, and the global `Lecture seule` badge. Full-height screens (the two grids, the tender comparison) mount it themselves rather than going through `AuthenticatedLayout`. A page must not re-render the readonly badge: it is a property of the account. A page badge is only for a reason of its own, like a locked métré.
+- **Aspekta**, self-hosted from `resources/fonts/` (SIL OFL 1.1). It lives under `resources/` and is referenced relatively **on purpose**: `laravel-vite-plugin` sets `publicDir: false`, so an absolute `url('/fonts/…')` resolves against the Vite dev-server origin and 404s in `composer run dev`. No third-party font domain is required any more.
+
+Two cascade traps, both found in a browser and both silent:
+
+- **In Tailwind v4 the layer order (`theme, base, components, utilities`) beats specificity.** A `.cell-input:focus` rule in `components` loses to a plain `bg-clay-50/70` utility. That is why the grid cells carry `focus:bg-white` in the template: only a utility beats a utility, and Tailwind sorts variants last.
+- **A disabled *and* checked checkbox must stay visibly checked.** The forms plugin paints the tick with `background-color: currentColor` on `:checked`; a later `:disabled { background-color: … }` at equal specificity erased it, so on a readonly account `Accepté` read as "not accepted" and the grid's Est./Opt. columns reported the opposite of the data. The rule is split on `:not(:checked)` / `:checked`.
+
 ## Settled decisions — do not "fix" these
 
 Each of these looks like an inconsistency and is not. Ask before changing any of them.
@@ -136,7 +151,9 @@ Any migration/seeder touching `MET_Metre`, `METL_MetreLines`, `LOT_Lot`, `REF_Re
 
 - **SOR → FileMaker link.** The Achats/Ventes/Commandes view shows the linked supplier order's title but cannot open it. Needs three things confirmed: the target file, the script name, and the parameter format. `SOR_GoTo` exists in the export but only as a name, and it is in the ShakeMetre file while the SOR lives in ShakeDesign.
 - **The Tags/Lots switch.** Lots is fully wired. Tags shows `METL::tag1` read-only, because METL carries `tag1`/`tag2` *and* there is a separate `TAG` table keyed to the métré, and nothing says which the switch should drive.
-- **Métré views not yet built:** Achats — Ventes, Achats — Commandes, Ventes. The three render as disabled buttons on the métré page.
-- **Documents:** all seven buttons are disabled placeholders.
-- **`Nouvelle offre client`** on the métré page is a disabled placeholder; `ShakeDesignClient::createOffer()` exists and is tested but nothing calls it yet.
+- **Métré views not yet built:** Achats — Ventes, Achats — Commandes, Ventes. The three are listed on the métré page as inert rows tagged `Bientôt`, so the page shows the full set it will offer instead of looking finished with three missing.
+- **Documents:** all seven are inert rows tagged `Bientôt`, same reasoning as the views.
+- **`Nouvelle offre client`** on the métré page is a disabled button tagged `Bientôt`; `ShakeDesignClient::createOffer()` exists and is tested but nothing calls it yet.
 - **Supplier company filtering** in the picker is limited to `isSupplier_b` + `isActive_b`. No company in ShakeDesign currently has `isActive_b = 0`, so that half of the filter has never been exercised against real data.
+- **The profile and password screens are still in Breeze's English** ("Profile Information", "Save", "Delete Account"). They now carry the DA but not the language of the rest of the application. `Welcome.vue`, Breeze's landing page on `/`, is untouched beyond the ramp remap.
+- **The breadcrumb on the Achats/Ventes/Commandes view stops at the métré.** The project's *name* lives in ShakeDesign, and fetching it over the Data API for a single label would put a remote call on the heaviest screen of the application. `metre.project_id` is in the payload if that trade-off is ever revisited.

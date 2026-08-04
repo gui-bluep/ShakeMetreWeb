@@ -1,12 +1,15 @@
 <script setup>
-import { nextTick, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import AppCard from '@/Components/AppCard.vue';
+import Icon from '@/Components/Icon.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import LotManagerModal from '@/Components/LotManagerModal.vue';
 import Modal from '@/Components/Modal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import StatTile from '@/Components/StatTile.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 
@@ -76,168 +79,242 @@ function date(value) {
 function shortId(id) {
     return id ? `${id.slice(0, 8)}…` : '—';
 }
+
+/**
+ * Les mêmes chiffres que la ligne de total du tableau, remontés en tête d'écran.
+ *
+ * Redondance assumée : les tuiles donnent le résultat du projet sans avoir à lire un tableau,
+ * la ligne de total garde l'alignement sous sa colonne — c'est ce qui permet de vérifier d'où
+ * vient le chiffre. « Commandes » désigne ici la colonne du projet, et pas la même que sur la
+ * page d'un métré : décision confirmée, commentée dans le contrôleur.
+ */
+const tiles = computed(() => [
+    { label: 'Commandes', value: money(props.totals.total_ordered), numeric: props.totals.total_ordered, tone: 'mallow' },
+    { label: 'Travaux', value: money(props.totals.total_works), numeric: props.totals.total_works, tone: 'olive' },
+    { label: 'Gains', value: money(props.totals.total_gain), numeric: props.totals.total_gain, tone: 'accent' },
+    {
+        label: 'Ratio du projet',
+        value: props.totals.total_ratio ?? '—',
+        numeric: null,
+        tone: 'neutral',
+        hint: 'Ratio de l’ensemble des métrés du projet',
+    },
+]);
 </script>
 
 <template>
     <Head :title="project.name || 'Projet'" />
 
-    <AuthenticatedLayout>
-        <template #header>
-            <div class="grid grid-cols-3 items-center">
-                <div>
-                    <!-- Named explicitly rather than left to be inferred from greyed-out fields:
-                         a readonly account otherwise just finds inputs that refuse to focus,
-                         with nothing on screen saying why. -->
-                    <span
-                        v-if="readOnly()"
-                        class="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800"
-                        title="Votre compte ShakeDesign est en lecture seule : les champs sont désactivés."
-                    >
-                        compte en lecture seule
-                    </span>
-                </div>
-                <h2 class="justify-self-center text-xl font-semibold leading-tight text-gray-800">
-                    {{ project.name || 'Projet sans nom' }}
-                </h2>
-                <div class="justify-self-end">
-                    <PrimaryButton v-if="!readOnly()" @click="openMetreModal">+ Métré</PrimaryButton>
-                </div>
-            </div>
+    <AuthenticatedLayout
+        :title="project.name || 'Projet sans nom'"
+        :breadcrumbs="[
+            { label: 'Projets', href: route('dashboard') },
+            { label: project.name || 'Projet sans nom' },
+        ]"
+    >
+        <template #meta>
+            <span v-if="project.number" class="code-chip">N° {{ project.number }}</span>
+            <span v-if="project.status" class="badge badge-neutral">{{ project.status }}</span>
+            <span>{{ metres.length }} métré{{ metres.length === 1 ? '' : 's' }}</span>
+            <span>{{ lots.length }} lot{{ lots.length === 1 ? '' : 's' }}</span>
         </template>
 
-        <div class="py-12">
-            <div class="mx-auto flex max-w-screen-2xl gap-4 px-4 sm:px-6 lg:px-8">
-                <!-- Métrés: 4/5 of the width. -->
-                <div class="w-4/5 overflow-hidden overflow-x-auto rounded-lg bg-white shadow-sm">
-                    <table class="w-full border-collapse text-xs">
-                        <thead>
-                            <tr class="border-b border-gray-200 bg-gray-100 text-[11px] uppercase tracking-wide text-gray-500">
-                                <th class="px-3 py-2 text-left">ID</th>
-                                <th class="px-3 py-2 text-left">Nom</th>
-                                <th class="px-3 py-2 text-right">Ratio</th>
-                                <th class="px-3 py-2 text-right">Créé le</th>
-                                <th class="px-3 py-2 text-right">Accord le</th>
-                                <th class="px-3 py-2 text-center">Accepté</th>
-                                <th class="px-3 py-2 text-center">Site</th>
-                                <th class="px-3 py-2 text-right">Offres</th>
-                                <th class="px-3 py-2 text-right">Commandes</th>
-                                <th class="px-3 py-2 text-right">Travaux</th>
-                                <th class="px-3 py-2 text-right">Gains</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="metre in metres" :key="metre.id" class="border-b border-gray-100 hover:bg-blue-50/30">
-                                <td class="px-3 py-2 font-mono text-gray-400" :title="metre.id">{{ shortId(metre.id) }}</td>
-                                <td class="px-3 py-2">
-                                    <!-- The métré's own page, not straight to the line grid: the
-                                         grid is one of the views reachable from there. -->
-                                    <Link
-                                        :href="`/metres/${metre.id}`"
-                                        class="font-medium text-gray-900 hover:text-blue-600 hover:underline"
-                                    >
-                                        {{ metre.name || 'Métré sans nom' }}
-                                    </Link>
-                                </td>
-                                <td class="px-3 py-2 text-right tabular-nums">{{ metre.ratio ?? '—' }}</td>
-                                <td class="px-3 py-2 text-right tabular-nums text-gray-500">{{ date(metre.date_creation) }}</td>
-                                <td class="px-3 py-2 text-right tabular-nums text-gray-500">{{ date(metre.date_agreement) }}</td>
-                                <td class="px-3 py-2 text-center">
-                                    <input type="checkbox" :checked="metre.is_accepted_b" disabled class="size-3.5 rounded border-gray-300" />
-                                </td>
-                                <td class="px-3 py-2 text-center">
-                                    <input type="checkbox" :checked="metre.is_status_site_b" disabled class="size-3.5 rounded border-gray-300" />
-                                </td>
-                                <td class="px-3 py-2 text-right tabular-nums">{{ money(metre.total_offers) }}</td>
-                                <td class="px-3 py-2 text-right tabular-nums">{{ money(metre.total_ordered) }}</td>
-                                <td class="px-3 py-2 text-right tabular-nums">{{ money(metre.total_works) }}</td>
-                                <td
-                                    class="px-3 py-2 text-right tabular-nums"
-                                    :class="metre.total_gain < 0 ? 'text-red-600' : ''"
-                                >
-                                    {{ money(metre.total_gain) }}
-                                </td>
-                            </tr>
+        <template #actions>
+            <!-- Le lime est réservé au geste que l'écran attend vraiment. -->
+            <button v-if="!readOnly()" type="button" class="btn btn-accent" @click="openMetreModal">
+                <Icon name="plus" :size="4" />
+                Nouveau métré
+            </button>
+        </template>
 
-                            <tr v-if="metres.length === 0">
-                                <td colspan="11" class="p-8 text-center text-gray-400">Ce projet n'a aucun métré.</td>
-                            </tr>
-                        </tbody>
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <StatTile
+                    v-for="tile in tiles"
+                    :key="tile.label"
+                    :label="tile.label"
+                    :value="tile.value"
+                    :numeric="tile.numeric"
+                    :tone="tile.tone"
+                    :hint="tile.hint"
+                />
+            </div>
 
-                        <!-- Project-wide ratio and sums of the same "commandes" / "travaux" / "gains"
-                             columns, across every métré of the project - not just the ones listed
-                             above with a non-null value. -->
-                        <tfoot v-if="metres.length > 0">
-                            <tr class="border-t-2 border-gray-300 bg-gray-50 font-medium text-gray-700">
-                                <td colspan="2" class="px-3 py-2">Total du projet</td>
-                                <td class="px-3 py-2 text-right tabular-nums">{{ totals.total_ratio ?? '—' }}</td>
-                                <td colspan="4" class="px-3 py-2 text-right tabular-nums text-gray-300">—</td>
-                                <td class="px-3 py-2 text-right tabular-nums text-gray-300">—</td>
-                                <td class="px-3 py-2 text-right tabular-nums">{{ money(totals.total_ordered) }}</td>
-                                <td class="px-3 py-2 text-right tabular-nums">{{ money(totals.total_works) }}</td>
-                                <td
-                                    class="px-3 py-2 text-right tabular-nums"
-                                    :class="totals.total_gain < 0 ? 'text-red-600' : ''"
-                                >
-                                    {{ money(totals.total_gain) }}
-                                </td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
+            <div class="flex flex-col gap-4 xl:flex-row">
+                <!-- Métrés -->
+                <AppCard title="Métrés" flush class="min-w-0 flex-1">
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th class="w-24">Réf.</th>
+                                    <th>Nom</th>
+                                    <th class="text-right">Ratio</th>
+                                    <th class="text-right">Créé le</th>
+                                    <th class="text-right">Accord le</th>
+                                    <th class="text-center">Accepté</th>
+                                    <th class="text-center">Site</th>
+                                    <th class="text-right">Offres</th>
+                                    <th class="text-right">Commandes</th>
+                                    <th class="text-right">Travaux</th>
+                                    <th class="text-right">Gains</th>
+                                </tr>
+                            </thead>
 
-                <!-- Lots: 1/5 of the width. -->
-                <div class="w-1/5 shrink-0 rounded-lg bg-white shadow-sm">
-                    <div class="flex items-center justify-between border-b border-gray-200 px-3 py-2">
-                        <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Lots</h3>
-                        <button
-                            type="button"
-                            class="rounded px-1.5 py-0.5 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
-                            @click="showLotManager = true"
-                        >
+                            <tbody>
+                                <tr v-for="metre in metres" :key="metre.id">
+                                    <td>
+                                        <span class="code-chip" :title="metre.id">{{ shortId(metre.id) }}</span>
+                                    </td>
+                                    <td>
+                                        <!-- The métré's own page, not straight to the line grid: the
+                                             grid is one of the views reachable from there. -->
+                                        <Link
+                                            :href="`/metres/${metre.id}`"
+                                            class="group inline-flex items-center gap-1.5 text-sand-900 hover:text-sand-950"
+                                            style="font-variation-settings: 'wght' 550"
+                                        >
+                                            <span class="underline decoration-sand-300 decoration-1 underline-offset-2 group-hover:decoration-accent-500">
+                                                {{ metre.name || 'Métré sans nom' }}
+                                            </span>
+                                            <Icon
+                                                name="chevron-right"
+                                                :size="3.5"
+                                                class="text-sand-400 transition-transform group-hover:translate-x-0.5"
+                                            />
+                                        </Link>
+                                    </td>
+                                    <td class="num">{{ metre.ratio ?? '—' }}</td>
+                                    <td class="num text-sand-600">{{ date(metre.date_creation) }}</td>
+                                    <td class="num text-sand-600">{{ date(metre.date_agreement) }}</td>
+
+                                    <!-- Un état, pas une commande : une case à cocher désactivée se lit
+                                         comme un champ qu'on n'arrive pas à modifier. -->
+                                    <td class="text-center">
+                                        <Icon
+                                            v-if="metre.is_accepted_b"
+                                            name="check"
+                                            :size="4"
+                                            class="mx-auto text-success-600"
+                                            aria-label="Accepté"
+                                        />
+                                        <span v-else class="text-sand-300" aria-label="Non accepté">—</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <Icon
+                                            v-if="metre.is_status_site_b"
+                                            name="check"
+                                            :size="4"
+                                            class="mx-auto text-success-600"
+                                            aria-label="Site"
+                                        />
+                                        <span v-else class="text-sand-300" aria-label="Hors site">—</span>
+                                    </td>
+
+                                    <td class="num">{{ money(metre.total_offers) }}</td>
+                                    <td class="num">{{ money(metre.total_ordered) }}</td>
+                                    <td class="num">{{ money(metre.total_works) }}</td>
+                                    <td class="num" :class="metre.total_gain < 0 ? 'text-danger-600' : ''">
+                                        {{ money(metre.total_gain) }}
+                                    </td>
+                                </tr>
+
+                                <tr v-if="metres.length === 0" class="hover:bg-transparent">
+                                    <td colspan="11" class="py-12">
+                                        <div class="flex flex-col items-center gap-2 text-center">
+                                            <Icon name="table" :size="6" class="text-sand-300" />
+                                            <p class="text-[13px] text-sand-700">Ce projet n'a aucun métré.</p>
+                                            <button
+                                                v-if="!readOnly()"
+                                                type="button"
+                                                class="btn btn-secondary btn-sm mt-1"
+                                                @click="openMetreModal"
+                                            >
+                                                <Icon name="plus" :size="3.5" />
+                                                Créer le premier métré
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+
+                            <!-- Project-wide ratio and sums of the same "commandes" / "travaux" / "gains"
+                                 columns, across every métré of the project - not just the ones listed
+                                 above with a non-null value. -->
+                            <tfoot v-if="metres.length > 0">
+                                <tr>
+                                    <td colspan="2">Total du projet</td>
+                                    <td class="num">{{ totals.total_ratio ?? '—' }}</td>
+                                    <td colspan="4" class="num text-sand-300">—</td>
+                                    <td class="num text-sand-300">—</td>
+                                    <td class="num">{{ money(totals.total_ordered) }}</td>
+                                    <td class="num">{{ money(totals.total_works) }}</td>
+                                    <td class="num" :class="totals.total_gain < 0 ? 'text-danger-600' : ''">
+                                        {{ money(totals.total_gain) }}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </AppCard>
+
+                <!-- Lots -->
+                <AppCard title="Lots" flush class="w-full shrink-0 xl:w-72">
+                    <template #actions>
+                        <span class="badge badge-neutral">{{ lots.length }}</span>
+                        <button type="button" class="btn btn-ghost btn-sm" @click="showLotManager = true">
+                            <Icon name="layers" :size="3.5" />
                             Gérer
                         </button>
-                    </div>
+                    </template>
 
                     <!-- Plain list, deliberately not links: the tender comparison screen is
                          reached another way, not by clicking a lot here. -->
-                    <ul>
+                    <ul class="divide-y divide-sand-200/70">
                         <li
                             v-for="lot in lots"
                             :key="lot.id"
-                            class="border-b border-gray-100 px-3 py-2 text-xs text-gray-700 last:border-b-0"
+                            class="flex items-center gap-2 px-3 py-2 text-[13px] text-sand-800"
                         >
-                            <span v-if="lot.code" class="tabular-nums text-gray-400">#{{ lot.code }}</span>
-                            {{ lot.title || 'Lot sans titre' }}
+                            <span v-if="lot.code" class="code-chip shrink-0">{{ lot.code }}</span>
+                            <span class="min-w-0 truncate" :title="lot.title || 'Lot sans titre'">
+                                {{ lot.title || 'Lot sans titre' }}
+                            </span>
                         </li>
 
-                        <li v-if="lots.length === 0" class="p-4 text-center text-xs text-gray-400">Aucun lot.</li>
+                        <li v-if="lots.length === 0" class="px-3 py-8 text-center">
+                            <p class="text-[13px] text-sand-600">Aucun lot.</p>
+                            <button type="button" class="btn btn-secondary btn-sm mt-2" @click="showLotManager = true">
+                                Créer un lot
+                            </button>
+                        </li>
                     </ul>
-                </div>
+                </AppCard>
             </div>
         </div>
 
         <!-- Add a métré -->
-        <Modal :show="showMetreModal" @close="closeMetreModal">
-            <form class="p-6" @submit.prevent="submitMetre">
-                <h2 class="text-lg font-medium text-gray-900">Nouveau métré</h2>
+        <Modal :show="showMetreModal" max-width="md" @close="closeMetreModal">
+            <form @submit.prevent="submitMetre">
+                <header class="surface-head">
+                    <h2 class="text-[15px] text-sand-900" style="font-variation-settings: 'wght' 600">Nouveau métré</h2>
+                </header>
 
-                <div class="mt-4">
-                    <InputLabel for="metre-name" value="Nom" />
+                <div class="p-5">
+                    <InputLabel for="metre-name" value="Nom du métré" />
                     <TextInput
                         id="metre-name"
                         ref="metreNameInput"
                         v-model="metreForm.name"
                         type="text"
-                        class="mt-1 block w-full"
+                        class="block w-full"
                     />
                     <InputError :message="metreForm.errors.name" class="mt-2" />
                 </div>
 
-                <div class="mt-6 flex justify-end gap-3">
+                <div class="flex justify-end gap-2 border-t border-sand-200 bg-sand-50 px-5 py-3">
                     <SecondaryButton @click="closeMetreModal">Annuler</SecondaryButton>
-                    <PrimaryButton :class="{ 'opacity-25': metreForm.processing }" :disabled="metreForm.processing">
-                        Créer
-                    </PrimaryButton>
+                    <PrimaryButton :disabled="metreForm.processing">Créer le métré</PrimaryButton>
                 </div>
             </form>
         </Modal>
