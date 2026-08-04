@@ -373,6 +373,27 @@ class ProjectPageTest extends TestCase
                 ->where('lots.0.title', 'Gros oeuvre'));
     }
 
+    /**
+     * The code is a number, so 2 comes before 10 - the trap a text sort falls into. Lots with
+     * no code go last rather than first, where MySQL's default NULL ordering would put them and
+     * where they would read as the head of the list.
+     */
+    public function test_the_lots_are_ordered_by_code_as_numbers(): void
+    {
+        $this->actAsWriter();
+        $this->fakeProjectFound();
+
+        Lot::forceCreate(['project_id' => self::PROJECT, 'code' => 10, 'title_fr' => 'Dix']);
+        Lot::forceCreate(['project_id' => self::PROJECT, 'code' => null, 'title_fr' => 'Sans code']);
+        Lot::forceCreate(['project_id' => self::PROJECT, 'code' => 2, 'title_fr' => 'Deux']);
+
+        $this->get('/projects/'.self::PROJECT)
+            ->assertInertia(fn ($page) => $page
+                ->where('lots.0.title', 'Deux')
+                ->where('lots.1.title', 'Dix')
+                ->where('lots.2.title', 'Sans code'));
+    }
+
     public function test_a_readonly_account_may_view_the_project_page(): void
     {
         $this->actAsReadOnly();

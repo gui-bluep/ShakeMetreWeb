@@ -63,6 +63,17 @@ function submitMetre() {
 
 const showLotManager = ref(false);
 
+/**
+ * La liste est remise dans l'ordre des codes à l'ouverture, et pas pendant : le gestionnaire
+ * affiche un champ de saisie par lot, et un tri réactif déplacerait la ligne sous le curseur
+ * dès la frappe du code. À l'ouverture, l'ordre est celui du panneau latéral ; les lots créés
+ * ensuite s'ajoutent à la fin et y restent jusqu'à la prochaine ouverture.
+ */
+function openLotManager() {
+    lots.value = sortedLots.value;
+    showLotManager.value = true;
+}
+
 // --- display helpers ----------------------------------------------------------------------
 
 const currency = new Intl.NumberFormat('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -83,6 +94,26 @@ function date(value) {
 function ratio(value) {
     return value === null || value === undefined ? '—' : currency.format(value);
 }
+
+/**
+ * Le code d'un lot est un numéro : 2 vient avant 10. Le serveur trie déjà ainsi, mais la liste
+ * affichée est une copie locale que « Gérer les lots » modifie en place — un lot créé y est
+ * ajouté à la fin et un code modifié ne bouge pas — donc le tri est refait ici, sinon un lot
+ * numéroté 2 après coup reste sous le 10. Les lots sans code passent à la fin : en tête, ils se
+ * lisent comme les premiers de la liste.
+ */
+const sortedLots = computed(() =>
+    [...lots.value].sort((a, b) => {
+        if (a.code === b.code) {
+            return (a.title || '').localeCompare(b.title || '', 'fr');
+        }
+
+        if (a.code === null || a.code === undefined || a.code === '') return 1;
+        if (b.code === null || b.code === undefined || b.code === '') return -1;
+
+        return Number(a.code) - Number(b.code);
+    })
+);
 
 /**
  * Les mêmes chiffres que la ligne de total du tableau, remontés en tête d'écran.
@@ -275,17 +306,18 @@ const tiles = computed(() => [
                 <AppCard title="Lots" flush class="w-full shrink-0 xl:w-72">
                     <template #actions>
                         <span class="badge badge-neutral">{{ lots.length }}</span>
-                        <button type="button" class="btn btn-ghost btn-sm" @click="showLotManager = true">
+                        <button type="button" class="btn btn-ghost btn-sm" @click="openLotManager">
                             <Icon name="layers" :size="3.5" />
                             Gérer
                         </button>
                     </template>
 
                     <!-- Plain list, deliberately not links: the tender comparison screen is
-                         reached another way, not by clicking a lot here. -->
+                         reached another way, not by clicking a lot here. Ordered by code as a
+                         number - see sortedLots. -->
                     <ul class="divide-y divide-sand-200/70">
                         <li
-                            v-for="lot in lots"
+                            v-for="lot in sortedLots"
                             :key="lot.id"
                             class="flex items-center gap-2 px-3 py-2 text-[13px] text-sand-800"
                         >
@@ -297,7 +329,7 @@ const tiles = computed(() => [
 
                         <li v-if="lots.length === 0" class="px-3 py-8 text-center">
                             <p class="text-[13px] text-sand-600">Aucun lot.</p>
-                            <button type="button" class="btn btn-secondary btn-sm mt-2" @click="showLotManager = true">
+                            <button type="button" class="btn btn-secondary btn-sm mt-2" @click="openLotManager">
                                 Créer un lot
                             </button>
                         </li>

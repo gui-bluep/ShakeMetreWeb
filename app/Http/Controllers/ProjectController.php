@@ -33,9 +33,13 @@ class ProjectController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Le code d'un lot est un numéro (colonne entière) : le tri est donc numérique, 2 avant
+        // 10. `code is null` d'abord dans le ORDER BY renvoie les lots sans code à la fin -
+        // MySQL les placerait en tête, où ils passent pour les premiers de la liste. Écrit en
+        // SQL brut parce que l'expression doit rester la même sur MySQL et sur SQLite.
         $lots = Lot::query()
             ->where('project_id', $project)
-            ->orderBy('code')
+            ->orderByRaw('code is null, code')
             ->get();
 
         return Inertia::render('Projects/Show', [
