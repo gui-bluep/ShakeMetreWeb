@@ -331,6 +331,13 @@ function csrfToken() {
 
 const currency = new Intl.NumberFormat('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/**
+ * Un montant, sans le symbole : l'euro est dit une fois par colonne dans l'en-tête (« P.U. (€) »,
+ * « Total (€) ») plutôt que répété sur chaque ligne. Six colonnes monétaires × des centaines de
+ * lignes, cela ferait des milliers de « € » pour une information qui ne change jamais — et la
+ * colonne des chiffres alignés à droite se lit d'autant mieux qu'elle ne contient que des
+ * chiffres.
+ */
 function money(value) {
     return value === null || value === undefined ? '—' : currency.format(value);
 }
@@ -473,8 +480,8 @@ const breadcrumbs = computed(() => [
                         >
                             Qté
                         </div>
-                        <div class="bg-clay-50 px-1.5 py-1 text-right">P.U.</div>
-                        <div class="bg-clay-50 px-1.5 py-1 text-right">Total</div>
+                        <div class="bg-clay-50 px-1.5 py-1 text-right" title="Prix unitaire, en euros">P.U. (€)</div>
+                        <div class="bg-clay-50 px-1.5 py-1 text-right" title="Quantité × prix unitaire, en euros">Total (€)</div>
                         <div class="px-1.5 py-1 text-right">Ratio</div>
                         <div
                             class="bg-olive-50 px-1.5 py-1 text-right"
@@ -482,11 +489,11 @@ const breadcrumbs = computed(() => [
                         >
                             Qté
                         </div>
-                        <div class="bg-olive-50 px-1.5 py-1 text-right">P.U.</div>
-                        <div class="bg-olive-50 px-1.5 py-1 text-right">Total</div>
+                        <div class="bg-olive-50 px-1.5 py-1 text-right" title="Prix unitaire, en euros">P.U. (€)</div>
+                        <div class="bg-olive-50 px-1.5 py-1 text-right" title="Quantité × prix unitaire, en euros">Total (€)</div>
                         <div class="bg-mallow-50 px-1.5 py-1 text-right">Qté</div>
-                        <div class="bg-mallow-50 px-1.5 py-1 text-right">P.U.</div>
-                        <div class="bg-mallow-50 px-1.5 py-1 text-right">Total</div>
+                        <div class="bg-mallow-50 px-1.5 py-1 text-right" title="Prix unitaire, en euros">P.U. (€)</div>
+                        <div class="bg-mallow-50 px-1.5 py-1 text-right" title="Quantité × prix unitaire, en euros">Total (€)</div>
                         <div class="px-1 py-1 text-center">Sél.</div>
                         <div class="px-1 py-1" />
                         <div class="px-1 py-1" />
