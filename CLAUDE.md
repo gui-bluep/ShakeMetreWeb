@@ -28,14 +28,42 @@ Run `git log --oneline` first — the commit messages carry the reasoning behind
 
 Do not port: `ZZZ_Template`, `ZSET_Settings`/`ZVAR_Variables`/`ZSTRI_Strings` (use Laravel config + a `translations` table), the `BrowserNav` module, anything under `OLD/`/`TEMP/`/`__SAVE_AR_*`/`__OLD`, the `DEV/Raw`/`DEV/Blank` layouts. Most of the 92 custom functions need no equivalent — only the FR/date and privilege logic.
 
+### Reading the old application directly
+
+The FileMaker ShakeMetre being replaced is **hosted on a server and readable over the Data API**
+with a dedicated account. Credentials live in `.env` under `SHAKEMETRE_FM_*` and are exposed as
+`config('services.shakemetre_filemaker')`.
+
+**Never use it from `app/`.** ShakeMetre becomes purely web: its data lives in this project's
+database, and nothing the application does at runtime may depend on the thing it replaces. The
+access exists for one purpose — establishing how the FileMaker application behaves, so the web
+version reproduces it instead of guessing. Throwaway scripts only. Both the config block and the
+environment variables get deleted when the migration is done, which is also why they are absent
+from `.env.example`.
+
+What it answers, and what it does not:
+
+- **Data** — the Data API. Any layout is addressable with a full-access account; `DEV/Raw/*_raw`
+  expose every field of a table, so no API layout has to be created to read one. This is the only
+  way to know what the data actually looks like, and it has already contradicted the export twice
+  (see the two entries below).
+- **Behaviour** — the XML export's script bodies, not the API, which cannot read a script.
+- **Intent** — neither. Ask.
+
+The local `.fmp12` copies (`~/dev/ShakeWeb/ShakeFilemaker/`) drift from the hosted one and are not
+the reference for data; the XML export is dated, so say which date a script body comes from.
+
 ### What the export does and does not tell you
 
 Hard-won and worth knowing before trusting it:
 
-- **Script bodies are absent** (`Has_DDR_INFO="False"`). You get script *names* only. 274 of them.
+- **Script bodies ARE available** — an earlier version of this file said the opposite, and that error cost several formulas that had to be guessed instead of read. `Has_DDR_INFO="False"` refers to DDR-specific info, not to script steps: `~/dev/filemaker/ShakeMetre.xml` carries all 274 script bodies (16 633 steps) under `Structure/AddAction/StepsForScripts`, where each `<Script>` names itself in a child `<ScriptReference>` and holds its steps in `<ObjectList>`. The `ScriptCatalog` entries near the top of the file are name-only, which is what misled the extraction behind `ShakeMetre_data_dictionary.json`. A step's target field is `<FieldReference>`, its calculation is `<Parameter type="Calculation">`. **Read the script before guessing a rule.**
 - **Summary fields carry `calc: null`** — no aggregation operator, no source field. Their meaning is unverified unless separately confirmed.
 - The 250-character calc truncation **has been fixed** by a re-export (commit `3fb3a66`). Older comments referring to truncated formulas are historical.
 - `isTenderLine_b`, `Omit_b` and `TENDER_Id` are referenced by no formula at all.
+- **REFS and REFSL zkp are UUIDs, not numbers.** The export types them `Number`; the live records are UUIDs at all three levels, so the migration plan's "numeric legacy keys" no longer holds for them. `REF_Reference.Code`, on the other hand, really is text in places — the first section's code is the string `"00"`, which this project's `integer` column flattens to 0.
+- **A métré line does not point at the reference catalogue.** `zkf_REF` / `zkf_REFS` / `zkf_REFSL` are EMPTY on all 57 809 lines of the live file; the section lives on the line as copied values. See the settled decision below.
+- **The line's title is `REFSL_Title`, not `Description`.** Filled on 57 079 lines against 29 for `Description`, which holds a free note when it is used at all ("1374,07 € selon offre Collignon"). Both web grids currently edit `description` as the line title — see the settled decision below.
 - **The export lists what the tables contain. It does not tell you what the API layouts expose.** Those are two different things, and the difference has caused real bugs. Probe the live layout metadata (`GET /fmi/data/vLatest/databases/{db}/layouts/{layout}`) before relying on a field being reachable.
 
 ### API layouts, as confirmed against the live server
@@ -128,6 +156,8 @@ Each of these looks like an inconsistency and is not. Ask before changing any of
 - **Which of the two sets a screen reads is a decision, not an accident.** Métré page (the four tiles) and `Ratio_c`: the **ungated** `Total_*_METL_Stored` — it is the screen a métré is worked on, and it showed four empty tiles until *Accepté* and *Site* were both ticked, which reads as a broken page rather than as "nothing is committed yet". Project page roll-up and the ShakeDesign portal replica: the **gated** `Tot_Sum_*`, which answer "how much is agreed, how much is on site". Same sums, two questions.
 - **`Date_Agreement` follows `isAccepted_b`.** Filled with today's date when the box is ticked, emptied when it is unticked, and **no memory**: re-ticking stamps today rather than restoring the old date, which described an agreement that was taken back. The field stays editable (a métré accepted last Tuesday and recorded today has to be correctable) and the stamp only fires on the transition. **Which "today"**: the page sends the *browser's* civil date (`localToday()`, never `toISOString()`, which is UTC and reads as yesterday just after midnight) — only the machine of the person ticking knows the day they are living in. `MetreController::stampAgreementDate()` keeps the same rule as a fallback for a caller that sends no date, from the server clock (`config('app.timezone')`, `APP_TIMEZONE`); a date in the request always wins.
 - **The four line views are one page, cut by a slug.** `/metres/{metre}/lines/{view}` with `view` in `MetreLineDetailController::VIEWS`, which maps each slug to its money blocks (`achats-ventes` → `['achats', 'ventes']`) and is also the route whitelist — so what a view *is* is one fact, not two that can drift. The payload is identical for all four: a line carries the same fields and the same computed values everywhere, including `price_ratio`, which the narrow views simply do not draw. The page owns only how a block *looks* (`BLOCKS` in `LinesDetail.vue`, with literal Tailwind classes — a computed `bg-${tone}-50/70` would never be generated). The ratio column and the shared-quantity note appear only where both achats and ventes are on screen, because that is where they mean something. Adding a fifth cut is one line in `VIEWS`.
+- **A line's section is copied onto the line, never joined.** The reference catalogue (REF → REFS → REFSL, 19/118/507 rows) is a source to copy FROM. A line carries `ref_code`, `ref_title`, `refs_code`, `refs_title`, `refsl_title` and `ref_order`; the foreign keys are written as provenance only and nothing reads them to display a line. That is what lets a section be renamed — or invented on the spot, which FileMaker allows — without rewriting métrés already sent to a client, and it is verified by a test. `ref_order` counts from 1 inside one `(métré, ref_code, refs_code)` group and is the third component of the printed code `MetreLine::refLineCode()` = "20.8.1" (METL::REFSL_Code_c). Lines are listed in section order (METL_Sort: `ref_code, refs_code, refs_title, ref_order`), sectionless lines last. Inserting from the catalogue (METL_New_Multi) copies the item's title, its unit and its price — into **`price_buy`**: the catalogue is a purchase-price book and nothing in it feeds the client price. Titles are copied in the **métré's** language (the source used the interface's) with a fallback (the source blanks the title when the translation is missing, and `Title_NL` is empty on all 644 catalogue rows).
+- **Open: which field is a line's title.** The source says `REFSL_Title`; both web grids edit `description`. Catalogue insertion currently writes the title into **both** as a bridge, so a line reads correctly today. Rebinding the grids' title column to `refsl_title` is a decision to take before importing the 57 809 lines.
 - **A lot's `code` is a number, and every list of lots sorts on it numerically** (2 before 10), with codeless lots last — at the top, where MySQL's NULL ordering puts them, they read as the head of the list. The project page re-sorts client-side too, because the lot manager edits the sidebar's array in place: a lot renumbered to 2 afterwards would otherwise stay below the 10. The manager's own rows are only re-sorted on open, so a row does not jump out from under the cursor while its code is being typed.
 - **The line ratio is computed, not read.** `price_sales / price_buy`, rounded to 2, null when either price is absent or the purchase price is 0. It deliberately replaces the stored `METL::Ratio` column, which nothing in the export claims to maintain. The column is left untouched in the database.
 - **Active/inactive was dropped from the dashboard.** `PRJ_Projects.isActive_b` is not on `API_PRJ`; coercing its absence to `false` made every project claim to be inactive.
