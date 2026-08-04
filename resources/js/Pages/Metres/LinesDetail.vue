@@ -87,7 +87,7 @@ const visibleRows = computed(() => {
     }
 
     return rows.value.filter((row) =>
-        [row.description, row.unit, row.lot_name, row.sor_title_ref]
+        [row.refsl_title, row.description, row.unit, row.lot_name, row.sor_title_ref]
             .some((field) => String(field ?? '').toLowerCase().includes(term))
     );
 });
@@ -671,10 +671,10 @@ const breadcrumbs = computed(() => [
                     <!-- Titre -->
                     <input
                         type="text"
-                        :value="row.description"
+                        :value="row.refsl_title"
                         :disabled="readOnly"
                         class="cell-input focus:bg-white"
-                        @input="editText(row, 'description', $event.target.value)"
+                        @input="editText(row, 'refsl_title', $event.target.value)"
                         @blur="flushRow(row)"
                     />
 

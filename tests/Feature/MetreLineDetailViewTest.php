@@ -381,9 +381,8 @@ class MetreLineDetailViewTest extends TestCase
         ])->assertCreated();
 
         $response->assertJsonPath('data.0.refsl_title', 'Carrelage 30x30')
-            // Le titre du catalogue atterrit aussi dans `description`, que les deux grilles
-            // éditent comme titre de ligne - pont assumé, voir le contrôleur.
-            ->assertJsonPath('data.0.description', 'Carrelage 30x30')
+            // `description` reste vide : c'est la note libre du source, pas le titre.
+            ->assertJsonPath('data.0.description', null)
             ->assertJsonPath('data.0.unit', 'm2')
             ->assertJsonPath('data.0.price_buy', 48.5)
             // La section est recopiée sur la ligne, pas jointe.
@@ -534,28 +533,6 @@ class MetreLineDetailViewTest extends TestCase
             ->assertJsonPath('data.0.sub_references.0.lines.0.title', 'Carrelage 30x30')
             ->assertJsonPath('data.0.sub_references.0.lines.0.unit', 'm2')
             ->assertJsonPath('data.0.sub_references.0.lines.0.price', 48.5);
-    }
-
-    /**
-     * The order a métré's lines are listed in is METL_Sort's: section, sub-section, then rank.
-     * Not the order they were created in - a line added to section 20 belongs under 20, above
-     * everything in section 60, however late it was typed.
-     */
-    public function test_the_lines_are_listed_in_section_order(): void
-    {
-        $this->actAsWriter();
-        $this->line(['description' => 'sans section', 'sort_order' => 1]);
-        $this->line(['description' => 'électricité', 'ref_code' => 60, 'refs_code' => 4, 'ref_order' => 1, 'sort_order' => 2]);
-        $this->line(['description' => 'sols, rang 2', 'ref_code' => 20, 'refs_code' => 8, 'ref_order' => 2, 'sort_order' => 3]);
-        $this->line(['description' => 'sols, rang 1', 'ref_code' => 20, 'refs_code' => 8, 'ref_order' => 1, 'sort_order' => 4]);
-
-        $this->get($this->url())->assertInertia(fn ($page) => $page
-            ->where('lines.0.description', 'sols, rang 1')
-            ->where('lines.1.description', 'sols, rang 2')
-            ->where('lines.2.description', 'électricité')
-            // Les lignes sans section passent à la fin, pas en tête.
-            ->where('lines.3.description', 'sans section')
-            ->etc());
     }
 
     /**

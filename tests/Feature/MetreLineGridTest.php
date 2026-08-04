@@ -116,6 +116,30 @@ class MetreLineGridTest extends TestCase
 
     // --- PATCH: protection ------------------------------------------------------------
 
+    /**
+     * METL::REFSL_Title est le titre de la ligne, et la colonne « Désignation » l'écrit.
+     * `description` reste modifiable et reste la note libre du fichier source - les deux passent
+     * par la même surface d'écriture, et aucune vue ne peut en décider autrement.
+     */
+    public function test_the_line_title_is_refsl_title(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $line = $this->line(['refsl_title' => 'Carrelage 30x30', 'description' => 'selon offre Collignon']);
+
+        $this->get("/metres/{$this->metre->id}/lines")
+            ->assertInertia(fn ($page) => $page
+                ->where('lines.0.refsl_title', 'Carrelage 30x30')
+                ->where('lines.0.description', 'selon offre Collignon')
+                ->etc());
+
+        $this->patchJson("/api/metre-lines/{$line->id}", ['refsl_title' => 'Carrelage 60x60'])
+            ->assertOk()
+            ->assertJsonPath('data.refsl_title', 'Carrelage 60x60');
+
+        $this->assertSame('Carrelage 60x60', $line->fresh()->refsl_title);
+        $this->assertSame('selon offre Collignon', $line->fresh()->description);
+    }
+
     public function test_the_update_endpoint_requires_authentication(): void
     {
         $line = $this->line();

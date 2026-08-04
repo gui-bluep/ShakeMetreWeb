@@ -28,6 +28,18 @@ class UpdateMetreLineRequest extends FormRequest
     public const EDITABLE = [
         'reference_id',
         'sub_reference_id',
+        /*
+         * Le titre de la ligne, et le champ que les grilles éditent sous « Titre ».
+         *
+         * C'est METL::REFSL_Title, décidé sur les données réelles : rempli sur 57 079 des 57 809
+         * lignes du fichier FileMaker, contre 29 pour Description - qui n'y sert que de note
+         * libre (« 1374,07 € selon offre Collignon »). Le troisième niveau du référentiel EST la
+         * ligne, et son titre est celui de la ligne ; METL_NewFromREF place d'ailleurs le curseur
+         * dans ce champ juste après la création.
+         */
+        'refsl_title',
+        // Reste éditable : la note libre du fichier source, et ce que portaient les lignes créées
+        // par cette application avant que le titre ne soit rebranché.
         'description',
         'quantity',
         // Independent of `quantity`: METL_METC_UpdateQuantities feeds each from its own
@@ -83,6 +95,7 @@ class UpdateMetreLineRequest extends FormRequest
         $rules = [
             'reference_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('metre_references', 'id')],
             'sub_reference_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('sub_references', 'id')],
+            'refsl_title' => ['sometimes', 'nullable', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string', 'max:65535'],
             'quantity' => ['sometimes', 'nullable', 'numeric', 'between:-99999999.9999,99999999.9999'],
             'quantity_ordered' => ['sometimes', 'nullable', 'numeric', 'between:-99999999.9999,99999999.9999'],

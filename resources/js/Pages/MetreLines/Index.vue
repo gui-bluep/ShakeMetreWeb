@@ -21,7 +21,9 @@ const ROW_HEIGHT = 36;
 const EDITABLE_COLUMNS = [
     { key: 'reference_id', type: 'reference', label: 'Réf.', width: '150px' },
     { key: 'sub_reference_id', type: 'subReference', label: 'Sous-réf.', width: '150px' },
-    { key: 'description', type: 'text', label: 'Désignation', width: 'minmax(220px, 1fr)' },
+    // METL::REFSL_Title - le titre de la ligne. `description` reste une note libre, comme dans
+    // le fichier source où elle n'est remplie que sur 29 lignes sur 57 809.
+    { key: 'refsl_title', type: 'text', label: 'Désignation', width: 'minmax(220px, 1fr)' },
     { key: 'quantity', type: 'number', label: 'Qté', width: '90px' },
     // Independent of `quantity` - each is fed from its own component sum in FileMaker, and a
     // "pm" unit forces this one empty, hence the per-row disabling below.

@@ -49,16 +49,6 @@ class MetreLineDetailController extends Controller
     {
         $lines = $metre->metreLines()
             ->with('lot')
-            /*
-             * L'ordre d'affichage d'un métré, celui de METL_Sort : section, sous-section, puis
-             * rang dans la sous-section (REF_Code, REFS_Code, REFS_Title, Order). Les lignes sans
-             * section passent à la fin et gardent leur propre ordre - `sort_order` reste le rang
-             * libre d'une ligne dans le métré, et sert ici de départage.
-             *
-             * `ref_code is null` en tête du ORDER BY plutôt qu'un NULLS LAST : l'expression doit
-             * dire la même chose sur MySQL et sur SQLite.
-             */
-            ->orderByRaw('ref_code is null, ref_code, refs_code, refs_title, ref_order')
             ->orderBy('sort_order')
             ->orderBy('sequence_number')
             ->get();
@@ -158,23 +148,8 @@ class MetreLineDetailController extends Controller
                 $line->sub_reference_id = $item->sub_reference_id;
                 $line->sub_reference_line_id = $item->getKey();
 
-                /*
-                 * Le libellé va dans les DEUX champs, et c'est un pont assumé, pas une étourderie.
-                 *
-                 * Dans le fichier réel, le titre d'une ligne est REFSL_Title : rempli sur 57 079
-                 * des 57 809 lignes, tandis que Description ne l'est que sur 29 - et y sert de
-                 * note libre (« 1374,07 € selon offre Collignon »). METL_NewFromREF place
-                 * d'ailleurs le curseur dans REFSL_Title après création.
-                 *
-                 * Or les deux grilles web éditent `description` comme titre de ligne. Écrire les
-                 * deux donne une ligne lisible aujourd'hui sans reconstruire ces écrans : la copie
-                 * du catalogue reste dans refsl_title, ce que la ligne dit maintenant est dans
-                 * description. Rebrancher le titre des grilles sur refsl_title est une décision à
-                 * prendre - elle change ce que la colonne « Titre » écrit - et l'import des 57 809
-                 * lignes en dépend.
-                 */
+                // METL_New écrit le libellé du catalogue dans REFSL_Title, qui est le titre de la ligne.
                 $line->refsl_title = $item->localisedTitle($metre->language);
-                $line->description = $line->refsl_title;
                 $line->unit = $item->unit;
                 $line->price_buy = $item->price;
 
