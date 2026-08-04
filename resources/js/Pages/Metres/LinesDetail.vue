@@ -943,32 +943,49 @@ const showRatio = computed(() => props.blocks.includes('achats') && props.blocks
 /** Même condition : le partage de METL::Quantity ne se dit que là où il se voit. */
 const sharedQuantity = showRatio;
 
-/** Column widths, so the header and the rows stay aligned across the horizontal scroll. */
-const TEMPLATE = computed(() => [
-    '4.5rem',                               // code de ligne (REF.REFS.rang)
-    'minmax(15rem, 1.4fr)',                 // titre
-    '2.5rem', '2.5rem',                     // est. / option
-    '5.5rem',                               // unité
+/**
+ * Les colonnes de la grille : leur largeur minimale en rem, et leur part de l'espace en trop.
+ *
+ * Une seule liste, d'où sortent ET le `grid-template-columns` ET la largeur plancher du contenu.
+ * C'était deux faits séparés, et ils avaient dérivé : le plancher annonçait 96,5rem là où les
+ * colonnes en réclament 117. La grille débordait donc de son conteneur de 20,5rem — Livraison, Lot
+ * et Commande fourn. — et un enfant de grille qui déborde se dessine EN DEHORS de la boîte de sa
+ * ligne. Le fond de la ligne, son survol et sa teinte de sélection s'arrêtaient net à la limite,
+ * visible dès que la fenêtre était trop étroite et qu'on défilait vers la droite. Additionner la
+ * même liste supprime l'écart par construction.
+ */
+const COLUMNS = computed(() => [
+    { min: 4.5 },                           // code de ligne (REF.REFS.rang)
+    { min: 15, grow: 1.4 },                 // titre
+    { min: 2.5 }, { min: 2.5 },             // est. / option
+    { min: 5.5 },                           // unité
     ...blocks.value.flatMap((block) => [
-        '5rem', '6rem', '7rem',             // qté / p.u. / total
+        { min: 5 }, { min: 6 }, { min: 7 }, // qté / p.u. / total
         // Le ratio se glisse juste après le bloc achats, entre les deux prix qu'il divise.
-        ...(showRatio.value && block.key === 'achats' ? ['4rem'] : []),
+        ...(showRatio.value && block.key === 'achats' ? [{ min: 4 }] : []),
     ]),
-    '2.5rem',                               // select
-    '2rem', '2rem',                         // actions / comments
-    '6.5rem',                               // delivered
-    'minmax(8rem, 0.8fr)',                  // lot / tag
-    'minmax(8rem, 0.8fr)',                  // SOR
-].join(' '));
+    { min: 2.5 },                           // select
+    { min: 2 }, { min: 2 },                 // actions / comments
+    { min: 6.5 },                           // delivered
+    { min: 8, grow: 0.8 },                  // lot / tag
+    { min: 8, grow: 0.8 },                  // SOR
+]);
+
+/** Column widths, so the header and the rows stay aligned across the horizontal scroll. */
+const TEMPLATE = computed(() => COLUMNS.value
+    .map((column) => (column.grow === undefined
+        ? `${column.min}rem`
+        : `minmax(${column.min}rem, ${column.grow}fr)`))
+    .join(' '));
 
 /**
- * Largeur plancher de la grille, en rem, pour que les colonnes ne se compriment pas sous leur
- * lisibilité : 92 pour les trois blocs, moins 18 par bloc retiré et 4 si le ratio ne s'affiche
- * pas. Sans ce calcul, la vue « Ventes » garderait un plancher prévu pour trois fois plus de
- * colonnes et traînerait un défilement horizontal sur du vide.
+ * Largeur plancher du contenu : la somme des minimums, pour que les colonnes ne se compriment pas
+ * sous leur lisibilité et que la ligne couvre tout ce qui se défile. Elle suit d'elle-même les
+ * blocs retirés d'une vue plus étroite, qui garderait sinon un plancher prévu pour trois fois plus
+ * de colonnes et traînerait un défilement horizontal sur du vide.
  */
 const minWidth = computed(
-    () => `${96.5 - 18 * (3 - blocks.value.length) - (showRatio.value ? 0 : 4)}rem`
+    () => `${COLUMNS.value.reduce((total, column) => total + column.min, 0)}rem`
 );
 
 /** Le titre de chaque vue, celui-là même que la page du métré affiche dans sa liste. */
