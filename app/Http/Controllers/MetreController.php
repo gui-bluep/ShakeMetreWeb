@@ -8,6 +8,7 @@ use App\Jobs\RecalculateMetreTotals;
 use App\Models\Metre;
 use App\Models\MetreLine;
 use App\Models\MetreLineComponent;
+use App\Services\ShakeDesign\ShakeDesignApiException;
 use App\Services\ShakeDesign\ShakeDesignClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -36,6 +37,10 @@ class MetreController extends Controller
             // La carte « Fournisseur » : le portail des lots de MET_Form, avec leurs montants dans
             // ce métré et les trois totaux assigné / non assigné. Voir Metre::lotBreakdown().
             'lotBreakdown' => $metre->lotBreakdown(),
+
+            // Les offres client de ce métré, par OFF_Offers.zkf_MET. Un appel distant de plus sur
+            // cette page, assumé : c'est le seul moyen de les connaître, et il est dégradable.
+            'offers' => $this->offers($metre, $client),
             // Shown in the delete confirmation, so what is about to be destroyed is stated
             // rather than left to be discovered.
             'lineCount' => $metre->metreLines()->count(),
@@ -66,6 +71,77 @@ class MetreController extends Controller
         }
 
         return response()->json(['data' => $this->payload($metre)]);
+    }
+
+    /**
+     * Crée une offre client dans ShakeDesign depuis ce métré - MET_OFF_CreateClientOffer.
+     *
+     * Ce que le script source fait, dans l'ordre : rafraîchit les totaux stockés
+     * (`MET_UpdateStoredCalcs`), refuse un métré sans ligne, demande confirmation, groupe les
+     * lignes par TVA pour en faire les lignes de l'offre (voir `Metre::offerLinesByVat()`), puis
+     * appelle `OFF_New` avec la référence dure `EXT = MET::zkp`, la société et le contact DU
+     * PROJET, la langue du métré et son nom comme titre.
+     *
+     * Trois écarts, tous assumés :
+     *
+     *  - La confirmation est côté écran, en un seul dialogue : le source en a deux temps (un écran
+     *    de validation `METL_ClientOfferValidation` puis la création), simplifié sur décision.
+     *  - `OFF_New` est un script FileMaker que l'API de données pourrait déclencher, mais
+     *    `ShakeDesignClient::createOffer()` écrit directement l'en-tête sur `API_OFF` et une ligne
+     *    par entrée sur `API_OFL` - c'est le chemin que ce projet a déjà choisi et testé pour les
+     *    commandes fournisseur, et il ne dépend pas d'un script dont nous ne voyons pas le corps.
+     *  - Le PDF et son enregistrement par `DOC_New` ne sont PAS repris : les documents sont en
+     *    attente de décision (voir les questions ouvertes).
+     *
+     * Le recalcul tourne en ligne et non en file : le montant envoyé au client doit être celui de
+     * l'écran, pas celui d'avant la dernière frappe.
+     */
+    public function createOffer(Metre $metre, ShakeDesignClient $client): JsonResponse
+    {
+        if ($metre->metreLines()->count() === 0) {
+            return response()->json([
+                'message' => "Ce métré n'a aucune ligne : il n'y a rien à offrir.",
+            ], 422);
+        }
+
+        (new RecalculateMetreTotals($metre))->handle();
+        $metre->refresh();
+
+        $project = $metre->project_id === null ? null : $client->findProject($metre->project_id);
+
+        $header = array_filter([
+            'zkf_MET' => $metre->getKey(),
+            'zkf_PRJ' => $metre->project_id,
+            'zkf_CPY' => $project['zkf_CPY'] ?? null,
+            'zkf_CTC' => $project['zkf_CTC'] ?? null,
+            'Language' => $metre->language,
+            'Title' => $metre->name,
+        ], fn ($value) => $value !== null && $value !== '');
+
+        $created = $client->createOffer($header, $metre->offerLinesByVat());
+
+        return response()->json([
+            'data' => [
+                'offer' => ['zkp' => $created['zkp'] ?? null],
+                'offers' => $this->offers($metre, $client),
+            ],
+        ], 201);
+    }
+
+    /**
+     * Les offres client déjà rattachées à ce métré, ou `null` si ShakeDesign n'a pas répondu.
+     *
+     * Dégradé plutôt que fatal : la page d'un métré doit s'afficher même quand l'autre application
+     * est indisponible. `null` se lit « on n'a pas pu savoir », ce qui n'est pas la même chose
+     * qu'une liste vide, et l'écran le dit.
+     */
+    private function offers(Metre $metre, ShakeDesignClient $client): ?array
+    {
+        try {
+            return $client->listOffersForMetre($metre->getKey());
+        } catch (ShakeDesignApiException) {
+            return null;
+        }
     }
 
     /**

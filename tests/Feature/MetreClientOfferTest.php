@@ -1,0 +1,357 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Lot;
+use App\Models\Metre;
+use App\Models\MetreLine;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
+
+/**
+ * L'offre client d'un métré - MET_OFF_CreateClientOffer, et la liste des offres déjà rattachées.
+ *
+ * Aucun test ne touche un vrai serveur FileMaker : tout passe par Http::fake(). Ce qui est vérifié
+ * en premier est la règle qu'on ne devinerait pas - une ligne d'offre PAR TAUX DE TVA, portant la
+ * somme des ventes de son taux, options exclues - et non le simple fait qu'un appel part.
+ */
+class MetreClientOfferTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private const PROJECT = 'PRJ-1A2B3C';
+
+    private const COMPANY = 'CPY-77';
+
+    private const CONTACT = 'CTC-88';
+
+    private Metre $metre;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set('services.shakedesign', [
+            'host' => 'fms.example.test',
+            'database' => 'ShakeDesign',
+            'username' => 'api_user',
+            'password' => 'api_secret',
+            'version' => 'vLatest',
+            'timeout' => 15,
+            'connect_timeout' => 5,
+            'verify' => true,
+            'token_cache_key' => 'shakedesign:data-api:token',
+            'token_ttl' => 840,
+        ]);
+
+        Cache::flush();
+
+        $this->metre = Metre::forceCreate([
+            'project_id' => self::PROJECT,
+            'name' => 'Chantier Nord',
+            'ind_project' => 6,
+            'language' => 'FR',
+        ]);
+    }
+
+    private function actAsWriter(): User
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        return $user;
+    }
+
+    private function line(array $attributes = []): MetreLine
+    {
+        return MetreLine::forceCreate($attributes + ['metre_id' => $this->metre->id]);
+    }
+
+    /** Le projet, la création de l'en-tête, celle des lignes, puis la relecture de la liste. */
+    private function fakeShakeDesign(array $offers = []): void
+    {
+        Http::fake([
+            '*/sessions' => Http::response([
+                'response' => ['token' => 'tok-1'],
+                'messages' => [['code' => '0', 'message' => 'OK']],
+            ]),
+            '*/layouts/API_PRJ/_find' => Http::response([
+                'response' => ['data' => [['fieldData' => [
+                    'zkp' => self::PROJECT, 'Name' => 'Chantier Nord',
+                    'zkf_CPY' => self::COMPANY, 'zkf_CTC' => self::CONTACT,
+                ], 'recordId' => '1']]],
+                'messages' => [['code' => '0', 'message' => 'OK']],
+            ]),
+            '*/layouts/API_OFF/records' => Http::response([
+                'response' => ['recordId' => '501', 'modId' => '0'],
+                'messages' => [['code' => '0', 'message' => 'OK']],
+            ]),
+            '*/layouts/API_OFF/records/501' => Http::response([
+                'response' => ['data' => [['fieldData' => ['zkp' => 'OFF-NEW'], 'recordId' => '501']]],
+                'messages' => [['code' => '0', 'message' => 'OK']],
+            ]),
+            '*/layouts/API_OFL/records' => Http::response([
+                'response' => ['recordId' => '900', 'modId' => '0'],
+                'messages' => [['code' => '0', 'message' => 'OK']],
+            ]),
+            '*/layouts/API_OFF/_find' => Http::response([
+                'response' => ['data' => array_map(fn ($o) => ['fieldData' => $o, 'recordId' => '1'], $offers)],
+                'messages' => [['code' => '0', 'message' => 'OK']],
+            ]),
+        ]);
+    }
+
+    /** @return list<array<string, mixed>> les fieldData envoyés à API_OFL, dans l'ordre */
+    private function sentOfferLines(): array
+    {
+        $lines = [];
+
+        foreach (Http::recorded() as [$request]) {
+            if (str_contains($request->url(), 'layouts/API_OFL/records')) {
+                // Le client envoie fieldData en objet, pour que {} sorte au lieu de [].
+                $lines[] = (array) $request->data()['fieldData'];
+            }
+        }
+
+        return $lines;
+    }
+
+    // --- la règle : une ligne par taux de TVA ------------------------------------------------
+
+    public function test_it_sends_one_offer_line_per_vat_rate(): void
+    {
+        $this->actAsWriter();
+        $this->fakeShakeDesign();
+
+        // 21 % : 10 × 100 = 1000, et 2 × 50 = 100 → 1100
+        $this->line(['vat_value_id' => 'VAT-21', 'vat_ae' => 21, 'price_sales' => 100, 'quantity' => 10]);
+        $this->line(['vat_value_id' => 'VAT-21', 'vat_ae' => 21, 'price_sales' => 50, 'quantity' => 2]);
+        // 6 % : 4 × 25 = 100
+        $this->line(['vat_value_id' => 'VAT-6', 'vat_ae' => 6, 'price_sales' => 25, 'quantity' => 4]);
+        // une option à 21 % : comptée nulle part
+        $this->line(['vat_value_id' => 'VAT-21', 'vat_ae' => 21, 'price_sales' => 9999, 'quantity' => 1, 'is_option_b' => true]);
+
+        $this->postJson("/api/metres/{$this->metre->id}/offer")->assertCreated();
+
+        $lines = $this->sentOfferLines();
+
+        $this->assertCount(2, $lines, 'Deux taux de TVA, deux lignes d\'offre.');
+
+        // Triées par taux : 6 avant 21.
+        $this->assertEquals(6, $lines[0]['VATRate']);
+        $this->assertEquals(100, $lines[0]['PriceUnit']);
+        $this->assertEquals(21, $lines[1]['VATRate']);
+        $this->assertEquals(1100, $lines[1]['PriceUnit'], 'L\'option est exclue.');
+
+        foreach ($lines as $line) {
+            $this->assertSame(1, $line['Quantity'], 'Quantity vaut toujours 1 : le prix EST le total.');
+            $this->assertSame('6 - Chantier Nord', $line['Title'], 'IndProject & " - " & Name.');
+        }
+    }
+
+    /** Les lignes sans TVA forment leur propre groupe, sans taux inventé, et passent en dernier. */
+    public function test_lines_without_vat_form_their_own_untaxed_group(): void
+    {
+        $this->actAsWriter();
+        $this->fakeShakeDesign();
+
+        $this->line(['vat_value_id' => 'VAT-21', 'vat_ae' => 21, 'price_sales' => 10, 'quantity' => 1]);
+        $this->line(['price_sales' => 7, 'quantity' => 1]);
+
+        $this->postJson("/api/metres/{$this->metre->id}/offer")->assertCreated();
+
+        $lines = $this->sentOfferLines();
+        $this->assertCount(2, $lines);
+        $this->assertEquals(21, $lines[0]['VATRate']);
+        $this->assertArrayNotHasKey('VATRate', $lines[1], 'Aucun taux inventé pour une ligne sans TVA.');
+        $this->assertEquals(7, $lines[1]['PriceUnit']);
+    }
+
+    /** Sans aucune TVA, une seule ligne : le total des ventes du métré. */
+    public function test_a_metre_without_any_vat_produces_one_line(): void
+    {
+        $this->actAsWriter();
+        $this->fakeShakeDesign();
+
+        $this->line(['price_sales' => 100, 'quantity' => 3]);
+        $this->line(['price_sales' => 50, 'quantity' => 1]);
+
+        $this->postJson("/api/metres/{$this->metre->id}/offer")->assertCreated();
+
+        $lines = $this->sentOfferLines();
+        $this->assertCount(1, $lines);
+        $this->assertEquals(350, $lines[0]['PriceUnit']);
+    }
+
+    // --- l'en-tête ---------------------------------------------------------------------------
+
+    /**
+     * `zkf_MET` est la référence dure que ce projet doit préserver : c'est par elle que ShakeDesign
+     * relie une offre à son métré. La société et le contact viennent DU PROJET, pas du métré.
+     */
+    public function test_the_header_carries_the_hard_metre_reference_and_the_projects_client(): void
+    {
+        $this->actAsWriter();
+        $this->fakeShakeDesign();
+        $this->line(['price_sales' => 1, 'quantity' => 1]);
+
+        $this->postJson("/api/metres/{$this->metre->id}/offer")->assertCreated();
+
+        $header = null;
+
+        foreach (Http::recorded() as [$request]) {
+            if (str_contains($request->url(), 'layouts/API_OFF/records') && $request->method() === 'POST') {
+                $header = (array) $request->data()['fieldData'];
+                break;
+            }
+        }
+
+        $this->assertSame($this->metre->id, $header['zkf_MET']);
+        $this->assertSame(self::PROJECT, $header['zkf_PRJ']);
+        $this->assertSame(self::COMPANY, $header['zkf_CPY']);
+        $this->assertSame(self::CONTACT, $header['zkf_CTC']);
+        $this->assertSame('FR', $header['Language']);
+        $this->assertSame('Chantier Nord', $header['Title']);
+    }
+
+    /** Les totaux sont rafraîchis avant l'envoi : le montant offert est celui de l'écran. */
+    public function test_it_recalculates_before_sending(): void
+    {
+        $this->actAsWriter();
+        $this->fakeShakeDesign();
+
+        $this->line(['price_sales' => 100, 'quantity' => 2]);
+
+        // Le total est faussé SANS passer par les modèles, donc sans déclencher l'observateur :
+        // c'est l'état d'un métré dont les totaux stockés ont pris du retard.
+        \Illuminate\Support\Facades\DB::table('metres')
+            ->where('id', $this->metre->id)
+            ->update(['total_sales_metl_stored' => 1]);
+
+        $this->postJson("/api/metres/{$this->metre->id}/offer")->assertCreated();
+
+        $this->assertEquals(200, $this->metre->fresh()->total_sales_metl_stored, 'Recalculé par le point d\'entrée.');
+
+        // Et c'est bien 200 qui part, pas le 1 périmé.
+        $this->assertEquals(200, $this->sentOfferLines()[0]['PriceUnit']);
+    }
+
+    // --- les refus ---------------------------------------------------------------------------
+
+    /** Le source refuse un métré sans ligne : « Aucune ligne de métré ». */
+    public function test_a_metre_without_lines_is_refused_before_any_call(): void
+    {
+        $this->actAsWriter();
+        $this->fakeShakeDesign();
+
+        $this->postJson("/api/metres/{$this->metre->id}/offer")->assertStatus(422);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_a_readonly_account_may_not_create_an_offer(): void
+    {
+        $this->actingAs(User::factory()->readOnly()->create());
+        $this->fakeShakeDesign();
+        $this->line(['price_sales' => 1, 'quantity' => 1]);
+
+        $this->postJson("/api/metres/{$this->metre->id}/offer")->assertForbidden();
+
+        Http::assertNothingSent();
+    }
+
+    // --- la liste ----------------------------------------------------------------------------
+
+    public function test_the_page_lists_the_offers_of_this_metre(): void
+    {
+        $this->actAsWriter();
+        $this->fakeShakeDesign([
+            [
+                'zkp' => 'OFF-1', 'Title' => 'Offre initiale', 'Date' => '05/11/2025',
+                'Category' => 'ST / CO', 'Language' => 'FR', 'OFL_Total_PriceNoTax_cU' => 5000,
+            ],
+            [
+                'zkp' => 'OFF-2', 'Title' => '', 'Date' => '', 'Category' => '',
+                'Language' => 'FR', 'OFL_Total_PriceNoTax_cU' => '',
+            ],
+        ]);
+
+        $this->get("/metres/{$this->metre->id}")->assertInertia(fn ($page) => $page
+            ->where('offers.0.zkp', 'OFF-1')
+            ->where('offers.0.title', 'Offre initiale')
+            ->where('offers.0.total_no_tax', 5000)
+            // Un champ FileMaker vide devient null, pas une chaîne vide ni 0 €.
+            ->where('offers.1.title', null)
+            ->where('offers.1.total_no_tax', null));
+    }
+
+    /** La recherche est bornée au métré : c'est zkf_MET qui filtre, pas le projet. */
+    public function test_the_list_is_filtered_on_the_metres_own_key(): void
+    {
+        $this->actAsWriter();
+        $this->fakeShakeDesign();
+
+        $this->get("/metres/{$this->metre->id}")->assertOk();
+
+        Http::assertSent(function ($request) {
+            if (! str_contains($request->url(), 'layouts/API_OFF/_find')) {
+                return false;
+            }
+
+            return $request->data()['query'][0]['zkf_MET'] === '=='.$this->metre->id;
+        });
+    }
+
+    /**
+     * ShakeDesign injoignable - pas « répond mal », mais « ne répond pas ».
+     *
+     * Ce cas traversait tout : une ConnectionException de Laravel n'est pas une
+     * ShakeDesignApiException, alors que le contrat du client annonce l'inverse depuis le début.
+     * Six tests de la page métré l'ont révélé en tentant un vrai appel réseau.
+     */
+    public function test_an_unreachable_host_degrades_instead_of_breaking_the_page(): void
+    {
+        $this->actAsWriter();
+
+        Http::fake([
+            '*/sessions' => Http::response([
+                'response' => ['token' => 'tok-1'],
+                'messages' => [['code' => '0', 'message' => 'OK']],
+            ]),
+            '*/layouts/API_PRJ/_find' => Http::response([
+                'response' => ['data' => [['fieldData' => ['zkp' => self::PROJECT, 'Name' => 'X'], 'recordId' => '1']]],
+                'messages' => [['code' => '0', 'message' => 'OK']],
+            ]),
+            '*/layouts/API_OFF/_find' => fn () => throw new \Illuminate\Http\Client\ConnectionException('Could not resolve host'),
+        ]);
+
+        $this->get("/metres/{$this->metre->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('offers', null));
+    }
+
+    /** ShakeDesign indisponible : la page s'affiche quand même, et le dit. */
+    public function test_the_page_degrades_when_shakedesign_cannot_be_reached(): void
+    {
+        $this->actAsWriter();
+
+        Http::fake([
+            '*/sessions' => Http::response([
+                'response' => ['token' => 'tok-1'],
+                'messages' => [['code' => '0', 'message' => 'OK']],
+            ]),
+            '*/layouts/API_PRJ/_find' => Http::response([
+                'response' => ['data' => [['fieldData' => ['zkp' => self::PROJECT, 'Name' => 'X'], 'recordId' => '1']]],
+                'messages' => [['code' => '0', 'message' => 'OK']],
+            ]),
+            '*/layouts/API_OFF/_find' => Http::response(['messages' => [['code' => '500', 'message' => 'Boom']]], 500),
+        ]);
+
+        $this->get("/metres/{$this->metre->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('offers', null));
+    }
+}

@@ -27,6 +27,8 @@ const props = defineProps({
     languages: { type: Array, required: true },
     lineCount: { type: Number, default: 0 },
     lotBreakdown: { type: Object, required: true },
+    /** Les offres client du métré, ou `null` si ShakeDesign n'a pas répondu. */
+    offers: { type: Array, default: null },
 });
 
 const page = usePage();
@@ -180,6 +182,58 @@ async function setLocked(locked) {
         Object.assign(form, body.data, { totals: { ...body.data.totals } });
     } catch (e) {
         lockError.value = e.message;
+    } finally {
+        busy.value = false;
+    }
+}
+
+/**
+ * Une offre client dans ShakeDesign - MET_OFF_CreateClientOffer.
+ *
+ * Un seul dialogue de confirmation, comme décidé : le source en a deux (un écran de validation
+ * puis la création). Le libellé nomme l'application de destination, comme le source qui demande
+ * « Confirmez-vous la création d'une offre dans Smarter? » - on écrit chez quelqu'un d'autre.
+ */
+const confirmingOffer = ref(false);
+const offerError = ref(null);
+const offerCreated = ref(false);
+const offers = ref(props.offers);
+
+watch(() => props.offers, (value) => { offers.value = value; });
+
+async function createOffer() {
+    if (readOnly.value || busy.value) {
+        return;
+    }
+
+    busy.value = true;
+    offerError.value = null;
+    await flush(props.metre.id);
+
+    try {
+        const response = await fetch(`/api/metres/${props.metre.id}/offer`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-XSRF-TOKEN': csrfToken(),
+            },
+        });
+
+        const body = await response.json().catch(() => null);
+
+        if (! response.ok) {
+            throw new Error(body?.message ?? `Échec (HTTP ${response.status})`);
+        }
+
+        // La réponse porte la liste rafraîchie : l'offre créée apparaît sans recharger la page.
+        offers.value = body.data.offers;
+        offerCreated.value = true;
+        confirmingOffer.value = false;
+    } catch (e) {
+        offerError.value = e.message;
     } finally {
         busy.value = false;
     }
@@ -463,10 +517,17 @@ function statusClasses(active) {
                 <!-- Actions -->
                 <AppCard title="Actions" class="lg:col-span-3">
                     <div class="flex flex-col gap-2">
-                        <SecondaryButton class="btn-block" disabled title="Pas encore disponible">
+                        <SecondaryButton
+                            v-if="!readOnly"
+                            class="btn-block"
+                            :disabled="busy || lineCount === 0"
+                            :title="lineCount === 0
+                                ? 'Ce métré n\'a aucune ligne : il n\'y a rien à offrir.'
+                                : 'Crée une offre client dans ShakeDesign, une ligne par taux de TVA'"
+                            @click="confirmingOffer = true"
+                        >
                             <Icon name="document" :size="4" />
                             Nouvelle offre client
-                            <Badge tone="soon" class="ml-auto">Bientôt</Badge>
                         </SecondaryButton>
 
                         <SecondaryButton
@@ -549,6 +610,47 @@ function statusClasses(active) {
                 </AppCard>
 
                 <!-- Fournisseur - deliberately empty for now. -->
+                <!-- Offres client déjà rattachées à ce métré (OFF_Offers.zkf_MET). Le montant
+                     affiché est hors TVA : c'est celui qui se compare au total des ventes du
+                     métré, qui ne porte pas de TVA non plus. -->
+                <AppCard title="Offres client" class="lg:col-span-12">
+                    <p v-if="offers === null" class="banner banner-warning">
+                        <Icon name="alert" :size="4" class="mt-px" />
+                        <span>ShakeDesign n'a pas répondu : les offres de ce métré n'ont pas pu être lues.</span>
+                    </p>
+
+                    <div v-else-if="offers.length === 0" class="flex flex-col items-center gap-1.5 py-6 text-center">
+                        <Icon name="document" :size="6" class="text-sand-300" />
+                        <p class="text-[13px] text-sand-600">Aucune offre client pour ce métré.</p>
+                    </div>
+
+                    <table v-else class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="text-left">Titre</th>
+                                <th class="text-left">Date</th>
+                                <th class="text-left">Catégorie</th>
+                                <th class="text-left">Langue</th>
+                                <th class="text-right">Total HTVA</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="offer in offers" :key="offer.zkp">
+                                <td>{{ offer.title || 'Offre sans titre' }}</td>
+                                <td class="num">{{ offer.date || '—' }}</td>
+                                <td>{{ offer.category || '—' }}</td>
+                                <td>{{ offer.language || '—' }}</td>
+                                <td class="num text-right">
+                                    {{ offer.total_no_tax === null ? '—' : money(offer.total_no_tax) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- L'ouverture d'une offre dans FileMaker est en attente : la cible, le script
+                         et le format du paramètre restent à confirmer, comme pour SOR_GoTo. -->
+                </AppCard>
+
                 <!-- Fournisseurs : le portail des lots de MET_Form. Les lots du projet qui ne
                      portent aucun montant dans ce métré sont omis - la carte est étroite, et un lot
                      à zéro n'apprend rien ici (la page du projet, elle, les liste tous). -->
@@ -645,5 +747,50 @@ function statusClasses(active) {
                 </div>
             </div>
         </Modal>
+        <!-- Un seul dialogue, comme décidé. Il nomme l'application de destination : on écrit
+             chez quelqu'un d'autre, et le geste n'est pas annulable d'ici. -->
+        <Modal :show="confirmingOffer" max-width="md" @close="confirmingOffer = false">
+            <div class="p-5">
+                <h2 class="text-[15px] text-sand-900" style="font-variation-settings: 'wght' 600">
+                    Créer une offre client
+                </h2>
+                <p class="mt-2 text-[13px] text-sand-700">
+                    Une offre sera créée dans <strong>ShakeDesign</strong> pour ce métré, avec
+                    <strong>une ligne par taux de TVA</strong> : chacune porte le total des ventes
+                    de son taux, options exclues.
+                </p>
+                <p class="mt-2 text-[12px] text-sand-600">
+                    Les totaux du métré sont recalculés juste avant, pour que le montant envoyé soit
+                    celui de l'écran.
+                </p>
+
+                <p v-if="offerError" class="banner banner-danger mt-3">
+                    <Icon name="alert" :size="4" class="mt-px" />
+                    <span>{{ offerError }}</span>
+                </p>
+
+                <div class="mt-5 flex justify-end gap-2">
+                    <SecondaryButton :disabled="busy" @click="confirmingOffer = false">Annuler</SecondaryButton>
+                    <button type="button" class="btn btn-accent" :disabled="busy" @click="createOffer">
+                        Créer l'offre
+                    </button>
+                </div>
+            </div>
+        </Modal>
+
+        <Modal :show="offerCreated" max-width="md" @close="offerCreated = false">
+            <div class="p-5">
+                <h2 class="text-[15px] text-sand-900" style="font-variation-settings: 'wght' 600">
+                    Offre créée
+                </h2>
+                <p class="mt-2 text-[13px] text-sand-700">
+                    L'offre a été créée dans ShakeDesign et apparaît dans la liste ci-dessous.
+                </p>
+                <div class="mt-5 flex justify-end">
+                    <SecondaryButton @click="offerCreated = false">Fermer</SecondaryButton>
+                </div>
+            </div>
+        </Modal>
+
     </AuthenticatedLayout>
 </template>

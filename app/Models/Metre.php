@@ -151,6 +151,60 @@ class Metre extends Model
         ];
     }
 
+    /**
+     * Les lignes d'une offre client, groupées par taux de TVA - `MET_OFF_CreateClientOffer`.
+     *
+     * La règle qu'on ne devinerait pas : une offre porte **une ligne par TVA**, pas une par ligne
+     * de métré. Le script source lit `UniqueValues ( METL::zsm_zkf_VAT_List )`, restreint les
+     * lignes à chaque clé de TVA, et pose par groupe `Quantity = 1`, `Price =
+     * zsm_SumTotalSales_noOptions` (donc options exclues) et un titre `IndProject & " - " & Name`.
+     * Il traite ensuite à part les lignes sans TVA, d'où le groupe final ici.
+     *
+     * Groupé sur la CLÉ (`vat_value_id`) et non sur le taux, comme la source : deux valeurs de TVA
+     * distinctes pourraient porter le même taux, et ce sont deux groupes pour ShakeDesign. Le taux
+     * envoyé (`VATRate`, que `API_OFL` attend en nombre) vient de `vat_ae`, l'auto-entrée qui suit
+     * la clé — `GetAsNumber ( ZVAL::Value )` — donc aucune résolution distante n'est nécessaire.
+     *
+     * @return list<array{Title: string, Quantity: int, PriceUnit: float, VATRate?: float}>
+     */
+    public function offerLinesByVat(): array
+    {
+        $title = trim(($this->ind_project === null ? '' : $this->ind_project.' - ').(string) $this->name);
+
+        $groups = DB::table('metre_lines')
+            ->where('metre_lines.metre_id', $this->getKey())
+            ->groupBy('metre_lines.vat_value_id', 'metre_lines.vat_ae')
+            ->selectRaw('
+                metre_lines.vat_value_id,
+                metre_lines.vat_ae,
+                COALESCE(SUM('.MetreLine::SQL_SALES_NO_OPTIONS.'), 0) AS price
+            ')
+            // Les lignes sans TVA en dernier, comme le script qui les traite après la boucle.
+            ->orderByRaw('CASE WHEN metre_lines.vat_value_id IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('metre_lines.vat_ae')
+            ->get();
+
+        $lines = [];
+
+        foreach ($groups as $group) {
+            $line = [
+                'Title' => $title,
+                'Quantity' => 1,
+                'PriceUnit' => round((float) $group->price, 2),
+            ];
+
+            // Sans TVA sur la ligne, le champ n'est pas envoyé du tout : le script source passe un
+            // `vatZkf` vide, et inventer un taux serait pire que de laisser ShakeDesign décider.
+            if ($group->vat_value_id !== null && $group->vat_ae !== null && $group->vat_ae !== '') {
+                $line['VATRate'] = (float) $group->vat_ae;
+            }
+
+            $lines[] = $line;
+        }
+
+        return $lines;
+    }
+
     public function ratio(): ?float
     {
         return self::ratioFromSums($this->total_sales_metl_stored, $this->total_purchase_metl_stored);

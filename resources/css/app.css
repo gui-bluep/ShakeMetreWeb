@@ -643,6 +643,12 @@
         @apply flex items-start gap-2 rounded-md border px-3 py-2 text-[13px];
     }
 
+    /* Un état dégradé, pas une faute : l'autre application n'a pas répondu, l'écran fonctionne
+       quand même. Le rouge est gardé pour ce qui a échoué par notre faute. */
+    .banner-warning {
+        @apply border-warning-200 bg-warning-50 text-warning-700;
+    }
+
     .banner-danger {
         @apply border-danger-200 bg-danger-50 text-danger-700;
     }

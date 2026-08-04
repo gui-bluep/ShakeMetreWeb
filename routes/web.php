@@ -71,6 +71,11 @@ Route::middleware('auth')->group(function () {
         // même chemin qu'un garde-fou « verrouillé » se refermerait sur sa propre clé.
         Route::post('/api/metres/{metre}/lock', [MetreController::class, 'lock'])
             ->name('metres.lock');
+
+        // Une offre client dans ShakeDesign depuis ce métré - MET_OFF_CreateClientOffer. Une
+        // écriture dans l'autre application, donc sous role.write comme le reste.
+        Route::post('/api/metres/{metre}/offer', [MetreController::class, 'createOffer'])
+            ->name('metres.create-offer');
         Route::post('/metres/{metre}/duplicate', [MetreController::class, 'duplicate'])->name('metres.duplicate');
         Route::delete('/metres/{metre}', [MetreController::class, 'destroy'])->name('metres.destroy');
     });
