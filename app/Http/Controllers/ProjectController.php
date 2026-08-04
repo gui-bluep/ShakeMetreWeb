@@ -110,7 +110,25 @@ class ProjectController extends Controller
             'ind_project' => $metre->ind_project === null ? null : (int) $metre->ind_project,
             'name' => $metre->name,
 
-            'ratio' => $metre->ratio(),
+            /*
+             * The ratio of THIS page is Commandes / Travaux - the row's own two columns,
+             * Tot_Sum_TotalSales_Stored / Tot_Sum_TotalOrdered_Stored. Confirmed by the user.
+             * The point is that the figure is verifiable by eye from the two cells beside it.
+             *
+             * It is NOT Metre::ratio() (Ratio_c, vendu / acheté), which is what the métré's own
+             * page shows as "Ratio réel" and what the ShakeDesign portal replica returns. Two
+             * ratios of two different pairs of numbers, on purpose - the same guard divides
+             * both (empty or zero denominator yields no ratio, never 0 or an error).
+             *
+             * The source's equivalent field is Tot_Ratio_TotalFees_Stored, which
+             * RecalculateMetreTotals maintains from the same two columns. Read here rather than
+             * off that column so the number can never disagree with the two cells it sits
+             * between, whatever the state of the last recalculation.
+             */
+            'ratio' => Metre::ratioFromSums(
+                $metre->tot_sum_total_sales_stored,
+                $metre->tot_sum_total_ordered_stored,
+            ),
             'date_creation' => $metre->date_creation?->toDateString(),
             'date_agreement' => $metre->date_agreement?->toDateString(),
             'is_accepted_b' => (bool) $metre->is_accepted_b,
@@ -173,10 +191,10 @@ class ProjectController extends Controller
      * non-null total, since a métré not yet on site (isStatus_Site_b false) contributes 0
      * to a sum the same way FileMaker's Sum() treats an empty operand as 0.
      *
-     * total_ratio is not a column anywhere: it is Metre::ratio()'s own formula (Σ sales /
-     * Σ purchase, from the same two _metl_Stored inputs) applied across every métré of the
-     * project rather than one - an extension of the per-métré figure, not a transcription
-     * of a source calculation.
+     * total_ratio is the same Commandes / Travaux as the rows above, on the summed columns:
+     * the total row's ratio has to be the total row's own two figures divided, or the column
+     * would stop meaning the same thing on the last line. No source field at this level - it
+     * is the per-row formula applied to the sums, not a transcription.
      *
      * @return array{total_ordered: float, total_works: float, total_gain: float, total_ratio: ?float}
      */
@@ -187,17 +205,18 @@ class ProjectController extends Controller
             ->selectRaw('
                 COALESCE(SUM(tot_sum_total_sales_stored), 0) AS total_ordered,
                 COALESCE(SUM(tot_sum_total_ordered_stored), 0) AS total_works,
-                COALESCE(SUM(tot_sum_total_gain_stored), 0) AS total_gain,
-                SUM(total_sales_metl_stored) AS sum_sales_metl,
-                SUM(total_purchase_metl_stored) AS sum_purchase_metl
+                COALESCE(SUM(tot_sum_total_gain_stored), 0) AS total_gain
             ')
             ->first();
 
+        $commandes = (float) $row->total_ordered;
+        $travaux = (float) $row->total_works;
+
         return [
-            'total_ordered' => (float) $row->total_ordered,
-            'total_works' => (float) $row->total_works,
+            'total_ordered' => $commandes,
+            'total_works' => $travaux,
             'total_gain' => (float) $row->total_gain,
-            'total_ratio' => Metre::ratioFromSums($row->sum_sales_metl, $row->sum_purchase_metl),
+            'total_ratio' => Metre::ratioFromSums($commandes, $travaux),
         ];
     }
 

@@ -139,7 +139,8 @@ class ProjectPageTest extends TestCase
         $this->get('/projects/'.self::PROJECT)
             ->assertInertia(fn ($page) => $page
                 ->where('metres.0.name', 'Métré A')
-                ->where('metres.0.ratio', 1.25)
+                // Commandes / Travaux = 900 / 700, not the _metl_ pair below (which is 1.25).
+                ->where('metres.0.ratio', 1.29)
                 ->where('metres.0.date_creation', '2026-01-15')
                 ->where('metres.0.date_agreement', '2026-02-01')
                 ->where('metres.0.is_accepted_b', true)
@@ -168,24 +169,53 @@ class ProjectPageTest extends TestCase
     }
 
     /**
-     * total_ratio is Σ Total_Sales_METL_Stored / Σ Total_Purchase_METL_Stored across the
-     * project's métrés - the same Ratio_c formula as a single métré, applied to summed
-     * inputs rather than transcribed from a source field (there isn't one at this level).
+     * The Ratio column of THIS page is Commandes / Travaux - the row's own two columns - and
+     * not Metre::ratio() (vendu / acheté), which is the "Ratio réel" of the métré's own page.
+     * Confirmed by the user. Pinned with numbers that tell the two formulas apart: the
+     * _metl_ inputs below would give 1.25, Commandes / Travaux gives 1.29.
      */
-    public function test_the_page_total_ratio_sums_the_metl_inputs_across_metres(): void
+    public function test_the_metre_ratio_column_is_commandes_over_travaux(): void
     {
         $this->actAsWriter();
         $this->fakeProjectFound();
 
-        $this->metre(['total_sales_metl_stored' => 1000, 'total_purchase_metl_stored' => 800]);
-        $this->metre(['total_sales_metl_stored' => 500, 'total_purchase_metl_stored' => 400]);
+        $this->metre([
+            'tot_sum_total_sales_stored' => 900,     // Commandes
+            'tot_sum_total_ordered_stored' => 700,   // Travaux
+            'total_sales_metl_stored' => 1000,       // Ratio_c's inputs: 1.25, not what is shown
+            'total_purchase_metl_stored' => 800,
+        ]);
 
-        // (1000 + 500) / (800 + 400) = 1.25
+        // 900 / 700 = 1.2857… -> 1.29
         $this->get('/projects/'.self::PROJECT)
-            ->assertInertia(fn ($page) => $page->where('totals.total_ratio', 1.25));
+            ->assertInertia(fn ($page) => $page->where('metres.0.ratio', 1.29));
     }
 
-    public function test_the_page_total_ratio_is_null_when_nothing_feeds_it(): void
+    /**
+     * And the total row divides its own two figures, so the column keeps meaning the same
+     * thing on the last line as on every line above it.
+     */
+    public function test_the_page_total_ratio_is_the_summed_commandes_over_the_summed_travaux(): void
+    {
+        $this->actAsWriter();
+        $this->fakeProjectFound();
+
+        $this->metre(['tot_sum_total_sales_stored' => 900, 'tot_sum_total_ordered_stored' => 700]);
+        $this->metre(['tot_sum_total_sales_stored' => 600, 'tot_sum_total_ordered_stored' => 500]);
+
+        // (900 + 600) / (700 + 500) = 1.25
+        $this->get('/projects/'.self::PROJECT)
+            ->assertInertia(fn ($page) => $page
+                ->where('totals.total_ordered', 1500)
+                ->where('totals.total_works', 1200)
+                ->where('totals.total_ratio', 1.25));
+    }
+
+    /**
+     * A métré not yet on site has both columns empty, so there is nothing to divide - an em
+     * dash, not a 0 and not an error. Same guard as Ratio_c.
+     */
+    public function test_the_ratio_is_absent_when_there_is_nothing_to_divide(): void
     {
         $this->actAsWriter();
         $this->fakeProjectFound();
@@ -193,7 +223,9 @@ class ProjectPageTest extends TestCase
         $this->metre();
 
         $this->get('/projects/'.self::PROJECT)
-            ->assertInertia(fn ($page) => $page->where('totals.total_ratio', null));
+            ->assertInertia(fn ($page) => $page
+                ->where('metres.0.ratio', null)
+                ->where('totals.total_ratio', null));
     }
 
     // --- the métré's ID within its project ---------------------------------------------------

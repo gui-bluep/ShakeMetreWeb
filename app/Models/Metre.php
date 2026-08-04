@@ -60,9 +60,10 @@ class Metre extends Model
      * lines' purchases - on an assumption stated in full there, the export carrying no formula
      * for either. Nothing wrote them before, which is why this ratio read empty everywhere.
      *
-     * The single source of truth for this formula - both the ShakeDesign portal replica
-     * (ProjectMetreResource) and the project page read it from here rather than each
-     * keeping their own copy.
+     * The single source of truth for this formula, read by the métré page ("Ratio réel") and
+     * by the ShakeDesign portal replica (ProjectMetreResource) rather than each keeping its own
+     * copy. The project page's Ratio column is a DIFFERENT division - Commandes / Travaux, see
+     * ProjectController::metreRow() - and deliberately does not come through here.
      */
     public function ratio(): ?float
     {
@@ -70,11 +71,11 @@ class Metre extends Model
     }
 
     /**
-     * The same Ratio_c guard (empty or zero denominator yields null, not an error or 0),
-     * shared so a project-wide ratio - Σ Total_Sales_METL_Stored / Σ Total_Purchase_METL_Stored
-     * across every métré of a project - divides by exactly the same rule as a single métré's
-     * own ratio. There is no FileMaker field for that project-wide figure; it is this same
-     * formula applied to summed inputs, not a transcription of a source calculation.
+     * The Ratio_c guard on its own (empty or zero denominator yields null, not an error or 0),
+     * kept separate from ratio() so the rule is stated in one place and can divide operands
+     * that are not a single record's two columns: the project page divides its own pair
+     * (Commandes / Travaux) and the project total divides the sums of that pair, both by
+     * exactly this rule. There is no FileMaker field for a total-row ratio.
      */
     public static function ratioFromSums(null|int|float|string $sales, null|int|float|string $purchase): ?float
     {

@@ -77,6 +77,14 @@ function date(value) {
 }
 
 /**
+ * Le ratio est un nombre nu (vendu / acheté), pas un montant : deux décimales et pas d'euro,
+ * mais la même virgule décimale que le reste de l'écran.
+ */
+function ratio(value) {
+    return value === null || value === undefined ? '—' : currency.format(value);
+}
+
+/**
  * Les mêmes chiffres que la ligne de total du tableau, remontés en tête d'écran.
  *
  * Redondance assumée : les tuiles donnent le résultat du projet sans avoir à lire un tableau,
@@ -90,10 +98,10 @@ const tiles = computed(() => [
     { label: 'Gains', value: money(props.totals.total_gain), numeric: props.totals.total_gain, tone: 'accent' },
     {
         label: 'Ratio du projet',
-        value: props.totals.total_ratio ?? '—',
+        value: ratio(props.totals.total_ratio),
         numeric: null,
         tone: 'neutral',
-        hint: 'Ratio de l’ensemble des métrés du projet',
+        hint: 'Commandes ÷ Travaux, sur l’ensemble des métrés du projet',
     },
 ]);
 </script>
@@ -148,7 +156,10 @@ const tiles = computed(() => [
                                          affichée. -->
                                     <th class="w-14">ID</th>
                                     <th>Nom</th>
-                                    <th class="text-right">Ratio</th>
+                                    <!-- Commandes ÷ Travaux, les deux colonnes de droite - et pas
+                                         le « Ratio réel » (vendu/acheté) de la page d'un métré.
+                                         Voir ProjectController::metreRow(). -->
+                                    <th class="text-right" title="Commandes ÷ Travaux">Ratio</th>
                                     <th class="text-right">Créé le</th>
                                     <th class="text-right">Accord le</th>
                                     <th class="text-center">Accepté</th>
@@ -184,7 +195,7 @@ const tiles = computed(() => [
                                             />
                                         </Link>
                                     </td>
-                                    <td class="num">{{ metre.ratio ?? '—' }}</td>
+                                    <td class="num">{{ ratio(metre.ratio) }}</td>
                                     <td class="num text-sand-600">{{ date(metre.date_creation) }}</td>
                                     <td class="num text-sand-600">{{ date(metre.date_agreement) }}</td>
 
@@ -244,9 +255,11 @@ const tiles = computed(() => [
                             <tfoot v-if="metres.length > 0">
                                 <tr>
                                     <td colspan="2">Total du projet</td>
-                                    <td class="num">{{ totals.total_ratio ?? '—' }}</td>
-                                    <td colspan="4" class="num text-sand-300">—</td>
-                                    <td class="num text-sand-300">—</td>
+                                    <td class="num">{{ ratio(totals.total_ratio) }}</td>
+                                    <!-- Centré et non aligné à droite : à droite, le tiret se
+                                         collerait sous « Offres » et se lirait comme le total de
+                                         cette colonne-là, alors qu'il couvre les cinq. -->
+                                    <td colspan="5" class="text-center text-sand-300">—</td>
                                     <td class="num">{{ money(totals.total_ordered) }}</td>
                                     <td class="num">{{ money(totals.total_works) }}</td>
                                     <td class="num" :class="totals.total_gain < 0 ? 'text-danger-600' : ''">
