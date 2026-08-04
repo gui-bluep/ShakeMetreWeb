@@ -55,7 +55,10 @@ class Metre extends Model
      * FileMaker returns empty when either operand is empty, so null here. Division by zero
      * is guarded the same way: the source formula only checks for emptiness because
      * FileMaker yields an error rather than a value, which surfaces as empty in the portal.
-
+     *
+     * Both operands are written by RecalculateMetreTotals - Σ of the lines' sales and Σ of the
+     * lines' purchases - on an assumption stated in full there, the export carrying no formula
+     * for either. Nothing wrote them before, which is why this ratio read empty everywhere.
      *
      * The single source of truth for this formula - both the ShakeDesign portal replica
      * (ProjectMetreResource) and the project page read it from here rather than each

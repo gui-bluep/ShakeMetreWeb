@@ -38,6 +38,66 @@ class RecalculateMetreTotalsTest extends TestCase
         $this->assertNotNull($metre->date_time_update_calcs_stored);
     }
 
+    /**
+     * The two inputs of Ratio_c. Nothing wrote them before, so the métré ratio was empty on
+     * every screen that shows it; they are Σ sales and Σ buy over the lines, on the assumption
+     * spelled out in the job (the export carries no formula for either).
+     */
+    public function test_it_writes_the_two_ratio_inputs(): void
+    {
+        $metre = $this->metre(['is_status_site_b' => true, 'is_accepted_b' => true]);
+
+        // sales 250, buy 200 -> ratio 1.25
+        $this->line($metre, ['price_sales' => 100, 'price_buy' => 80, 'quantity' => 2]);
+        $this->line($metre, ['price_sales' => 50, 'price_buy' => 40, 'quantity' => 1]);
+        $this->line($metre, ['is_option_b' => true, 'price_sales' => 999, 'price_buy' => 999, 'quantity' => 9]);
+
+        (new RecalculateMetreTotals($metre))->handle();
+        $metre->refresh();
+
+        $this->assertEquals(250.0, (float) $metre->total_sales_metl_stored);
+        $this->assertEquals(200.0, (float) $metre->total_purchase_metl_stored);
+        $this->assertSame(1.25, $metre->ratio());
+    }
+
+    /**
+     * Ungated, unlike every sibling total: the ratio describes what the métré says, so it must
+     * not disappear because nobody has ticked "accepté" or "site" yet. That is exactly how it
+     * read as a permanently empty column.
+     */
+    public function test_the_ratio_inputs_are_not_gated_on_acceptance_or_site(): void
+    {
+        $metre = $this->metre(['is_status_site_b' => false, 'is_accepted_b' => false]);
+        $this->line($metre, ['price_sales' => 100, 'price_buy' => 80, 'quantity' => 2]);
+
+        (new RecalculateMetreTotals($metre))->handle();
+        $metre->refresh();
+
+        $this->assertEquals(200.0, (float) $metre->total_sales_metl_stored);
+        $this->assertEquals(160.0, (float) $metre->total_purchase_metl_stored);
+        $this->assertSame(1.25, $metre->ratio());
+
+        // While the gated totals stay empty, as their own formulas require.
+        $this->assertNull($metre->tot_sum_total_sales_stored);
+        $this->assertNull($metre->tot_sum_total_buy_stored);
+    }
+
+    /**
+     * A métré with no purchase price anywhere divides by zero: Ratio_c yields empty, and the
+     * column keeps the honest 0 rather than a made-up ratio.
+     */
+    public function test_a_metre_with_no_purchase_price_has_no_ratio(): void
+    {
+        $metre = $this->metre();
+        $this->line($metre, ['price_sales' => 100, 'quantity' => 2]);
+
+        (new RecalculateMetreTotals($metre))->handle();
+        $metre->refresh();
+
+        $this->assertEquals(0.0, (float) $metre->total_purchase_metl_stored);
+        $this->assertNull($metre->ratio());
+    }
+
     public function test_status_site_gate_empties_totals_but_not_the_offer_total(): void
     {
         $metre = $this->metre(['is_status_site_b' => false, 'is_accepted_b' => false]);

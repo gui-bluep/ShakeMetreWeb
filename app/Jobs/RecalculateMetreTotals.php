@@ -103,6 +103,30 @@ class RecalculateMetreTotals implements ShouldBeUniqueUntilProcessing, ShouldQue
             //   Unconditional - the only sibling with no status gate.
             'tot_sum_total_sales_offer_stored' => (float) $lineTotals->sales_no_options,
 
+            /*
+             * MET_Metre::Total_Sales_METL_Stored and Total_Purchase_METL_Stored - the two
+             * inputs, and the only consumers, of Ratio_c (see Metre::ratio()).
+             *
+             * WRITTEN ON AN ASSUMPTION, stated here because there is no formula behind it: both
+             * are plain Normal fields, the export gives them no calculation, and no other
+             * calculation reads them - a script maintained them and script bodies are absent.
+             * Until now nothing wrote them, so Ratio_c had two empty operands and the métré
+             * ratio was empty on every screen that shows it, which is what surfaced this.
+             *
+             * The assumption is the one the field names make: the sum of the lines' sales and
+             * the sum of the lines' purchases, over the same PriceTotal*_noOptions_c
+             * expressions as every other total here. It matches the line-level ratio the
+             * application already computes (price_sales / price_buy) - a métré's ratio is that
+             * same figure over the whole métré.
+             *
+             * Deliberately ungated, unlike Tot_Sum_TotalBuy (isAccepted_b) and its siblings
+             * (IsStatus_Site_b): the gates answer "how much is agreed / on site", whereas a
+             * ratio is a property of what the métré says, and a margin that disappears until
+             * somebody ticks a box would read as a broken column.
+             */
+            'total_sales_metl_stored' => (float) $lineTotals->sales_no_options,
+            'total_purchase_metl_stored' => (float) $lineTotals->buy_no_options,
+
             // MET_Metre::PROG_ProgressClientTotal_Amount_Valid_Stored_c
             //   PROG_ProgressClientTotal_Amount_Stored * isAccepted_b
             'prog_progress_client_total_amount_valid_stored_c' => $this->validated(
@@ -218,9 +242,10 @@ class RecalculateMetreTotals implements ShouldBeUniqueUntilProcessing, ShouldQue
      *     Plain Normal fields written by the MET_UpdateStoredCalcs_PROG script, whose steps
      *     are absent from the export. Read as inputs above, never written.
      *
-     *   Total_Sales_METL_Stored, Total_Purchase_METL_Stored,
      *   Total_Ordered_METL_Stored, Total_Gain_METL_Stored
-     *     Plain Normal fields with no formula anywhere; only consumed (by Ratio_c).
+     *     Plain Normal fields with no formula anywhere, and unlike the two _METL_ columns
+     *     written above, nothing consumes them either - no calculation, no screen. Writing
+     *     them would be a guess with nothing depending on the answer, so they stay empty.
      *
      * The MET_Metre / METL_MetreLines `zsm_*` Summary fields have no columns at all: they are
      * found-set aggregates (portal, list and report totals evaluated at display time), so
