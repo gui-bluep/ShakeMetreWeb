@@ -134,9 +134,11 @@ const maxWidthClass = computed(() => {
                     class="fixed inset-0 transform transition-all"
                     @click="close"
                 >
-                    <!-- Voile à l'encre plutôt qu'au gris : sur un fond chaud, un gris neutre
-                         vire au bleu. -->
-                    <div class="absolute inset-0 bg-sand-950/60" />
+                    <!-- `scrim`, pas `sand-950` : l'encre de la marque est un brun saturé, et en
+                         aplat translucide sur toute la page elle se lit comme un voile rougeâtre.
+                         Le scrim est un presque-noir de la même teinte mais désaturé — chaud sans
+                         être rouge, là où un gris neutre virerait au bleu sur ce fond. -->
+                    <div class="absolute inset-0 bg-scrim/55" />
                 </div>
             </Transition>
 

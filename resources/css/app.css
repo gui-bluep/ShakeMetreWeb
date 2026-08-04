@@ -79,6 +79,15 @@
     --color-sand-900: #382119;  /* hsl(14 38% 16%)  — titres, focus */
     --color-sand-950: #35160e;  /* hsl(13 59% 13%)  — l'encre de la marque */
 
+    /* ── Voile des modales ─────────────────────────────────────────────────────────────────
+       L'encre de la marque est un brun très saturé (S 59 %) : étalée en aplat translucide sur
+       toute la page, elle ne se lit plus comme un noir chaud mais comme un voile rougeâtre.
+       Le scrim garde la chaleur (teinte 14) en descendant la saturation à 10 % et la
+       luminosité à 10 % : un presque-noir neutre, qui n'introduit ni rouge ni bleu.
+       Réservé au fond des modales — ce n'est ni une couleur de texte ni une couleur de
+       surface. */
+    --color-scrim: #1c1817;     /* hsl(14 10% 10%) */
+
     /* ── Accent lime ───────────────────────────────────────────────────────────────────────
        Signature de la marque. Jamais en couleur de texte sur fond clair : accent-400 plafonne
        à 1,23:1 sur blanc. Sur l'encre en revanche il monte à 13,43:1. */
