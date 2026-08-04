@@ -438,6 +438,20 @@ function toggleSelected(row) {
     selected.value = next;
 }
 
+/**
+ * Les tags déjà employés dans ce métré, par champ - ce qui tient lieu de liste.
+ *
+ * Il n'y a pas de table de tags : un tag existe dès qu'il est tapé sur une ligne, et devient alors
+ * proposable aux autres lignes du même métré. Calculé sur la copie locale et non sur les props,
+ * pour qu'un tag frappé à l'instant soit proposé à la ligne suivante sans recharger.
+ *
+ * `tag1` et `tag2` ont chacun leur jeu : ce sont deux qualifications distinctes, pas deux cases
+ * d'un même vocabulaire.
+ */
+const tagOptions = (field) => [...new Set(
+    rows.value.map((row) => (row[field] ?? '').trim()).filter((value) => value !== '')
+)].sort((a, b) => a.localeCompare(b, 'fr'));
+
 // --- popovers -----------------------------------------------------------------------------
 
 /**
@@ -996,7 +1010,12 @@ const COLUMNS = computed(() => [
     { min: 2.5 },                           // select
     { min: 2 }, { min: 2 },                 // actions / comments
     { min: 6.5 },                           // delivered
-    { min: 8, grow: 0.8 },                  // lot / tag
+    // Lots : une colonne. Tags : deux, à la place de la même - un tag n'est pas un lot, et les
+    // deux champs sont indépendants (chacun ses valeurs). Le plancher de la grille étant la somme
+    // de cette liste, il suit la bascule tout seul.
+    ...(grouping.value === 'lots'
+        ? [{ min: 8, grow: 0.8 }]
+        : [{ min: 7, grow: 0.6 }, { min: 7, grow: 0.6 }]),
     { min: 8, grow: 0.8 },                  // SOR
 ]);
 
@@ -1225,7 +1244,13 @@ const breadcrumbs = computed(() => [
                         <div class="px-1 py-1" />
                         <div class="px-1 py-1" />
                         <div class="px-1.5 py-1 text-center">Livraison</div>
-                        <div class="px-1.5 py-1">{{ grouping === 'lots' ? 'Lot' : 'Tag' }}</div>
+                        <template v-if="grouping === 'lots'">
+                            <div class="px-1.5 py-1">Lot</div>
+                        </template>
+                        <template v-else>
+                            <div class="px-1.5 py-1" title="METL::TAG1">Tag 1</div>
+                            <div class="px-1.5 py-1" title="METL::TAG2">Tag 2</div>
+                        </template>
                         <div class="px-1.5 py-1">Commande fourn.</div>
                     </div>
                 </div>
@@ -1744,14 +1769,34 @@ const breadcrumbs = computed(() => [
                         </div>
                     </div>
 
-                    <!-- Tags mode: the stored tag, read-only until the switch's meaning is settled. -->
-                    <div
-                        v-else
-                        class="min-w-0 truncate px-1.5 py-1 text-xs text-sand-600"
-                        title="METL::Tag1 — le rôle exact du bascule Tags reste à définir"
-                    >
-                        {{ row.tag1 || '—' }}
-                    </div>
+                    <!-- Mode Tags : METL::TAG1 et TAG2, deux champs texte libres.
+                         `list` plutôt qu'un sélecteur : le navigateur propose alors les valeurs
+                         déjà employées SANS interdire d'en taper une nouvelle, ce qui est exactement
+                         la règle - un tag existe dès qu'il est écrit, et devient proposable aux
+                         autres lignes du métré. Une liste par champ, partagée par toutes les
+                         lignes, définie une fois en bas de page. -->
+                    <template v-else>
+                        <input
+                            type="text"
+                            :value="row.tag1"
+                            :disabled="readOnly"
+                            list="tag1-options"
+                            class="cell-input focus:bg-white"
+                            title="METL::TAG1"
+                            @input="editText(row, 'tag1', $event.target.value)"
+                            @blur="flushRow(row)"
+                        />
+                        <input
+                            type="text"
+                            :value="row.tag2"
+                            :disabled="readOnly"
+                            list="tag2-options"
+                            class="cell-input focus:bg-white"
+                            title="METL::TAG2"
+                            @input="editText(row, 'tag2', $event.target.value)"
+                            @blur="flushRow(row)"
+                        />
+                    </template>
 
                     <!-- Linked ShakeDesign supplier order. Displayed only: opening it in the
                          FileMaker client needs a confirmed fmp:// target - see the page note. -->
@@ -1904,6 +1949,17 @@ const breadcrumbs = computed(() => [
             </div>
         </div>
     </Modal>
+
+    <!-- Les valeurs déjà employées dans le métré, offertes aux deux colonnes de tags. Déclarées
+         une fois pour la page : une liste par ligne serait le même contenu répété 357 fois. -->
+    <template v-if="grouping === 'tags'">
+        <datalist id="tag1-options">
+            <option v-for="value in tagOptions('tag1')" :key="value" :value="value" />
+        </datalist>
+        <datalist id="tag2-options">
+            <option v-for="value in tagOptions('tag2')" :key="value" :value="value" />
+        </datalist>
+    </template>
 
     <GridToasts :toasts="toasts" @dismiss="dismiss" />
 </template>

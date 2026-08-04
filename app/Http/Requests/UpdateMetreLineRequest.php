@@ -59,6 +59,18 @@ class UpdateMetreLineRequest extends FormRequest
         // Which lot the line belongs to; constrained to the métré's own project below.
         'lot_id',
 
+        /*
+         * Les deux tags de la ligne - METL::TAG1 / TAG2, deux champs texte libres.
+         *
+         * Libres au sens plein : il n'y a pas de liste à respecter. `TAG_Tags`, la table de tags
+         * par métré que porte encore l'export, est abandonnée (confirmé par l'utilisateur) ; ce
+         * qui fait office de liste est l'ensemble des valeurs déjà employées dans le métré, que
+         * l'écran propose en autocomplétion. Un tag « existe » donc dès que quelqu'un l'a tapé
+         * sur une ligne, et les deux champs ont chacun leur propre jeu de valeurs.
+         */
+        'tag1',
+        'tag2',
+
         // The five candidate suppliers' quotes on this line, edited from the tender
         // comparison screen rather than the main grid.
         'tender_supp1_price',
@@ -111,6 +123,10 @@ class UpdateMetreLineRequest extends FormRequest
             'comment_client' => ['sometimes', 'nullable', 'string', 'max:65535'],
             'comment_supplier' => ['sometimes', 'nullable', 'string', 'max:65535'],
             'lot_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('lots', 'id')],
+
+            // Longueur de la colonne. Pas de `Rule::in` : la valeur libre est le principe.
+            'tag1' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'tag2' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
 
         foreach (MetreLine::SUPPLIER_SLOTS as $supplier) {

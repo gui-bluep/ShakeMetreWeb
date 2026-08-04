@@ -387,6 +387,78 @@ class MetreLineDetailViewTest extends TestCase
             ->assertInertia(fn ($page) => $page->where('lines.0.lot_name', 'Sur mesure'));
     }
 
+    // --- tags (METL::TAG1 / TAG2) -----------------------------------------------------------
+
+    /**
+     * Deux champs texte libres, sans liste à respecter : `TAG_Tags`, la table de tags par métré
+     * que porte encore l'export, est abandonnée. Ce qui tient lieu de liste est l'ensemble des
+     * valeurs déjà employées dans le métré, que l'écran propose - un tag existe dès qu'il est tapé.
+     */
+    public function test_it_writes_the_two_tags(): void
+    {
+        $this->actAsWriter();
+        $line = $this->line();
+
+        $this->patchJson("/api/metre-lines/{$line->id}", ['tag1' => 'Phase 1', 'tag2' => 'Étage 3'])
+            ->assertOk();
+
+        $line->refresh();
+        $this->assertSame('Phase 1', $line->tag1);
+        $this->assertSame('Étage 3', $line->tag2);
+    }
+
+    /** Une valeur inédite est acceptée : c'est le principe même du champ libre. */
+    public function test_a_tag_needs_to_exist_nowhere_first(): void
+    {
+        $this->actAsWriter();
+        $line = $this->line();
+
+        $this->patchJson("/api/metre-lines/{$line->id}", ['tag1' => 'Tout nouveau'])->assertOk();
+
+        $this->assertSame('Tout nouveau', $line->fresh()->tag1);
+    }
+
+    public function test_a_tag_can_be_cleared(): void
+    {
+        $this->actAsWriter();
+        $line = $this->line(['tag1' => 'Phase 1']);
+
+        $this->patchJson("/api/metre-lines/{$line->id}", ['tag1' => null])->assertOk();
+
+        $this->assertNull($line->fresh()->tag1);
+    }
+
+    public function test_the_two_tags_are_independent(): void
+    {
+        $this->actAsWriter();
+        $line = $this->line(['tag1' => 'Phase 1', 'tag2' => 'Étage 3']);
+
+        $this->patchJson("/api/metre-lines/{$line->id}", ['tag2' => 'Étage 4'])->assertOk();
+
+        $line->refresh();
+        $this->assertSame('Phase 1', $line->tag1, 'Écrire TAG2 ne doit pas toucher TAG1.');
+        $this->assertSame('Étage 4', $line->tag2);
+    }
+
+    public function test_a_tag_longer_than_the_column_is_refused(): void
+    {
+        $this->actAsWriter();
+
+        $this->patchJson("/api/metre-lines/{$this->line()->id}", ['tag1' => str_repeat('a', 256)])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tag1');
+    }
+
+    public function test_the_page_carries_both_tags(): void
+    {
+        $this->actAsWriter();
+        $this->line(['tag1' => 'Phase 1', 'tag2' => 'Étage 3']);
+
+        $this->get($this->url())->assertInertia(fn ($page) => $page
+            ->where('lines.0.tag1', 'Phase 1')
+            ->where('lines.0.tag2', 'Étage 3'));
+    }
+
     public function test_a_readonly_account_may_view_the_page(): void
     {
         $this->actingAs(User::factory()->readOnly()->create());
