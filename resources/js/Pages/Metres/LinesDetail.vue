@@ -53,6 +53,34 @@ function clone(line) {
 
 const rows = ref(props.lines.map(clone));
 
+/**
+ * Remet les lignes dans l'ordre du serveur — METL_Sort, que la source rejoue après chaque
+ * création (METL_New et METL_New_Multi terminent par un appel à ce script).
+ *
+ * Sans cela, une ligne ajoutée reste en fin de liste et le regroupement, qui ne rassemble que des
+ * lignes consécutives, lui ouvre un deuxième intitulé de section sous le premier.
+ *
+ * Croissant, vides d'abord, comme le ORDER BY : `ref_code, refs_code, refs_title, ref_order`,
+ * puis `sort_order` pour départager.
+ */
+function sortRows() {
+    const byNumber = (a, b) => {
+        if (a === b) return 0;
+        if (a === null || a === undefined) return -1;
+        if (b === null || b === undefined) return 1;
+
+        return Number(a) - Number(b);
+    };
+
+    rows.value.sort((a, b) =>
+        byNumber(a.ref_code, b.ref_code)
+        || byNumber(a.refs_code, b.refs_code)
+        || (a.refs_title ?? '').localeCompare(b.refs_title ?? '', 'fr')
+        || byNumber(a.ref_order, b.ref_order)
+        || byNumber(a.sort_order, b.sort_order)
+    );
+}
+
 // Re-seeded if the page is pointed at another métré - Inertia can reuse this component, and a
 // copy seeded once at setup would show the previous métré's lines while writing to the new one.
 // La vue compte aussi : passer d'une coupe à l'autre est une navigation, qui ramène des lignes
@@ -91,6 +119,72 @@ const visibleRows = computed(() => {
             .some((field) => String(field ?? '').toLowerCase().includes(term))
     );
 });
+
+/**
+ * La liste telle que FileMaker la met en page (METL_MetreComplete_List_Full) : deux niveaux
+ * d'intitulés au-dessus des lignes, chacun avec ses sous-totaux, et un total général en pied.
+ *
+ * Ce sont, dans le fichier source, deux « sub-summary » — par REF_Code puis par REFS_Title — et
+ * une « trailing grand summary ». Ils n'existent que pour les groupes réellement présents dans le
+ * métré : une section sans ligne n'a pas d'intitulé, parce qu'un sub-summary ne s'imprime que
+ * lorsqu'un enregistrement le déclenche.
+ *
+ * Les sous-totaux additionnent les montants HORS options (zsm_SumTotal*_noOptions), alors que la
+ * colonne Total d'une ligne montre son montant même si elle est en option. C'est voulu dans la
+ * source : une option affiche ce qu'elle coûterait sans peser sur le total.
+ *
+ * Calculés ici et non sur le serveur : les cellules se recalculent déjà à la frappe, donc un
+ * sous-total qui attendrait la réponse serait le seul chiffre en retard de l'écran.
+ */
+const groupedRows = computed(() => {
+    const zero = () => ({ buy: 0, sales: 0, ordered: 0 });
+    const add = (into, row) => {
+        into.buy += row.computed.price_total_buy_no_options ?? 0;
+        into.sales += row.computed.price_total_sales_no_options ?? 0;
+        into.ordered += row.computed.price_total_ordered_no_options ?? 0;
+    };
+
+    const sections = [];
+    let section = null;
+    let subSection = null;
+
+    for (const row of visibleRows.value) {
+        const sectionKey = `${row.ref_code ?? ''}`;
+        const subKey = `${row.refs_code ?? ''}|${row.refs_title ?? ''}`;
+
+        if (section === null || section.key !== sectionKey) {
+            section = { key: sectionKey, code: row.ref_code, title: row.ref_title, totals: zero(), subSections: [] };
+            sections.push(section);
+            subSection = null;
+        }
+
+        if (subSection === null || subSection.key !== subKey) {
+            subSection = { key: subKey, code: row.refs_code, title: row.refs_title, totals: zero(), rows: [] };
+            section.subSections.push(subSection);
+        }
+
+        subSection.rows.push(row);
+        add(subSection.totals, row);
+        add(section.totals, row);
+    }
+
+    return sections;
+});
+
+/** Le total général du pied — la « trailing grand summary » du même écran. */
+const grandTotals = computed(() =>
+    groupedRows.value.reduce(
+        (into, section) => ({
+            buy: into.buy + section.totals.buy,
+            sales: into.sales + section.totals.sales,
+            ordered: into.ordered + section.totals.ordered,
+        }),
+        { buy: 0, sales: 0, ordered: 0 }
+    )
+);
+
+/** La clé de bloc → la clé de sous-total, pour aligner un montant de groupe sous sa colonne. */
+const SUBTOTAL_BY_BLOCK = { achats: 'buy', ventes: 'sales', commandes: 'ordered' };
 
 const allVisibleSelected = computed(() =>
     visibleRows.value.length > 0 && visibleRows.value.every((row) => selected.value.has(row.id))
@@ -183,6 +277,12 @@ function recomputeLocally(row) {
         price_total_ordered_no_options: option
             ? 0
             : round2((row.price_ordered ?? 0) * (row.quantity_ordered ?? 0)),
+
+        // PriceTotal*All_c : sans le garde-fou « option ». C'est ce que la colonne Total d'une
+        // ligne affiche, les sous-totaux étant les seuls à écarter les options.
+        price_total_buy_all: round2((row.price_buy ?? 0) * (row.quantity ?? 0)),
+        price_total_sales_all: round2((row.price_sales ?? 0) * (row.quantity ?? 0)),
+        price_total_ordered_all: round2((row.price_ordered ?? 0) * (row.quantity_ordered ?? 0)),
     };
 }
 
@@ -243,7 +343,14 @@ async function assignLot(row, lot) {
 
 const busy = ref(false);
 
-async function addLine() {
+/**
+ * Une ligne, éventuellement classée d'emblée — METL_NewFromREF.
+ *
+ * Sans section, c'est l'ancien bouton « Ligne ». Avec, deux cas, exactement les deux branches du
+ * script source : une ligne de plus dans un groupe existant (on répète ses quatre valeurs), ou une
+ * sous-section définie sur le champ, code et titre saisis, qui n'existe dans aucun catalogue.
+ */
+async function addLine(section = null) {
     if (readOnly.value || busy.value) {
         return;
     }
@@ -251,12 +358,49 @@ async function addLine() {
     busy.value = true;
 
     try {
-        const body = await request(`/api/metres/${props.metre.id}/lines`, 'POST', {});
+        const body = await request(`/api/metres/${props.metre.id}/lines`, 'POST', section ?? {});
         rows.value.push(clone(body.data));
+        sortRows();
+
+        return body.data;
     } catch (e) {
         notify(null, e.message);
+
+        return null;
     } finally {
         busy.value = false;
+    }
+}
+
+/**
+ * « Définissez en une nouvelle (code et titre) » : la saisie posée dans l'intitulé de section,
+ * comme les deux champs globaux zg_REF_SelectedNewCode / zg_REF_SelectedNewTitle qui l'occupent
+ * dans la mise en page d'origine. Ouvert pour une section à la fois.
+ */
+const newSubSection = ref(null);
+
+function openNewSubSection(section) {
+    newSubSection.value = { sectionKey: section.key, code: null, title: '' };
+}
+
+async function createSubSection(section) {
+    const draft = newSubSection.value;
+
+    if (draft === null || draft.code === null || draft.code === '' || draft.title.trim() === '') {
+        notify(null, 'Une nouvelle sous-section a besoin d\'un code et d\'un titre.');
+
+        return;
+    }
+
+    const created = await addLine({
+        ref_code: section.code,
+        ref_title: section.title,
+        refs_code: Number(draft.code),
+        refs_title: draft.title.trim(),
+    });
+
+    if (created) {
+        newSubSection.value = null;
     }
 }
 
@@ -280,6 +424,7 @@ async function insertFromCatalogue(ids) {
         });
 
         rows.value.push(...(body.data ?? []).map(clone));
+        sortRows();
         showCatalogue.value = false;
     } catch (e) {
         notify(null, e.message);
@@ -300,6 +445,7 @@ async function duplicateLine(row) {
     try {
         const body = await request(`/api/metre-lines/${row.id}/duplicate`, 'POST', {});
         rows.value.splice(rows.value.indexOf(row) + 1, 0, clone(body.data));
+        sortRows();
     } catch (e) {
         notify(row.id, e.message);
     } finally {
@@ -408,7 +554,8 @@ const BLOCKS = {
         cellClass: 'bg-clay-50/70',
         quantityField: 'quantity',
         priceField: 'price_buy',
-        totalKey: 'price_total_buy_no_options',
+        totalKey: 'price_total_buy_all',
+        subtotalKey: 'price_total_buy_no_options',
     },
     ventes: {
         key: 'ventes',
@@ -418,7 +565,8 @@ const BLOCKS = {
         cellClass: 'bg-olive-50/70',
         quantityField: 'quantity',
         priceField: 'price_sales',
-        totalKey: 'price_total_sales_no_options',
+        totalKey: 'price_total_sales_all',
+        subtotalKey: 'price_total_sales_no_options',
     },
     commandes: {
         key: 'commandes',
@@ -428,7 +576,8 @@ const BLOCKS = {
         cellClass: 'bg-mallow-50/70',
         quantityField: 'quantity_ordered',
         priceField: 'price_ordered',
-        totalKey: 'price_total_ordered_no_options',
+        totalKey: 'price_total_ordered_all',
+        subtotalKey: 'price_total_ordered_no_options',
     },
 };
 
@@ -648,8 +797,124 @@ const breadcrumbs = computed(() => [
                     </div>
                 </div>
 
+                <template v-for="section in groupedRows" :key="section.key">
+                    <!-- Intitulé de section — « sub-summary by REF_Code », avec ses sous-totaux
+                         et, comme dans la mise en page d'origine, la saisie d'une sous-section
+                         définie sur le champ. -->
+                    <div
+                        class="grid items-center border-y border-sand-300 bg-sand-100 text-xs"
+                        :style="{ gridTemplateColumns: TEMPLATE }"
+                    >
+                        <div class="px-1.5 py-1.5 tabular-nums text-sand-700" style="font-variation-settings: 'wght' 650">
+                            {{ section.code ?? '—' }}
+                        </div>
+                        <div class="col-span-4 flex min-w-0 items-center gap-2 px-1.5 py-1.5">
+                            <span class="truncate uppercase tracking-[0.04em] text-sand-900" style="font-variation-settings: 'wght' 650">
+                                {{ section.title || (section.code === null ? 'Sans section' : 'Section sans titre') }}
+                            </span>
+
+                            <template v-if="!readOnly">
+                                <button
+                                    v-if="newSubSection?.sectionKey !== section.key"
+                                    type="button"
+                                    class="btn btn-ghost shrink-0 rounded px-1 py-0.5 text-[10px]"
+                                    title="Définir une nouvelle sous-section dans cette section"
+                                    @click="openNewSubSection(section)"
+                                >
+                                    <Icon name="plus" :size="3" />
+                                    Sous-section
+                                </button>
+                                <span v-else class="flex shrink-0 items-center gap-1" @click.stop>
+                                    <input
+                                        type="number"
+                                        :value="newSubSection.code"
+                                        placeholder="code"
+                                        class="w-14 px-1 py-0.5 text-[11px] tabular-nums"
+                                        @input="newSubSection.code = $event.target.value"
+                                    />
+                                    <input
+                                        type="text"
+                                        :value="newSubSection.title"
+                                        placeholder="titre de la sous-section"
+                                        class="w-52 px-1 py-0.5 text-[11px]"
+                                        @input="newSubSection.title = $event.target.value"
+                                        @keydown.enter="createSubSection(section)"
+                                    />
+                                    <button type="button" class="btn btn-accent btn-sm px-1.5 py-0.5 text-[10px]" :disabled="busy" @click="createSubSection(section)">
+                                        Créer
+                                    </button>
+                                    <button type="button" class="btn btn-ghost rounded px-1 py-0.5 text-[10px]" @click="newSubSection = null">
+                                        Annuler
+                                    </button>
+                                </span>
+                            </template>
+                        </div>
+
+                        <template v-for="block in blocks" :key="block.key">
+                            <div />
+                            <div />
+                            <div
+                                class="px-1.5 py-1.5 text-right tabular-nums text-sand-900"
+                                :class="block.cellClass"
+                                style="font-variation-settings: 'wght' 650"
+                                title="Total de la section, options exclues"
+                            >
+                                {{ money(section.totals[SUBTOTAL_BY_BLOCK[block.key]]) }}
+                            </div>
+                            <div v-if="showRatio && block.key === 'achats'" />
+                        </template>
+                        <div class="col-span-6" />
+                    </div>
+
+                    <template v-for="sub in section.subSections" :key="sub.key">
+                        <!-- Intitulé de sous-section — « sub-summary by REFS_Title ». -->
+                        <div
+                            class="grid items-center border-b border-sand-200 bg-sand-50 text-xs"
+                            :style="{ gridTemplateColumns: TEMPLATE }"
+                        >
+                            <div class="px-1.5 py-1 tabular-nums text-sand-600">
+                                {{ section.code ?? '—' }}.{{ sub.code ?? '—' }}
+                            </div>
+                            <div class="col-span-4 flex min-w-0 items-center gap-2 px-1.5 py-1">
+                                <span class="truncate text-sand-800" style="font-variation-settings: 'wght' 600">
+                                    {{ sub.title || 'Sous-section sans titre' }}
+                                </span>
+                                <button
+                                    v-if="!readOnly"
+                                    type="button"
+                                    class="btn btn-ghost shrink-0 rounded px-1 py-0.5 text-[10px]"
+                                    title="Ajouter une ligne dans cette sous-section"
+                                    :disabled="busy"
+                                    @click="addLine({
+                                        ref_code: section.code,
+                                        ref_title: section.title,
+                                        refs_code: sub.code,
+                                        refs_title: sub.title,
+                                    })"
+                                >
+                                    <Icon name="plus" :size="3" />
+                                    Ligne
+                                </button>
+                            </div>
+
+                            <template v-for="block in blocks" :key="block.key">
+                                <div />
+                                <div />
+                                <div
+                                    class="px-1.5 py-1 text-right tabular-nums text-sand-700"
+                                    :class="block.cellClass"
+                                    style="font-variation-settings: 'wght' 600"
+                                    title="Total de la sous-section, options exclues"
+                                >
+                                    {{ money(sub.totals[SUBTOTAL_BY_BLOCK[block.key]]) }}
+                                </div>
+                                <div v-if="showRatio && block.key === 'achats'" />
+                            </template>
+                            <div class="col-span-6" />
+                        </div>
+
                 <div
-                    v-for="row in visibleRows"
+                    v-for="row in sub.rows"
                     :key="row.id"
                     class="grid items-center border-b border-sand-200/70 text-xs transition-colors"
                     :class="selected.has(row.id)
@@ -737,9 +1002,13 @@ const breadcrumbs = computed(() => [
                             />
                             <span class="euro-suffix">€</span>
                         </div>
+                        <!-- `totalKey` est le montant SANS garde-fou « option » : une ligne en
+                             option montre ce qu'elle coûterait, et seuls les sous-totaux
+                             l'écartent. Grisée pour que la différence se voie. -->
                         <div
-                            class="px-1.5 py-1 text-right tabular-nums text-sand-700"
-                            :class="block.cellClass"
+                            class="px-1.5 py-1 text-right tabular-nums"
+                            :class="[block.cellClass, row.is_option_b ? 'text-sand-400 italic' : 'text-sand-700']"
+                            :title="row.is_option_b ? 'Option : ce montant ne compte dans aucun total' : undefined"
                         >
                             {{ money(row.computed[block.totalKey]) }}
                         </div>
@@ -906,6 +1175,35 @@ const breadcrumbs = computed(() => [
                         </span>
                         <span v-else class="text-sand-300">—</span>
                     </div>
+                </div>
+                    </template>
+                </template>
+
+                <!-- Total général — la « trailing grand summary » du même écran. Options exclues,
+                     comme les sous-totaux au-dessus. -->
+                <div
+                    v-if="visibleRows.length > 0"
+                    class="sticky bottom-0 z-10 grid items-center border-t-2 border-sand-300 bg-sand-100 text-xs"
+                    :style="{ gridTemplateColumns: TEMPLATE }"
+                >
+                    <div />
+                    <div class="col-span-4 px-1.5 py-2 uppercase tracking-[0.04em] text-sand-900" style="font-variation-settings: 'wght' 650">
+                        Total du métré
+                    </div>
+                    <template v-for="block in blocks" :key="block.key">
+                        <div />
+                        <div />
+                        <div
+                            class="px-1.5 py-2 text-right tabular-nums text-sand-900"
+                            :class="block.cellClass"
+                            style="font-variation-settings: 'wght' 650"
+                            title="Total du métré, options exclues"
+                        >
+                            {{ money(grandTotals[SUBTOTAL_BY_BLOCK[block.key]]) }}
+                        </div>
+                        <div v-if="showRatio && block.key === 'achats'" />
+                    </template>
+                    <div class="col-span-6" />
                 </div>
 
                 <div v-if="visibleRows.length === 0" class="flex flex-col items-center gap-2 bg-white py-16 text-center">

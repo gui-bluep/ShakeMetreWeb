@@ -78,6 +78,36 @@ class MetreLine extends Model
             : round((float) $this->price_buy * (float) $this->quantity, 2));
     }
 
+    /*
+     * PriceTotal{Buy,Sales,Ordered}All_c - the same three products WITHOUT the option guard:
+     *
+     *     Round ( PriceBuy * Quantity ; 2 )
+     *
+     * The distinction is the point, and the list layout uses both: a line's own Total column shows
+     * the All figure, so an option line displays what it would cost, while every subtotal and the
+     * métré's stored totals use the noOptions variant, so that amount is not counted. Showing 0,00 €
+     * on an option line - which is what this application did - hides the number the option exists
+     * to state.
+     */
+
+    /** PriceTotalBuyAll_c: Round ( PriceBuy * Quantity ; 2 ) */
+    protected function priceTotalBuyAll(): Attribute
+    {
+        return Attribute::get(fn (): float => round((float) $this->price_buy * (float) $this->quantity, 2));
+    }
+
+    /** PriceTotalSalesAll_c: Round ( PriceSales * Quantity ; 2 ) */
+    protected function priceTotalSalesAll(): Attribute
+    {
+        return Attribute::get(fn (): float => round((float) $this->price_sales * (float) $this->quantity, 2));
+    }
+
+    /** PriceTotalOrderedAll_c: Round ( PriceOrdered * QuantityOrdered ; 2 ) */
+    protected function priceTotalOrderedAll(): Attribute
+    {
+        return Attribute::get(fn (): float => round((float) $this->price_ordered * (float) $this->quantity_ordered, 2));
+    }
+
     /**
      * The line's margin ratio: unit price sold to the client over unit purchase price.
      *

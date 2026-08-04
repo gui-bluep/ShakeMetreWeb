@@ -361,6 +361,105 @@ class MetreLineDetailViewTest extends TestCase
 
     // --- create / duplicate / delete ---------------------------------------------------------
 
+    // --- filing a line by hand -----------------------------------------------------------
+
+    /**
+     * METL_NewFromREF's second branch: a sub-section defined on the spot, code and title typed in
+     * the section header, existing in no catalogue. The source's dialog says as much -
+     * « Choisissez une section ou définissez en une nouvelle (code et titre) » - and it is why a
+     * line's section is a copy rather than a link: here there is nothing to link to.
+     */
+    public function test_a_line_can_be_filed_under_a_section_defined_on_the_spot(): void
+    {
+        $this->actAsWriter();
+
+        $this->postJson("/api/metres/{$this->metre->id}/lines", [
+            'ref_code' => 20,
+            'ref_title' => 'SOLS',
+            'refs_code' => 99,
+            'refs_title' => 'Reprises diverses',
+        ])->assertCreated()
+            ->assertJsonPath('data.ref_title', 'SOLS')
+            ->assertJsonPath('data.refs_title', 'Reprises diverses')
+            ->assertJsonPath('data.computed.ref_line_code', '20.99.1');
+
+        $line = MetreLine::sole();
+        $this->assertNull($line->reference_id, 'aucun catalogue derrière cette section');
+        $this->assertNull($line->sub_reference_id);
+        $this->assertSame(0, SubReference::count());
+    }
+
+    /** L'autre branche : une ligne de plus dans un groupe qui existe déjà, donc le rang suivant. */
+    public function test_a_line_added_to_an_existing_group_takes_the_next_rank(): void
+    {
+        $this->actAsWriter();
+        $section = ['ref_code' => 20, 'ref_title' => 'SOLS', 'refs_code' => 8, 'refs_title' => 'Carrelage'];
+
+        $this->postJson("/api/metres/{$this->metre->id}/lines", $section)
+            ->assertCreated()->assertJsonPath('data.computed.ref_line_code', '20.8.1');
+        $this->postJson("/api/metres/{$this->metre->id}/lines", $section)
+            ->assertCreated()->assertJsonPath('data.computed.ref_line_code', '20.8.2');
+    }
+
+    public function test_an_empty_line_still_takes_no_section(): void
+    {
+        $this->actAsWriter();
+
+        $this->postJson("/api/metres/{$this->metre->id}/lines", [])
+            ->assertCreated()
+            ->assertJsonPath('data.ref_code', null)
+            ->assertJsonPath('data.computed.ref_line_code', null);
+    }
+
+    /**
+     * Une sous-section sans titre s'imprimerait comme un intitulé illisible, et la section d'une
+     * ligne ne se modifie plus après coup : ce serait changer le code imprimé d'une ligne déjà
+     * portée sur un document.
+     */
+    public function test_a_new_sub_section_needs_a_code_and_a_title(): void
+    {
+        $this->actAsWriter();
+
+        $this->postJson("/api/metres/{$this->metre->id}/lines", ['refs_code' => 99])
+            ->assertStatus(422)->assertJsonValidationErrors('refs_title');
+
+        $this->postJson("/api/metres/{$this->metre->id}/lines", ['refs_code' => null, 'refs_title' => 'Divers'])
+            ->assertStatus(422)->assertJsonValidationErrors('refs_code');
+
+        $this->postJson("/api/metres/{$this->metre->id}/lines", ['quantity' => 5])
+            ->assertStatus(422)->assertJsonValidationErrors('quantity');
+
+        $line = $this->line(['ref_code' => 20, 'refs_code' => 8]);
+        $this->patchJson("/api/metre-lines/{$line->id}", ['ref_code' => 30])
+            ->assertStatus(422)->assertJsonValidationErrors('ref_code');
+    }
+
+    /**
+     * PriceTotal*All_c : le montant d'une ligne, options comprises. La liste FileMaker affiche
+     * celui-là par ligne et n'écarte les options que dans ses sous-totaux - une option montre ce
+     * qu'elle coûterait sans peser sur le total.
+     */
+    public function test_a_line_carries_both_its_own_total_and_the_gated_one(): void
+    {
+        $this->actAsWriter();
+        $this->line([
+            'is_option_b' => true,
+            'quantity' => 2, 'price_buy' => 50, 'price_sales' => 100,
+            'quantity_ordered' => 2, 'price_ordered' => 80,
+        ]);
+
+        $this->get($this->url())->assertInertia(fn ($page) => $page
+            ->where('lines.0.computed.price_total_buy_all', 100)
+            ->where('lines.0.computed.price_total_sales_all', 200)
+            ->where('lines.0.computed.price_total_ordered_all', 160)
+            // Les mêmes, écartés parce que la ligne est en option : ce sont eux qu'additionnent
+            // les sous-totaux et les totaux du métré.
+            ->where('lines.0.computed.price_total_buy_no_options', 0)
+            ->where('lines.0.computed.price_total_sales_no_options', 0)
+            ->where('lines.0.computed.price_total_ordered_no_options', 0)
+            ->etc());
+    }
+
     // --- the reference catalogue -----------------------------------------------------------
 
     /**

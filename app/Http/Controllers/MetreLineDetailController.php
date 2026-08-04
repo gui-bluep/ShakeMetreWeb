@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreLinesFromCatalogueRequest;
+use App\Http\Requests\StoreMetreLineRequest;
 use App\Http\Requests\UpdateMetreLineRequest;
 use App\Http\Resources\MetreLineDetailResource;
 use App\Models\Lot;
@@ -102,14 +103,32 @@ class MetreLineDetailController extends Controller
     /**
      * Appends an empty line, so filling it in is the ordinary debounced edit path rather than a
      * second one - the same reasoning as the lot manager's "add".
+     *
+     * The line may be filed under a section on the way in, which is METL_NewFromREF: either into
+     * an existing group (its four values are simply repeated) or into a sub-section defined on the
+     * spot, code and title typed in the section header, that exists in no catalogue. The source
+     * offers both from the same button, and the second is why a line's section is a copy rather
+     * than a link - there is nothing to link to.
+     *
+     * `ref_order` is assigned here rather than by the observer, which only reacts to a catalogue
+     * entry being picked. Both paths end up at MetreLine::nextRefOrder(), so a line filed by hand
+     * and a line filed from the catalogue are numbered by the same rule.
      */
-    public function store(Metre $metre): JsonResponse
+    public function store(StoreMetreLineRequest $request, Metre $metre): JsonResponse
     {
         $this->assertWritable($metre);
+
+        $section = $request->safe()->only(StoreMetreLineRequest::EDITABLE);
 
         $line = new MetreLine;
         $line->metre_id = $metre->getKey();
         $line->sort_order = (int) $metre->metreLines()->max('sort_order') + 1;
+
+        if ($section !== []) {
+            $line->forceFill($section);
+            $line->ref_order = MetreLine::nextRefOrder($metre->getKey(), $line->ref_code, $line->refs_code);
+        }
+
         $line->save();
 
         return response()->json([

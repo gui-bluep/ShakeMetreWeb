@@ -80,6 +80,12 @@ class MetreLineDetailResource extends JsonResource
                 // the stored METL::Ratio column, which nothing in the export claims to maintain.
                 'price_ratio' => $this->price_ratio,
 
+                // Sans le garde-fou « option » : c'est ce que la colonne Total d'une ligne affiche dans la
+                // liste FileMaker, les sous-totaux étant les seuls à exclure les options.
+                'price_total_buy_all' => $this->price_total_buy_all,
+                'price_total_sales_all' => $this->price_total_sales_all,
+                'price_total_ordered_all' => $this->price_total_ordered_all,
+
                 // METL::REFSL_Code_c - « 20.2.2 », recalculé plutôt que lu (MetreLine::refLineCode()).
                 'ref_line_code' => $this->refLineCode(),
                 'price_total_buy_no_options' => $this->price_total_buy_no_options,
