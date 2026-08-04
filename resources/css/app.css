@@ -7,7 +7,575 @@
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
+/* ═════════════════════════════════════════════════════════════════════════════════════════
+   ShakeMetre — direction artistique
+   ─────────────────────────────────────────────────────────────────────────────────────────
+   Reprise de l'identité de shakedesign.be, dont la palette est déclarée en `@property`
+   dans sa feuille de style :
+
+       --dark    hsl(13 59% 13%)   #35160e   brun quasi noir, l'encre de la marque
+       --light   hsl(38 21% 93%)   #f1eee9   blanc chaud, le fond
+       --accent  hsl(79 92% 68%)   #c9f862   lime, la signature
+       + mallow #b4b5df, olive #b2b894, yellow #ecd283 en couleurs secondaires
+       + success #48ad6d, warning #fa8c3d, error #ed3131, info #5090f7
+
+   Ce qui est une identité web est traduit ici en interface de bureau dense : le lime reste
+   la signature mais ne sert jamais de couleur de texte (1,23:1 sur blanc) — il marque l'état
+   actif et la sélection. Les anneaux de focus sont à l'encre, toujours lisibles.
+
+   Rôles fixés une fois pour toutes, à respecter sur toutes les pages :
+
+     canvas       sand-100      fond d'application
+     surface      blanc + bordure sand-200, sans ombre marquée
+     titres       sand-900
+     libellés     sand-600  (6,08:1 — sand-500 ne passe pas 4,5:1 en petite taille)
+     atténué      sand-400/500 pour les placeholders et les « — »
+     focus        sand-900
+     actif/sélection  accent-400/500 et accent-100 en fond
+
+   Le trio monétaire du domaine est repris de la palette secondaire de la marque, pour que
+   les trois blocs des grilles et les totaux du métré parlent la même langue partout :
+
+     achats (estimation)  clay    — le brun de la marque
+     vendu client         olive   — le vert olive de la marque
+     commande             mallow  — le périwinkle de la marque
+
+   Toutes les couleurs de texte utilisées ont été vérifiées ≥ 4,5:1 sur leur fond.
+   ═════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* Aspekta est la police de shakedesign.be. Auto-hébergée (30 ko, une seule variable de
+   graisse 100→1000) plutôt que chargée depuis un CDN : l'application est un outil interne et
+   ne doit pas dépendre d'un tiers pour s'afficher correctement. SIL OFL 1.1, licence dans
+   resources/fonts/Aspekta-OFL.txt.
+
+   Chemin relatif, et le fichier dans `resources/` et non dans `public/` : laravel-vite-plugin
+   met `publicDir` à false, donc un `url('/fonts/…')` absolu se résout contre l'origine du
+   serveur Vite en développement et y renvoie un 404 — la police ne se chargeait qu'en build.
+   Passée par le pipeline Vite, elle est résolue et versionnée dans les deux modes. */
+@font-face {
+    font-family: 'Aspekta';
+    src: url('../fonts/AspektaVF.woff2') format('woff2-variations');
+    font-weight: 100 1000;
+    font-style: normal;
+    font-display: swap;
+}
+
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Aspekta', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+        'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* ── Neutres chauds ────────────────────────────────────────────────────────────────────
+       Dérivés de l'encre de la marque : la teinte glisse de 38 (le blanc chaud) à 13 (le brun
+       de la marque) en descendant l'échelle, donc aucun gris froid ne vient trancher. */
+    --color-sand-50: #fcfaf8;   /* hsl(38 33% 98%) */
+    --color-sand-100: #f6f4f1;  /* hsl(38 24% 95.5%) — canvas */
+    --color-sand-200: #e8e4de;  /* hsl(36 18% 89%)  — bordures */
+    --color-sand-300: #d1cac2;  /* hsl(32 14% 79%)  — bordures de champ */
+    --color-sand-400: #ada399;  /* hsl(28 11% 64%)  — placeholders */
+    --color-sand-500: #897a70;  /* hsl(24 10% 49%)  — 4,13:1, décoratif uniquement */
+    --color-sand-600: #6f5f58;  /* hsl(20 12% 39%)  — 6,08:1, libellés */
+    --color-sand-700: #594740;  /* hsl(17 16% 30%)  — 8,75:1, texte courant */
+    --color-sand-800: #46312b;  /* hsl(15 24% 22%) */
+    --color-sand-900: #382119;  /* hsl(14 38% 16%)  — titres, focus */
+    --color-sand-950: #35160e;  /* hsl(13 59% 13%)  — l'encre de la marque */
+
+    /* ── Accent lime ───────────────────────────────────────────────────────────────────────
+       Signature de la marque. Jamais en couleur de texte sur fond clair : accent-400 plafonne
+       à 1,23:1 sur blanc. Sur l'encre en revanche il monte à 13,43:1. */
+    --color-accent-100: #f2fbdf;
+    --color-accent-200: #e5fab7;
+    --color-accent-300: #d6fa89;
+    --color-accent-400: #c9f862;  /* la couleur de la marque */
+    --color-accent-500: #a9de35;
+    --color-accent-600: #7fa923;
+    --color-accent-700: #5b7c18;  /* 4,84:1 — le seul niveau utilisable en texte */
+
+    /* ── Trio monétaire ────────────────────────────────────────────────────────────────────
+       -50/-100/-200 en fonds et bordures de colonne, -700 en texte d'en-tête. */
+    --color-clay-50: #fcf5f3;
+    --color-clay-100: #f6e8e4;
+    --color-clay-200: #e9d0c9;
+    --color-clay-500: #c46145;
+    --color-clay-600: #a9482d;
+    --color-clay-700: #883720;   /* 8,03:1 */
+
+    --color-olive-50: #f8f9f1;
+    --color-olive-100: #edefe1;
+    --color-olive-200: #d9ddc5;
+    --color-olive-500: #869353;
+    --color-olive-600: #6b793e;
+    --color-olive-700: #53612e;  /* 6,74:1 */
+
+    --color-mallow-50: #f3f3fc;
+    --color-mallow-100: #e4e4f6;
+    --color-mallow-200: #cccceb;
+    --color-mallow-500: #6b6dbd;
+    --color-mallow-600: #4d4da3;
+    --color-mallow-700: #3d3c86;  /* 9,59:1 */
+
+    /* ── Sémantiques ───────────────────────────────────────────────────────────────────────
+       Les -500 sont les couleurs exactes de la marque ; les -600/-700 en sont les variantes
+       assombries, seules utilisables en texte. */
+    --color-success-50: #f0faf3;
+    --color-success-100: #dbf0e3;
+    --color-success-200: #b9e2c8;
+    --color-success-500: #48ad6d;  /* marque */
+    --color-success-600: #358d57;
+    --color-success-700: #287145;  /* 5,94:1 */
+
+    --color-warning-50: #fef3ec;
+    --color-warning-100: #fce6cf;
+    --color-warning-200: #f9cfa6;
+    --color-warning-500: #fa8c3d;  /* marque */
+    --color-warning-600: #d45911;
+    --color-warning-700: #9c4011;  /* 6,66:1 */
+
+    --color-danger-50: #fdf1f1;
+    --color-danger-100: #fbe0e0;
+    --color-danger-200: #f6c0c0;
+    --color-danger-500: #ed3131;  /* marque */
+    --color-danger-600: #c52020;  /* 5,83:1 */
+    --color-danger-700: #981b1b;
+
+    --color-info-50: #f0f6fe;
+    --color-info-100: #d9e6fd;
+    --color-info-200: #bcd4fb;
+    --color-info-500: #5090f7;  /* marque */
+    --color-info-600: #1964e6;
+    --color-info-700: #154aac;
+
+    /* ── Remappage des rampes Tailwind ─────────────────────────────────────────────────────
+       Les écrans déjà construits (grille de lignes, comparatif fournisseurs, panneau METC,
+       modales, profil, authentification) sont écrits en `gray-*`, `indigo-*`, `red-*`…
+       Plutôt que de réécrire des centaines d'utilitaires un à un — et de laisser la DA
+       dériver au prochain écran écrit par réflexe en `gray-500` — les rampes elles-mêmes
+       pointent vers la DA. Une page non touchée devient donc chaude et sur charte
+       gratuitement, et `gray-500` reste un synonyme correct de `sand-500`.
+
+       Dans le code nouveau, préférer toujours les noms de la DA : ils disent le rôle. */
+
+    --color-gray-50: var(--color-sand-50);
+    --color-gray-100: var(--color-sand-100);
+    --color-gray-200: var(--color-sand-200);
+    --color-gray-300: var(--color-sand-300);
+    --color-gray-400: var(--color-sand-400);
+    --color-gray-500: var(--color-sand-600); /* décalé d'un cran : `text-gray-500` est le
+                                                libellé le plus fréquent du code existant et
+                                                doit passer 4,5:1 */
+    --color-gray-600: var(--color-sand-600);
+    --color-gray-700: var(--color-sand-700);
+    --color-gray-800: var(--color-sand-800);
+    --color-gray-900: var(--color-sand-900);
+    --color-gray-950: var(--color-sand-950);
+
+    --color-zinc-50: var(--color-sand-50);
+    --color-zinc-100: var(--color-sand-100);
+    --color-zinc-200: var(--color-sand-200);
+    --color-zinc-300: var(--color-sand-300);
+    --color-zinc-400: var(--color-sand-400);
+    --color-zinc-500: var(--color-sand-600);
+    --color-zinc-600: var(--color-sand-600);
+    --color-zinc-700: var(--color-sand-700);
+    --color-zinc-800: var(--color-sand-800);
+    --color-zinc-900: var(--color-sand-900);
+    --color-zinc-950: var(--color-sand-950);
+
+    /* Indigo était la couleur de focus de Breeze. Les tons clairs deviennent l'accent (états
+       sélectionnés), les tons foncés l'encre (anneaux de focus, liens). */
+    --color-indigo-50: var(--color-accent-100);
+    --color-indigo-100: var(--color-accent-200);
+    --color-indigo-200: var(--color-accent-300);
+    --color-indigo-300: var(--color-accent-500);
+    --color-indigo-400: var(--color-sand-700);
+    --color-indigo-500: var(--color-sand-900);
+    --color-indigo-600: var(--color-sand-900);
+    --color-indigo-700: var(--color-sand-950);
+    --color-indigo-800: var(--color-sand-950);
+    --color-indigo-900: var(--color-sand-950);
+
+    /* Le rouge du domaine — le bloc « estimation achat » — est le brun de la marque ; le rouge
+       d'alerte reste un rouge. Les deux vivaient dans la même rampe `red-*`, séparés ici :
+       les tons clairs (fonds de colonne) partent vers clay, les tons saturés vers danger. */
+    --color-red-50: var(--color-clay-50);
+    --color-red-100: var(--color-clay-100);
+    --color-red-200: var(--color-clay-200);
+    --color-red-300: var(--color-clay-500);
+    --color-red-400: var(--color-danger-500);
+    --color-red-500: var(--color-danger-500);
+    --color-red-600: var(--color-danger-600);
+    --color-red-700: var(--color-danger-700);
+    --color-red-800: var(--color-clay-700);
+    --color-red-900: var(--color-danger-700);
+
+    /* Vert = vendu client → olive de la marque. */
+    --color-green-50: var(--color-olive-50);
+    --color-green-100: var(--color-olive-100);
+    --color-green-200: var(--color-olive-200);
+    --color-green-300: var(--color-olive-500);
+    --color-green-400: var(--color-olive-500);
+    --color-green-500: var(--color-olive-600);
+    --color-green-600: var(--color-olive-700);
+    --color-green-700: var(--color-olive-700);
+    --color-green-800: var(--color-olive-700);
+
+    /* Bleu = commande → mallow de la marque. */
+    --color-blue-50: var(--color-mallow-50);
+    --color-blue-100: var(--color-mallow-100);
+    --color-blue-200: var(--color-mallow-200);
+    --color-blue-300: var(--color-mallow-500);
+    --color-blue-400: var(--color-mallow-500);
+    --color-blue-500: var(--color-mallow-600);
+    --color-blue-600: var(--color-mallow-600);
+    --color-blue-700: var(--color-mallow-700);
+    --color-blue-800: var(--color-mallow-700);
+
+    /* Emerald marquait « livré » → succès. */
+    --color-emerald-50: var(--color-success-50);
+    --color-emerald-100: var(--color-success-100);
+    --color-emerald-200: var(--color-success-200);
+    --color-emerald-300: var(--color-success-500);
+    --color-emerald-400: var(--color-success-500);
+    --color-emerald-500: var(--color-success-600);
+    --color-emerald-600: var(--color-success-600);
+    --color-emerald-700: var(--color-success-700);
+    --color-emerald-800: var(--color-success-700);
+
+    /* Amber portait le badge « compte en lecture seule » → avertissement. */
+    --color-amber-50: var(--color-warning-50);
+    --color-amber-100: var(--color-warning-100);
+    --color-amber-200: var(--color-warning-200);
+    --color-amber-500: var(--color-warning-500);
+    --color-amber-600: var(--color-warning-600);
+    --color-amber-700: var(--color-warning-700);
+    --color-amber-800: var(--color-warning-700);
+
+    /* Le survol de ligne des grilles était en `yellow-50` → accent. */
+    --color-yellow-50: var(--color-accent-100);
+    --color-yellow-100: var(--color-accent-200);
+    --color-yellow-200: var(--color-accent-300);
+
+    /* ── Ombres ────────────────────────────────────────────────────────────────────────────
+       Teintées à l'encre plutôt qu'au noir pur, sinon elles grisent le fond chaud. Une
+       application de bureau se structure par des filets 1 px : les ombres sont réservées à
+       ce qui flotte réellement au-dessus de la page. */
+    --shadow-card: 0 1px 2px 0 rgb(53 22 14 / 0.04);
+    --shadow-raised: 0 1px 3px 0 rgb(53 22 14 / 0.08), 0 1px 2px -1px rgb(53 22 14 / 0.06);
+    --shadow-pop: 0 10px 30px -8px rgb(53 22 14 / 0.22), 0 2px 8px -3px rgb(53 22 14 / 0.1);
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════════════════
+   Base
+   ═════════════════════════════════════════════════════════════════════════════════════════ */
+
+@layer base {
+    body {
+        background-color: var(--color-sand-100);
+        color: var(--color-sand-800);
+        /* Aspekta est une variable 100→1000 : 380 donne un gris de texte un peu plus léger
+           que le 400 par défaut, ce qui va mieux à une interface dense. */
+        font-variation-settings: 'wght' 380;
+    }
+
+    h1, h2, h3, h4 {
+        color: var(--color-sand-900);
+        font-variation-settings: 'wght' 600;
+    }
+
+    /* Les champs de formulaire, une fois pour toute l'application.
+       Sélecteurs de spécificité (0,1,1) — supérieure aux (0,1,0) du plugin forms — pour
+       gagner sans dépendre de l'ordre des sources ; les utilitaires posés dans les gabarits
+       restent prioritaires, la couche `utilities` passant après `base`. */
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='submit'], [type='button'], [type='reset']),
+    select:not([multiple]),
+    textarea {
+        border-radius: 0.375rem;
+        border-color: var(--color-sand-300);
+        background-color: #fff;
+        color: var(--color-sand-900);
+        font-size: 0.8125rem;
+        line-height: 1.25rem;
+    }
+
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='submit'], [type='button'], [type='reset']):focus,
+    select:not([multiple]):focus,
+    textarea:focus {
+        border-color: var(--color-sand-900);
+        outline: none;
+        /* Remplace l'anneau bleu du plugin forms. `box-shadow` plutôt que `outline` pour
+           épouser le rayon du champ. */
+        box-shadow: 0 0 0 1px var(--color-sand-900);
+    }
+
+    input:disabled,
+    select:disabled,
+    textarea:disabled {
+        background-color: var(--color-sand-100);
+        border-color: var(--color-sand-200);
+        color: var(--color-sand-600);
+        cursor: not-allowed;
+    }
+
+    ::placeholder {
+        color: var(--color-sand-400);
+    }
+
+    /* La croix d'effacement d'un `input[type=search]` est dessinée par le navigateur en bleu
+       système, seule tache froide de l'interface. Elle n'est pas stylable, mais elle est
+       filtrable : désaturée et assombrie, elle rejoint l'encre sans perdre son rôle. */
+    input[type='search']::-webkit-search-cancel-button {
+        filter: grayscale(1) brightness(0.35);
+    }
+
+    /* `currentColor` sert de fond à la case cochée dans le plugin forms : l'encre donne une
+       case noire à coche blanche, plutôt que le bleu par défaut. */
+    [type='checkbox'],
+    [type='radio'] {
+        color: var(--color-sand-900);
+        border-color: var(--color-sand-400);
+        border-radius: 0.1875rem;
+    }
+
+    [type='checkbox']:focus,
+    [type='radio']:focus {
+        outline: 2px solid var(--color-sand-900);
+        outline-offset: 1px;
+        box-shadow: none;
+    }
+
+    /* Une case désactivée ET cochée doit rester visiblement cochée.
+       Le plugin forms peint la coche en posant `background-color: currentColor` sur `:checked` ;
+       un `:disabled { background-color: … }` écrit après, à spécificité égale, l'effaçait — une
+       case cochée s'affichait vide. Sur un compte en lecture seule, « Accepté » se lisait donc
+       « non accepté », et les colonnes Est./Opt. de la grille rapportaient l'inverse de la
+       donnée. Éteinte, oui ; muette, non. */
+    [type='checkbox']:disabled:not(:checked),
+    [type='radio']:disabled:not(:checked) {
+        border-color: var(--color-sand-300);
+        background-color: var(--color-sand-100);
+    }
+
+    [type='checkbox']:disabled:checked,
+    [type='radio']:disabled:checked {
+        color: var(--color-sand-500);
+        border-color: var(--color-sand-500);
+    }
+
+    /* Filet de focus visible au clavier pour tout ce qui n'est pas un champ. Le `:where`
+       maintient la spécificité à zéro : un composant qui gère son propre focus l'emporte. */
+    :where(a, button, summary, [tabindex]:not([tabindex='-1'])):focus-visible {
+        outline: 2px solid var(--color-sand-900);
+        outline-offset: 2px;
+        border-radius: 0.25rem;
+    }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════════════════
+   Composants
+   ─────────────────────────────────────────────────────────────────────────────────────────
+   Un vocabulaire court et fermé. Chaque classe existe parce qu'elle est répétée sur
+   plusieurs écrans : c'est ce qui fait tenir la DA d'une page à l'autre.
+   ═════════════════════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+    /* ── Surfaces ───────────────────────────────────────────────────────────────────────── */
+
+    .surface {
+        @apply rounded-lg border border-sand-200 bg-white shadow-card;
+    }
+
+    /* En-tête de carte : la barre de titre d'un panneau, avec ses actions à droite. */
+    .surface-head {
+        @apply flex min-h-[2.5rem] items-center justify-between gap-3 border-b border-sand-200 px-4 py-2;
+    }
+
+    .surface-body {
+        @apply p-4;
+    }
+
+    /* ── Typographie ────────────────────────────────────────────────────────────────────── */
+
+    /* Le titre de section et le libellé de champ : 11 px capitales, sand-600 (6,08:1). */
+    .eyebrow {
+        @apply text-[11px] uppercase tracking-[0.07em] text-sand-600;
+        font-variation-settings: 'wght' 600;
+    }
+
+    .field-label {
+        @apply mb-1 block text-[11px] uppercase tracking-[0.06em] text-sand-600;
+        font-variation-settings: 'wght' 600;
+    }
+
+    /* Un identifiant, un code de lot, un numéro de projet : chiffres alignés, fond discret. */
+    .code-chip {
+        @apply inline-flex items-center rounded border border-sand-200 bg-sand-50 px-1.5 py-px font-mono text-[11px] tabular-nums text-sand-600;
+    }
+
+    /* Une valeur calculée, non modifiable. Volontairement différente d'un champ désactivé :
+       un champ grisé se lit « momentanément bloqué », ceci se lit « il n'y a rien à écrire ». */
+    .readonly-value {
+        @apply block w-full rounded-md border border-dashed border-sand-300 bg-sand-50 px-2.5 py-1.5 text-right text-[13px] tabular-nums text-sand-700;
+    }
+
+    /* ── Boutons ────────────────────────────────────────────────────────────────────────────
+       Pas de capitales ni de `tracking-widest` comme chez Breeze : sur un écran qui aligne
+       sept boutons de document, les capitales deviennent illisibles. */
+
+    .btn {
+        @apply inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] transition-colors duration-100;
+        font-variation-settings: 'wght' 550;
+    }
+
+    .btn:disabled,
+    .btn[disabled] {
+        @apply cursor-not-allowed opacity-45;
+    }
+
+    .btn-primary {
+        @apply border border-sand-950 bg-sand-950 text-white hover:bg-sand-800 active:bg-sand-950;
+    }
+
+    /* Le lime en action principale, réservé au geste que l'écran attend vraiment (ajouter une
+       ligne, créer un métré). Texte à l'encre : 13,43:1. */
+    .btn-accent {
+        @apply border border-accent-500 bg-accent-400 text-sand-950 hover:bg-accent-300 active:bg-accent-500;
+    }
+
+    .btn-secondary {
+        @apply border border-sand-300 bg-white text-sand-800 hover:border-sand-400 hover:bg-sand-50 active:bg-sand-100;
+    }
+
+    .btn-danger {
+        @apply border border-danger-600 bg-danger-600 text-white hover:bg-danger-500 active:bg-danger-700;
+    }
+
+    /* La même action, mais posée au milieu d'autres. Le rouge plein est réservé à la
+       confirmation, là où il est la réponse attendue à une question ; dans une liste d'actions
+       il écrase tout l'écran sans rien protéger de plus — la modale s'en charge. */
+    .btn-danger-quiet {
+        @apply border border-danger-200 bg-white text-danger-600 hover:border-danger-500 hover:bg-danger-50;
+    }
+
+    /* Action tertiaire, sans contour : « Gérer », « Fermer », les icônes de barre d'outils. */
+    .btn-ghost {
+        @apply border border-transparent bg-transparent text-sand-600 hover:bg-sand-100 hover:text-sand-900;
+    }
+
+    .btn-sm {
+        @apply gap-1 rounded px-2 py-1 text-xs;
+    }
+
+    .btn-block {
+        @apply w-full justify-start;
+    }
+
+    /* ── Badges ─────────────────────────────────────────────────────────────────────────── */
+
+    .badge {
+        @apply inline-flex items-center gap-1 rounded-full border px-2 py-px text-[11px] whitespace-nowrap;
+        font-variation-settings: 'wght' 550;
+    }
+
+    .badge-neutral  { @apply border-sand-200 bg-sand-100 text-sand-700; }
+    .badge-accent   { @apply border-accent-500 bg-accent-200 text-sand-900; }
+    .badge-success  { @apply border-success-200 bg-success-50 text-success-700; }
+    .badge-warning  { @apply border-warning-200 bg-warning-50 text-warning-700; }
+    .badge-danger   { @apply border-danger-200 bg-danger-50 text-danger-700; }
+    .badge-info     { @apply border-info-200 bg-info-50 text-info-700; }
+
+    /* « Bientôt » : ce qui est prévu mais pas encore branché. Assez présent pour qu'on
+       comprenne que l'écran n'est pas cassé, assez discret pour ne pas attirer le clic. */
+    .badge-soon {
+        @apply border-dashed border-sand-300 bg-transparent text-sand-500;
+    }
+
+    /* ── Tableaux ───────────────────────────────────────────────────────────────────────────
+       `:where()` ramène la spécificité à celle d'une classe seule, pour qu'un `text-right`
+       posé dans le gabarit continue de gagner. */
+
+    .data-table {
+        @apply w-full border-collapse text-[13px];
+    }
+
+    /* Pas de `sticky` ici : selon l'écran l'en-tête colle au conteneur ou à la page, et un
+       `top-0` global ne colle nulle part dans un conteneur sans hauteur contrainte. */
+    .data-table :where(thead th) {
+        @apply border-b border-sand-200 bg-sand-100 px-3 py-2 text-left text-[11px] uppercase tracking-[0.06em] text-sand-600;
+        font-variation-settings: 'wght' 600;
+    }
+
+    .data-table :where(tbody td) {
+        @apply border-b border-sand-200/70 px-3 py-2 text-sand-800;
+    }
+
+    .data-table :where(tbody tr) {
+        @apply transition-colors duration-75;
+    }
+
+    .data-table :where(tbody tr:hover) {
+        @apply bg-accent-100/50;
+    }
+
+    .data-table :where(tfoot td) {
+        @apply border-t-2 border-sand-300 bg-sand-50 px-3 py-2 text-sand-900;
+        font-variation-settings: 'wght' 600;
+    }
+
+    /* Un nombre : chiffres de largeur fixe, pour que les colonnes se lisent en vertical. */
+    .num {
+        @apply text-right tabular-nums;
+    }
+
+    /* ── Cellule éditable de grille ─────────────────────────────────────────────────────────
+       Sans bordure au repos pour que la grille reste lisible, le champ se matérialisant au
+       focus. Le fond est transparent : c'est la colonne qui porte sa teinte.
+
+       12 px, et non les 13 px du reste de l'application : une grille de vingt colonnes se lit
+       d'un coup d'œil vertical, et chaque pixel de largeur gagné est une colonne de moins à
+       aller chercher au défilement horizontal.
+
+       Le passage au blanc au focus n'est PAS ici mais en `focus:bg-white` dans le gabarit.
+       En Tailwind v4 l'ordre des couches (`theme, base, components, utilities`) prime sur la
+       spécificité : une teinte de colonne posée en `bg-clay-50/70` battrait un `.cell-input:focus`
+       défini ici, aussi spécifique soit-il. Un utilitaire ne se laisse dépasser que par un autre
+       utilitaire, et Tailwind range les variantes après les classes de base — `focus:bg-white`
+       gagne donc toujours. */
+
+    .cell-input {
+        @apply w-full min-w-0 border-none px-1.5 py-1 text-xs text-sand-900;
+        background-color: transparent;
+    }
+
+    .cell-input:focus {
+        @apply relative z-10;
+        box-shadow: inset 0 0 0 1px var(--color-sand-900);
+        border-radius: 0.125rem;
+    }
+
+    .cell-input:disabled {
+        @apply text-sand-600;
+    }
+
+    /* ── Menu flottant ──────────────────────────────────────────────────────────────────── */
+
+    .popover {
+        @apply z-30 rounded-lg border border-sand-200 bg-white py-1 shadow-pop;
+    }
+
+    .popover-item {
+        @apply block w-full px-3 py-1.5 text-left text-[13px] text-sand-800 transition-colors hover:bg-sand-100 disabled:cursor-not-allowed disabled:opacity-40;
+    }
+
+    .popover-item-danger {
+        @apply text-danger-600 hover:bg-danger-50;
+    }
+
+    /* ── Bandeau de message ─────────────────────────────────────────────────────────────── */
+
+    .banner {
+        @apply flex items-start gap-2 rounded-md border px-3 py-2 text-[13px];
+    }
+
+    .banner-danger {
+        @apply border-danger-200 bg-danger-50 text-danger-700;
+    }
 }
