@@ -6,13 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ShakeMetre**, a quantity-survey/metré module originally built in FileMaker (`ShakeMetre.fmp12`), rebuilt here as a Laravel 13 / Inertia / Vue 3 application. It is coupled to **ShakeDesign**, which stays in FileMaker for the whole migration and is reached over the FileMaker Data API.
 
-The migration is well underway — this is **not** a skeleton. Already built and covered by ~420 PHP tests and 25 Vitest tests:
+The migration is well underway — this is **not** a skeleton. Already built and covered by ~480 PHP tests and 29 Vitest tests:
 
 - All 13 domain tables migrated, with UUID primary keys preserved from FileMaker.
 - Eloquent models per source table; `MetreLineObserver` / `MetreLineComponentObserver` driving `RecalculateMetreTotals` and `RecalculateMetreLineQuantitiesFromComponents`.
 - `ShakeDesignClient` over the Data API: project/company/contact/VAT/user lookups, project search, company list, a company's contacts through JCPYCTC, and offer / supplier-order creation.
 - Auth: Breeze password login **plus** a ShakeDesign SSO ticket flow, and a `readonly` role enforced server-side.
-- Screens: dashboard project search → project page (métrés + lots) → métré page → line views; plus the metré-line grid, the METC components panel, and the supplier tender comparison.
+- Screens: dashboard project search → project page (métrés + lots) → métré page → the four money views of its lines (`achats-ventes-commandes` and its three narrower cuts, one page cut by a slug); plus the metré-line grid, the METC components panel, the supplier tender comparison, and the reference catalogue on `/references`.
+- The reference catalogue is wired end to end: browsed and maintained on its own screen, inserted into a métré as lines, and its three levels drive how a métré's lines are grouped, numbered and subtotalled.
 
 Run `git log --oneline` first — the commit messages carry the reasoning behind the non-obvious decisions and are the fastest way to understand why something is the way it is.
 
@@ -24,7 +25,7 @@ Run `git log --oneline` first — the commit messages carry the reasoning behind
 - `ShakeMetre_data_dictionary.json` — all 17 tables, every field with its real calculation formula, 91 relationships, table occurrences, 274 scripts, 128 layouts, 92 custom functions, value lists.
 - `ShakeDesign_boundary_tables.json` — the 7 ShakeDesign tables ShakeMetre is coupled to.
 
-**Critical constraint:** `OFF_Offers.zkf_MET` and `SOR_SupplierOrders.zkf_MET` in ShakeDesign store **hard references** to `MET_Metre.zkp`. `MET_Metre`, `METL_MetreLines`, `LOT_Lot`, `REF_Reference` and `METC_MetreLineComponent` must keep their existing UUIDs verbatim, or those foreign keys break silently. `MAT`, `CAT`, `CATS`, `CART`, `JCARTMAT`, `TAG`, `REFS`, `REFSL` are on numeric legacy keys and are free to be redesigned.
+**Critical constraint:** `OFF_Offers.zkf_MET` and `SOR_SupplierOrders.zkf_MET` in ShakeDesign store **hard references** to `MET_Metre.zkp`. `MET_Metre`, `METL_MetreLines`, `LOT_Lot`, `REF_Reference` and `METC_MetreLineComponent` must keep their existing UUIDs verbatim, or those foreign keys break silently. `MAT`, `CAT`, `CATS`, `CART`, `JCARTMAT` and `TAG` are on numeric legacy keys and free to be redesigned. `REFS` and `REFSL` are **not**, whatever the export says: their live records carry UUIDs like every other table (checked on the server — see below), and this project keeps them.
 
 Do not port: `ZZZ_Template`, `ZSET_Settings`/`ZVAR_Variables`/`ZSTRI_Strings` (use Laravel config + a `translations` table), the `BrowserNav` module, anything under `OLD/`/`TEMP/`/`__SAVE_AR_*`/`__OLD`, the `DEV/Raw`/`DEV/Blank` layouts. Most of the 92 custom functions need no equivalent — only the FR/date and privilege logic.
 
@@ -141,6 +142,7 @@ Inertia can reuse a component across a navigation between two records of the sam
 Two cascade traps, both found in a browser and both silent:
 
 - **In Tailwind v4 the layer order (`theme, base, components, utilities`) beats specificity.** A `.cell-input:focus` rule in `components` loses to a plain `bg-clay-50/70` utility. That is why the grid cells carry `focus:bg-white` in the template: only a utility beats a utility, and Tailwind sorts variants last.
+- **The z-index stack of a grid is explicit, and each level only beats the one below.** 10 for a focused `.cell-input` (which repaints its background white), 15 for the `.euro-suffix` over it, 20 for the sticky total row, 30 for popovers. Getting it wrong is silent until you scroll: with the symbol at 20 and the total row at 10, the lines' « € » drew on top of the total row.
 - **A disabled *and* checked checkbox must stay visibly checked.** The forms plugin paints the tick with `background-color: currentColor` on `:checked`; a later `:disabled { background-color: … }` at equal specificity erased it, so on a readonly account `Accepté` read as "not accepted" and the grid's Est./Opt. columns reported the opposite of the data. The rule is split on `:not(:checked)` / `:checked`.
 
 ## Settled decisions — do not "fix" these
@@ -197,4 +199,7 @@ Any migration/seeder touching `MET_Metre`, `METL_MetreLines`, `LOT_Lot`, `REF_Re
 - **`Nouvelle offre client`** on the métré page is a disabled button tagged `Bientôt`; `ShakeDesignClient::createOffer()` exists and is tested but nothing calls it yet.
 - **Supplier company filtering** in the picker is limited to `isSupplier_b` + `isActive_b`. No company in ShakeDesign currently has `isActive_b = 0`, so that half of the filter has never been exercised against real data.
 - **The profile and password screens are still in Breeze's English** ("Profile Information", "Save", "Delete Account"). They now carry the DA but not the language of the rest of the application. `Welcome.vue`, Breeze's landing page on `/`, is untouched beyond the ramp remap.
+- **Four things the FileMaker line list does and this one does not yet.** Drag-and-drop reordering inside a sub-section (`zg_DRAG_N_DROP` + `Order`, which `METL_Reorder` renumbers 1..n); selection of a whole section or sub-section (`METL_Select_REF` / `_REFS`, which keep tri-state group flags in `MET::zkm_REF_Selection_g`); pushing a line's unit price back into the catalogue (`METL_Update_REFSL_Price`, confirmation dialog included — it writes `REFSL::Price`, the direction one would not guess); and the two tag levels of the sort, which wait on the Lots/Tags switch above.
+- **`REF_Reference.Code` is text in the source and an integer here.** The live catalogue's first section is the string `"00"`, which this project's column flattens to `0` — the line codes it feeds are numeric anyway (`0.0.1`), but the catalogue screen shows `0` where FileMaker shows `00`.
+- **The 57 809 métré lines are not imported yet.** The mapping is settled now, which was what it waited on: `REFSL_Title` → `refsl_title`, `Description` → `description`, the four section columns copied as they stand, `Order` → `ref_order`. The catalogue itself (19/118/507) can be re-read from the server whenever needed.
 - **The breadcrumb on the Achats/Ventes/Commandes view stops at the métré.** The project's *name* lives in ShakeDesign, and fetching it over the Data API for a single label would put a remote call on the heaviest screen of the application. `metre.project_id` is in the payload if that trade-off is ever revisited.
