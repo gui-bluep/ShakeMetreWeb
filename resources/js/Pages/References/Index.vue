@@ -54,6 +54,24 @@ const subReference = computed(
     () => reference.value?.sub_references.find((s) => s.id === openSubReference.value) ?? null
 );
 
+/**
+ * La ligne entière sélectionne, pas seulement ses champs : le survol éclaire tout le cadre, donc
+ * c'est tout le cadre qui doit répondre au clic. Le `@focus` des champs reste, pour la tabulation.
+ *
+ * Changer de section vide la sous-section choisie ; re-cliquer sur la section déjà ouverte ne la
+ * vide pas — sinon corriger une coquille dans son titre ferait perdre la sous-section en cours.
+ */
+function selectReference(id) {
+    if (openReference.value !== id) {
+        openReference.value = id;
+        openSubReference.value = null;
+    }
+}
+
+function selectSubReference(id) {
+    openSubReference.value = id;
+}
+
 const counts = computed(() => ({
     references: references.value.length,
     subReferences: references.value.reduce((n, r) => n + r.sub_references.length, 0),
@@ -314,8 +332,9 @@ function csrfToken() {
                         <li
                             v-for="ref in references"
                             :key="ref.id"
-                            class="flex items-center gap-1.5 px-2 py-1.5 transition-colors"
+                            class="flex cursor-pointer items-center gap-1.5 px-2 py-1.5 transition-colors"
                             :class="ref.id === openReference ? 'bg-accent-100' : 'hover:bg-sand-100'"
+                            @click="selectReference(ref.id)"
                         >
                             <input
                                 type="number"
@@ -323,7 +342,7 @@ function csrfToken() {
                                 :disabled="readOnly"
                                 class="w-14 shrink-0 px-1.5 py-1 text-right text-xs tabular-nums"
                                 title="Code de section"
-                                @focus="openReference = ref.id; openSubReference = null"
+                                @focus="selectReference(ref.id)"
                                 @input="edit('reference', ref, 'code', $event.target.value, 'number')"
                                 @blur="flush('reference', ref)"
                             />
@@ -333,7 +352,7 @@ function csrfToken() {
                                 :disabled="readOnly"
                                 placeholder="Titre de la section"
                                 class="min-w-0 flex-1 px-1.5 py-1 text-xs"
-                                @focus="openReference = ref.id; openSubReference = null"
+                                @focus="selectReference(ref.id)"
                                 @input="edit('reference', ref, 'title_fr', $event.target.value)"
                                 @blur="flush('reference', ref)"
                             />
@@ -354,7 +373,7 @@ function csrfToken() {
                                 type="button"
                                 class="btn btn-ghost shrink-0 rounded px-1 py-0.5 text-danger-600"
                                 title="Supprimer la section"
-                                @click="askDelete('reference', ref)"
+                                @click.stop="askDelete('reference', ref)"
                             >
                                 <Icon name="trash" :size="3.5" />
                             </button>
@@ -388,8 +407,9 @@ function csrfToken() {
                         <li
                             v-for="sub in reference?.sub_references ?? []"
                             :key="sub.id"
-                            class="flex items-center gap-1.5 px-2 py-1.5 transition-colors"
+                            class="flex cursor-pointer items-center gap-1.5 px-2 py-1.5 transition-colors"
                             :class="sub.id === openSubReference ? 'bg-accent-100' : 'hover:bg-sand-100'"
+                            @click="selectSubReference(sub.id)"
                         >
                             <span class="code-chip shrink-0">{{ reference.code }}.{{ sub.code ?? '?' }}</span>
                             <input
@@ -398,7 +418,7 @@ function csrfToken() {
                                 :disabled="readOnly"
                                 class="w-12 shrink-0 px-1.5 py-1 text-right text-xs tabular-nums"
                                 title="Code de sous-section"
-                                @focus="openSubReference = sub.id"
+                                @focus="selectSubReference(sub.id)"
                                 @input="edit('subReference', sub, 'code', $event.target.value, 'number')"
                                 @blur="flush('subReference', sub)"
                             />
@@ -408,7 +428,7 @@ function csrfToken() {
                                 :disabled="readOnly"
                                 placeholder="Titre de la sous-section"
                                 class="min-w-0 flex-1 px-1.5 py-1 text-xs"
-                                @focus="openSubReference = sub.id"
+                                @focus="selectSubReference(sub.id)"
                                 @input="edit('subReference', sub, 'title_fr', $event.target.value)"
                                 @blur="flush('subReference', sub)"
                             />
@@ -418,7 +438,7 @@ function csrfToken() {
                                 type="button"
                                 class="btn btn-ghost shrink-0 rounded px-1 py-0.5 text-danger-600"
                                 title="Supprimer la sous-section"
-                                @click="askDelete('subReference', sub)"
+                                @click.stop="askDelete('subReference', sub)"
                             >
                                 <Icon name="trash" :size="3.5" />
                             </button>
