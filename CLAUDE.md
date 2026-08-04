@@ -101,7 +101,7 @@ Inertia can reuse a component across a navigation between two records of the sam
 
 ### Direction artistique
 
-`resources/css/app.css` **is** the design system: read its header before styling anything. It carries the palette taken from shakedesign.be (declared there in `@property`), the role each colour plays, and a closed vocabulary of component classes — `.surface` / `.surface-head`, `.eyebrow` / `.field-label`, `.btn` + variants, `.badge-*`, `.data-table`, `.cell-input`, `.popover*`, `.banner*`, `.code-chip`, `.readonly-value`, `.num`.
+`resources/css/app.css` **is** the design system: read its header before styling anything. It carries the palette taken from shakedesign.be (declared there in `@property`), the role each colour plays, and a closed vocabulary of component classes — `.surface` / `.surface-head`, `.eyebrow` / `.field-label`, `.btn` + variants, `.badge-*`, `.data-table`, `.cell-input` (+ `.euro-suffix`), `.popover*`, `.banner*`, `.code-chip`, `.readonly-value`, `.num`.
 
 - **Encre `sand-950` (#35160e), fond `sand-100`, accent lime `accent-400` (#c9f862).** The lime is never a text colour on light (1.23:1) — it marks the active state and the selection. Focus rings are ink. Labels are `sand-600` or darker (`sand-500` is 4.13:1 and decorative only).
 - **The modal veil is `scrim` (#1c1817), not `sand-950`.** The brand ink is a 59 %-saturated brown; spread as a translucent sheet over a whole page it stops reading as warm black and reads as a reddish wash. `scrim` keeps the hue and drops the saturation to 10 %. It is a veil colour only — never text, never a surface.

@@ -564,6 +564,33 @@
         @apply text-sand-600;
     }
 
+    /* Pas de flèches d'incrément dans une cellule de grille : elles n'apparaissent qu'au survol,
+       recouvrent les derniers chiffres d'une colonne de 6 rem, et se posent exactement là où les
+       colonnes monétaires affichent leur « € ». On tape dans une grille, on ne clique pas sur des
+       flèches de 8 px. La valeur reste modifiable au clavier, flèches haut/bas comprises. */
+    .cell-input[type='number'] {
+        appearance: textfield;
+        -moz-appearance: textfield;
+    }
+
+    .cell-input[type='number']::-webkit-outer-spin-button,
+    .cell-input[type='number']::-webkit-inner-spin-button {
+        appearance: none;
+        margin: 0;
+    }
+
+    /* Le « € » d'une cellule éditable, posé par-dessus le champ : la valeur d'un
+       input[type=number] n'accepte que des chiffres, le symbole ne peut donc pas y être.
+       À poser dans un parent `relative` portant la teinte de la colonne ; le champ réserve la
+       place avec un `pr-4`.
+
+       `pointer-events-none` pour que le clic tombe dans le champ et non sur le symbole, et
+       `z-20` pour rester visible au focus : `.cell-input:focus` passe en `z-10` et repeint son
+       fond en blanc, ce qui masquerait un symbole resté en dessous. */
+    .euro-suffix {
+        @apply pointer-events-none absolute right-1 top-1/2 z-20 -translate-y-1/2 text-[10px] text-sand-600;
+    }
+
     /* ── Menu flottant ──────────────────────────────────────────────────────────────────── */
 
     .popover {

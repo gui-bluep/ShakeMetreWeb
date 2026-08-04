@@ -332,14 +332,17 @@ function csrfToken() {
 const currency = new Intl.NumberFormat('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /**
- * Un montant, sans le symbole : l'euro est dit une fois par colonne dans l'en-tête (« P.U. (€) »,
- * « Total (€) ») plutôt que répété sur chaque ligne. Six colonnes monétaires × des centaines de
- * lignes, cela ferait des milliers de « € » pour une information qui ne change jamais — et la
- * colonne des chiffres alignés à droite se lit d'autant mieux qu'elle ne contient que des
- * chiffres.
+ * Un montant avec son symbole. L'euro est marqué deux fois, dans l'en-tête de colonne
+ * (« Total (€) ») et sur chaque montant : demandé explicitement, et cohérent avec les six champs
+ * P.U. voisins, qui portent le leur en surimpression faute de pouvoir le mettre dans la valeur
+ * d'un input[type=number].
+ *
+ * Espace insécable avant le symbole, comme le veut la typographie française et comme le fait déjà
+ * `Intl` pour les milliers : sans elle, un retour à la ligne pourrait séparer le montant de son
+ * unité au milieu d'une cellule étroite.
  */
 function money(value) {
-    return value === null || value === undefined ? '—' : currency.format(value);
+    return value === null || value === undefined ? '—' : `${currency.format(value)}\u00a0€`;
 }
 
 /** Column widths, so the header and the rows stay aligned across the horizontal scroll. */
@@ -564,14 +567,17 @@ const breadcrumbs = computed(() => [
                         @input="editNumber(row, 'quantity', $event.target.value)"
                         @blur="flushRow(row)"
                     />
-                    <input
-                        type="number" step="any"
-                        :value="row.price_buy"
-                        :disabled="readOnly"
-                        class="cell-input bg-clay-50/70 text-right tabular-nums focus:bg-white"
-                        @input="editNumber(row, 'price_buy', $event.target.value)"
-                        @blur="flushRow(row)"
-                    />
+                    <div class="relative bg-clay-50/70">
+                        <input
+                            type="number" step="any"
+                            :value="row.price_buy"
+                            :disabled="readOnly"
+                            class="cell-input pr-4 text-right tabular-nums focus:bg-white"
+                            @input="editNumber(row, 'price_buy', $event.target.value)"
+                            @blur="flushRow(row)"
+                        />
+                        <span class="euro-suffix">€</span>
+                    </div>
                     <div class="bg-clay-50/70 px-1.5 py-1 text-right tabular-nums text-sand-700">
                         {{ money(row.computed.price_total_buy_no_options) }}
                     </div>
@@ -595,14 +601,17 @@ const breadcrumbs = computed(() => [
                         @input="editNumber(row, 'quantity', $event.target.value)"
                         @blur="flushRow(row)"
                     />
-                    <input
-                        type="number" step="any"
-                        :value="row.price_sales"
-                        :disabled="readOnly"
-                        class="cell-input bg-olive-50/70 text-right tabular-nums focus:bg-white"
-                        @input="editNumber(row, 'price_sales', $event.target.value)"
-                        @blur="flushRow(row)"
-                    />
+                    <div class="relative bg-olive-50/70">
+                        <input
+                            type="number" step="any"
+                            :value="row.price_sales"
+                            :disabled="readOnly"
+                            class="cell-input pr-4 text-right tabular-nums focus:bg-white"
+                            @input="editNumber(row, 'price_sales', $event.target.value)"
+                            @blur="flushRow(row)"
+                        />
+                        <span class="euro-suffix">€</span>
+                    </div>
                     <div class="bg-olive-50/70 px-1.5 py-1 text-right tabular-nums text-sand-700">
                         {{ money(row.computed.price_total_sales_no_options) }}
                     </div>
@@ -616,14 +625,17 @@ const breadcrumbs = computed(() => [
                         @input="editNumber(row, 'quantity_ordered', $event.target.value)"
                         @blur="flushRow(row)"
                     />
-                    <input
-                        type="number" step="any"
-                        :value="row.price_ordered"
-                        :disabled="readOnly"
-                        class="cell-input bg-mallow-50/70 text-right tabular-nums focus:bg-white"
-                        @input="editNumber(row, 'price_ordered', $event.target.value)"
-                        @blur="flushRow(row)"
-                    />
+                    <div class="relative bg-mallow-50/70">
+                        <input
+                            type="number" step="any"
+                            :value="row.price_ordered"
+                            :disabled="readOnly"
+                            class="cell-input pr-4 text-right tabular-nums focus:bg-white"
+                            @input="editNumber(row, 'price_ordered', $event.target.value)"
+                            @blur="flushRow(row)"
+                        />
+                        <span class="euro-suffix">€</span>
+                    </div>
                     <div class="bg-mallow-50/70 px-1.5 py-1 text-right tabular-nums text-sand-700">
                         {{ money(row.computed.price_total_ordered_no_options) }}
                     </div>
