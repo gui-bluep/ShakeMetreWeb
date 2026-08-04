@@ -65,6 +65,92 @@ class Metre extends Model
      * copy. The project page's Ratio column is a DIFFERENT division - Commandes / Travaux, see
      * ProjectController::metreRow() - and deliberately does not come through here.
      */
+    /**
+     * La répartition par lot de la carte « Fournisseur » - le portail `Prj_LOT__` de `MET_Form`.
+     *
+     * Relevé sur le fichier hébergé : la mise en page du métré montre les lots avec leur société
+     * fournisseur (`LOT::CPY_Name_ae`) et, pour chacun, les montants DE CE MÉTRÉ ; puis trois
+     * totaux, dont les formules sont
+     *
+     *     Tot_LotAssignedBuy_cU     Sum ( METL::LOT_AmountAssignedBuy )
+     *     Tot_LotNotAssignedBuy_cU  Sum ( METL::LOT_AmountNotAssignedBuy )
+     *     Tot_LotAssignedOrdered_cU Sum ( METL::LOT_AmountAssignedOrder )
+     *
+     * avec, par ligne,
+     *
+     *     LOT_AmountAssignedBuy     Case ( not IsEmpty ( zkf_LOT ) ; PriceTotalBuy_noOptions_c ; 0 )
+     *     LOT_AmountNotAssignedBuy  Case ( IsEmpty ( zkf_LOT ) ; PriceTotalBuy_noOptions_c ; 0 )
+     *     LOT_AmountAssignedOrder   Case ( not IsEmpty ( zkf_LOT ) ; PriceTotalOrdered_noOptions_c ; 0 )
+     *
+     * Le garde est donc « la ligne A un lot », et non « son lot a une société » - ce dernier est
+     * celui de `GainOnPurchases_c`, qui répond à une autre question. Un lot sans fournisseur compte
+     * ici comme assigné.
+     *
+     * Une seule requête agrégée, groupée par lot : la carte n'a pas à charger les lignes.
+     */
+    public function lotBreakdown(?string $language = null): array
+    {
+        $rows = DB::table('metre_lines')
+            ->leftJoin('lots', 'metre_lines.lot_id', '=', 'lots.id')
+            ->where('metre_lines.metre_id', $this->getKey())
+            ->groupBy('metre_lines.lot_id', 'lots.code', 'lots.title_custom', 'lots.title_fr', 'lots.title_en', 'lots.title_nl', 'lots.cpy_name_ae')
+            ->selectRaw('
+                metre_lines.lot_id,
+                lots.code AS lot_code,
+                lots.title_custom, lots.title_fr, lots.title_en, lots.title_nl,
+                lots.cpy_name_ae AS company,
+                COALESCE(SUM('.MetreLine::SQL_BUY_NO_OPTIONS.'), 0) AS buy,
+                COALESCE(SUM('.MetreLine::SQL_ORDERED_NO_OPTIONS.'), 0) AS ordered,
+                COUNT(*) AS lines_count
+            ')
+            ->get();
+
+        $assignedBuy = 0.0;
+        $unassignedBuy = 0.0;
+        $assignedOrdered = 0.0;
+        $lots = [];
+
+        foreach ($rows as $row) {
+            $buy = (float) $row->buy;
+            $ordered = (float) $row->ordered;
+
+            if ($row->lot_id === null) {
+                $unassignedBuy += $buy;
+
+                continue;
+            }
+
+            $assignedBuy += $buy;
+            $assignedOrdered += $ordered;
+
+            $lots[] = [
+                'id' => $row->lot_id,
+                'code' => $row->lot_code,
+                // Même règle de nom que partout où un métré nomme un lot - voir Lot::displayTitle().
+                'name' => (new Lot)->forceFill([
+                    'title_custom' => $row->title_custom,
+                    'title_fr' => $row->title_fr,
+                    'title_en' => $row->title_en,
+                    'title_nl' => $row->title_nl,
+                ])->displayTitle($language ?? $this->language),
+                'company' => $row->company,
+                'buy' => round($buy, 2),
+                'ordered' => round($ordered, 2),
+                'lines_count' => (int) $row->lines_count,
+            ];
+        }
+
+        // Par code, comme toute liste de lots ; les lots sans code en dernier.
+        usort($lots, fn (array $a, array $b) => [$a['code'] === null, (int) $a['code']] <=> [$b['code'] === null, (int) $b['code']]);
+
+        return [
+            'assigned_buy' => round($assignedBuy, 2),
+            'unassigned_buy' => round($unassignedBuy, 2),
+            'assigned_ordered' => round($assignedOrdered, 2),
+            'lots' => $lots,
+        ];
+    }
+
     public function ratio(): ?float
     {
         return self::ratioFromSums($this->total_sales_metl_stored, $this->total_purchase_metl_stored);

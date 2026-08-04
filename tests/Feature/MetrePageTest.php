@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Jobs\RecalculateMetreTotals;
 use App\Models\Cart;
+use App\Models\Lot;
 use App\Models\Metre;
 use App\Models\MetreLine;
 use App\Models\MetreLineComponent;
@@ -75,6 +76,100 @@ class MetrePageTest extends TestCase
     private function line(Metre $metre, array $attributes = []): MetreLine
     {
         return MetreLine::forceCreate($attributes + ['metre_id' => $metre->id]);
+    }
+
+    // --- carte Fournisseur (le portail Prj_LOT__ de MET_Form) -------------------------------
+
+    /**
+     * Les trois totaux et la répartition par lot, à la main.
+     *
+     * Le garde est « la ligne a un lot », pas « son lot a une société » : le second lot n'a aucun
+     * fournisseur et compte pourtant comme assigné - c'est ce qui distingue ces totaux de
+     * GainOnPurchases_c.
+     */
+    public function test_the_supplier_card_splits_the_amounts_by_lot(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre(['language' => 'FR']);
+
+        $withCompany = Lot::forceCreate([
+            'project_id' => self::PROJECT, 'code' => 2,
+            'title_fr' => 'Toiture', 'title_en' => 'Roof', 'cpy_name_ae' => 'Toitures Dupont',
+        ]);
+        $withoutCompany = Lot::forceCreate([
+            'project_id' => self::PROJECT, 'code' => 1, 'title_fr' => 'Gros oeuvre',
+        ]);
+
+        // 10 × 3 = 30 achats, 10 × 2 = 20 commandé
+        $this->line($metre, ['lot_id' => $withCompany->id, 'price_buy' => 3, 'quantity' => 10, 'price_ordered' => 2, 'quantity_ordered' => 10]);
+        // 4 × 1,5 = 6 achats, rien de commandé
+        $this->line($metre, ['lot_id' => $withCompany->id, 'price_buy' => 1.5, 'quantity' => 4]);
+        // 5 × 8 = 40 achats sur le lot sans fournisseur
+        $this->line($metre, ['lot_id' => $withoutCompany->id, 'price_buy' => 8, 'quantity' => 5]);
+        // 7 × 2 = 14 achats sans lot du tout
+        $this->line($metre, ['price_buy' => 2, 'quantity' => 7]);
+        // une option : comptée nulle part
+        $this->line($metre, ['lot_id' => $withCompany->id, 'price_buy' => 1000, 'quantity' => 1, 'is_option_b' => true]);
+
+        $breakdown = $metre->lotBreakdown();
+
+        $this->assertEquals(76, $breakdown['assigned_buy'], '30 + 6 + 40, options exclues');
+        $this->assertEquals(14, $breakdown['unassigned_buy']);
+        $this->assertEquals(20, $breakdown['assigned_ordered']);
+
+        // Triés par code : le lot 1 avant le lot 2.
+        $this->assertSame([1, 2], array_column($breakdown['lots'], 'code'));
+
+        [$first, $second] = $breakdown['lots'];
+        $this->assertEquals(40, $first['buy']);
+        $this->assertNull($first['company'], 'Un lot sans société reste dans la liste.');
+        $this->assertSame('Gros oeuvre', $first['name']);
+
+        $this->assertEquals(36, $second['buy'], '30 + 6, l\'option écartée');
+        $this->assertEquals(20, $second['ordered']);
+        $this->assertSame('Toitures Dupont', $second['company']);
+        // Un compte de LIGNES, pas de montants : l'option en fait partie même si son montant
+        // n'entre dans aucun total. Deux lignes ordinaires plus l'option.
+        $this->assertSame(3, $second['lines_count']);
+    }
+
+    /** Le nom du lot suit la langue du métré, comme partout ailleurs. */
+    public function test_the_card_names_a_lot_in_the_metres_language(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre(['language' => 'EN']);
+        $lot = Lot::forceCreate([
+            'project_id' => self::PROJECT, 'code' => 3,
+            'title_fr' => 'Toiture', 'title_en' => 'Roof', 'title_nl' => 'Dak',
+        ]);
+        $this->line($metre, ['lot_id' => $lot->id, 'price_buy' => 1, 'quantity' => 1]);
+
+        $this->assertSame('Roof', $metre->lotBreakdown()['lots'][0]['name']);
+    }
+
+    /** Un lot du projet sans aucune ligne dans ce métré n'encombre pas la carte. */
+    public function test_a_lot_with_no_line_in_this_metre_is_absent(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre();
+        Lot::forceCreate(['project_id' => self::PROJECT, 'code' => 9, 'title_fr' => 'Jamais utilisé']);
+        $this->line($metre, ['price_buy' => 1, 'quantity' => 1]);
+
+        $this->assertSame([], $metre->lotBreakdown()['lots']);
+        $this->assertEquals(1, $metre->lotBreakdown()['unassigned_buy']);
+    }
+
+    public function test_the_page_carries_the_breakdown(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre(['language' => 'FR']);
+        $lot = Lot::forceCreate(['project_id' => self::PROJECT, 'code' => 4, 'title_fr' => 'Sols', 'cpy_name_ae' => 'Sols SA']);
+        $this->line($metre, ['lot_id' => $lot->id, 'price_buy' => 10, 'quantity' => 2]);
+
+        $this->get("/metres/{$metre->id}")->assertInertia(fn ($page) => $page
+            ->where('lotBreakdown.assigned_buy', 20)
+            ->where('lotBreakdown.lots.0.company', 'Sols SA')
+            ->where('lotBreakdown.lots.0.name', 'Sols'));
     }
 
     // --- verrou (MET_LockUnlock) ------------------------------------------------------------

@@ -268,6 +268,26 @@ class MetreLine extends Model
         return $this->metreLineComponents()->exists();
     }
 
+    /**
+     * Les trois montants d'une ligne, hors options, en SQL - `PriceTotal*_noOptions_c`.
+     *
+     *     PriceTotalBuy_noOptions_c     Case ( isOption_b ; 0 ; Round ( PriceBuy * Quantity ; 2 ) )
+     *     PriceTotalSales_noOptions_c   Case ( isOption_b ; 0 ; Round ( PriceSales * Quantity ; 2 ) )
+     *     PriceTotalOrdered_noOptions_c Case ( isOption_b ; 0 ; Round ( PriceOrdered * QuantityOrdered ; 2 ) )
+     *
+     * Ici plutôt que dans le job qui les employait seul, parce qu'ils ont maintenant deux lecteurs :
+     * `RecalculateMetreTotals` et la répartition par lot de la carte Fournisseur. Deux copies de la
+     * même expression finiraient par ne plus dire la même chose, et ce sont des montants.
+     *
+     * Les colonnes sont préfixées de leur table : ces fragments servent aussi sous une jointure.
+     * `COALESCE` reprend FileMaker, où un nombre vide vaut 0 dans un calcul.
+     */
+    public const SQL_BUY_NO_OPTIONS = 'CASE WHEN metre_lines.is_option_b = 1 THEN 0 ELSE ROUND(COALESCE(metre_lines.price_buy, 0) * COALESCE(metre_lines.quantity, 0), 2) END';
+
+    public const SQL_SALES_NO_OPTIONS = 'CASE WHEN metre_lines.is_option_b = 1 THEN 0 ELSE ROUND(COALESCE(metre_lines.price_sales, 0) * COALESCE(metre_lines.quantity, 0), 2) END';
+
+    public const SQL_ORDERED_NO_OPTIONS = 'CASE WHEN metre_lines.is_option_b = 1 THEN 0 ELSE ROUND(COALESCE(metre_lines.price_ordered, 0) * COALESCE(metre_lines.quantity_ordered, 0), 2) END';
+
     public function metre(): BelongsTo
     {
         return $this->belongsTo(Metre::class);

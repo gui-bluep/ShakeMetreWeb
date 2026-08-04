@@ -26,6 +26,7 @@ const props = defineProps({
     project: { type: Object, required: true },
     languages: { type: Array, required: true },
     lineCount: { type: Number, default: 0 },
+    lotBreakdown: { type: Object, required: true },
 });
 
 const page = usePage();
@@ -548,8 +549,48 @@ function statusClasses(active) {
                 </AppCard>
 
                 <!-- Fournisseur - deliberately empty for now. -->
+                <!-- Fournisseurs : le portail des lots de MET_Form. Les lots du projet qui ne
+                     portent aucun montant dans ce métré sont omis - la carte est étroite, et un lot
+                     à zéro n'apprend rien ici (la page du projet, elle, les liste tous). -->
                 <AppCard title="Fournisseur" class="lg:col-span-4">
-                    <div class="flex flex-col items-center gap-1.5 py-6 text-center">
+                    <div v-if="lotBreakdown.lots.length > 0 || lotBreakdown.unassigned_buy > 0" class="flex flex-col gap-3">
+                        <!-- Les trois totaux. « Sans lot » n'est pas un manque à afficher plus tard :
+                             c'est le montant qui n'a encore été attribué à personne. -->
+                        <dl class="grid grid-cols-3 gap-2 text-center">
+                            <div class="rounded-md bg-clay-50/70 px-2 py-1.5">
+                                <dt class="eyebrow">Avec lot</dt>
+                                <dd class="num text-[13px] text-sand-900">{{ money(lotBreakdown.assigned_buy) }}</dd>
+                            </div>
+                            <div class="rounded-md bg-sand-100 px-2 py-1.5">
+                                <dt class="eyebrow">Sans lot</dt>
+                                <dd class="num text-[13px] text-sand-900">{{ money(lotBreakdown.unassigned_buy) }}</dd>
+                            </div>
+                            <div class="rounded-md bg-mallow-50/70 px-2 py-1.5">
+                                <dt class="eyebrow">Commandé</dt>
+                                <dd class="num text-[13px] text-sand-900">{{ money(lotBreakdown.assigned_ordered) }}</dd>
+                            </div>
+                        </dl>
+
+                        <ul class="divide-y divide-sand-200/70">
+                            <li v-for="lot in lotBreakdown.lots" :key="lot.id" class="flex items-baseline gap-2 py-1.5">
+                                <span v-if="lot.code !== null" class="code-chip shrink-0">{{ lot.code }}</span>
+                                <span class="min-w-0 flex-1">
+                                    <span class="block truncate text-[13px] text-sand-900">
+                                        {{ lot.name || 'Lot sans nom' }}
+                                    </span>
+                                    <span class="block truncate text-[11px]" :class="lot.company ? 'text-sand-600' : 'text-sand-400 italic'">
+                                        {{ lot.company || 'Aucun fournisseur' }}
+                                    </span>
+                                </span>
+                                <span class="shrink-0 text-right">
+                                    <span class="block num text-[12px] text-clay-700">{{ money(lot.buy) }}</span>
+                                    <span class="block num text-[11px] text-mallow-700">{{ money(lot.ordered) }}</span>
+                                </span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div v-else class="flex flex-col items-center gap-1.5 py-6 text-center">
                         <Icon name="user" :size="6" class="text-sand-300" />
                         <p class="text-[13px] text-sand-600">Aucun fournisseur lié à ce métré.</p>
                     </div>

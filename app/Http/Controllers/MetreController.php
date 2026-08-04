@@ -32,6 +32,10 @@ class MetreController extends Controller
                 'name' => $project['Name'] ?? null,
             ],
             'languages' => UpdateMetreRequest::LANGUAGES,
+
+            // La carte « Fournisseur » : le portail des lots de MET_Form, avec leurs montants dans
+            // ce métré et les trois totaux assigné / non assigné. Voir Metre::lotBreakdown().
+            'lotBreakdown' => $metre->lotBreakdown(),
             // Shown in the delete confirmation, so what is about to be destroyed is stated
             // rather than left to be discovered.
             'lineCount' => $metre->metreLines()->count(),

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Metre;
+use App\Models\MetreLine;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -189,9 +190,10 @@ class RecalculateMetreTotals implements ShouldBeUniqueUntilProcessing, ShouldQue
      */
     private function aggregateLineTotals(): object
     {
-        $sales = 'CASE WHEN metre_lines.is_option_b = 1 THEN 0 ELSE ROUND(COALESCE(metre_lines.price_sales, 0) * COALESCE(metre_lines.quantity, 0), 2) END';
-        $ordered = 'CASE WHEN metre_lines.is_option_b = 1 THEN 0 ELSE ROUND(COALESCE(metre_lines.price_ordered, 0) * COALESCE(metre_lines.quantity_ordered, 0), 2) END';
-        $buy = 'CASE WHEN metre_lines.is_option_b = 1 THEN 0 ELSE ROUND(COALESCE(metre_lines.price_buy, 0) * COALESCE(metre_lines.quantity, 0), 2) END';
+        // Partagés avec la répartition par lot - voir les constantes sur MetreLine.
+        $sales = MetreLine::SQL_SALES_NO_OPTIONS;
+        $ordered = MetreLine::SQL_ORDERED_NO_OPTIONS;
+        $buy = MetreLine::SQL_BUY_NO_OPTIONS;
 
         // GainOnPurchases_c is gated on the line's LOT having a supplier company assigned.
         $lotAssigned = "lots.company_id IS NOT NULL AND lots.company_id <> ''";
