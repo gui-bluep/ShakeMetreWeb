@@ -6,6 +6,7 @@ import GridToasts from '@/Components/GridToasts.vue';
 import ReferenceCatalogueModal from '@/Components/ReferenceCatalogueModal.vue';
 import Icon from '@/Components/Icon.vue';
 import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
+import { fold, highlightParts, matches } from '@/searchMatch';
 
 /**
  * Les quatre vues monétaires des lignes d'un métré : « Achats — Ventes — Commandes » et ses trois
@@ -202,8 +203,34 @@ function showAllLines() {
     popover.value = null;
 }
 
+/** Replié une fois pour toute la liste : sans accents ni casse (voir `searchMatch.js`). */
+const searchTerm = computed(() => fold(search.value.trim()));
+
+/**
+ * La recherche porte aussi sur la section et la sous-section, et pas seulement sur la ligne : un
+ * titre de section cherché ramène toutes les lignes de cette section, pas uniquement celles qui
+ * portent le mot dans leur propre libellé.
+ *
+ * Ce que cela demande, c'est deux champs de plus dans la liste — et rien d'autre. Une ligne porte
+ * la copie du titre de sa section et de sa sous-section (`ref_title`, `refs_title`) ; il n'y a donc
+ * ni jointure ni deuxième passe à écrire, et c'est aussi ce que ferait une recherche FileMaker,
+ * où ces deux champs sont sur METL comme les autres.
+ *
+ * Le désordre que cela pourrait créer n'est pas dans le résultat — il reste groupé par section,
+ * donc une section entière ramenée se lit comme une section entière — mais dans le fait de ne plus
+ * savoir POURQUOI une ligne est là. D'où le marquage des intitulés : un intitulé surligné dit que
+ * c'est lui qui a ramené tout son groupe, un intitulé non surligné dit que seules ses lignes
+ * trouvées sont là. Une ligne trouvée par son propre libellé n'a rien à expliquer, elle porte le
+ * mot à l'écran.
+ */
+const SEARCHED_FIELDS = [
+    'refsl_title', 'description', 'unit', 'lot_name', 'sor_title_ref',
+    // Le groupe, copié sur la ligne : c'est ce qui fait qu'une section se cherche par son nom.
+    'ref_title', 'refs_title',
+];
+
 const visibleRows = computed(() => {
-    const term = search.value.trim().toLowerCase();
+    const term = searchTerm.value;
     const found = foundSet.value;
 
     if (term === '' && found === null) {
@@ -213,11 +240,20 @@ const visibleRows = computed(() => {
     return rows.value.filter(
         (row) =>
             (found === null || found.has(subSectionKeyOf(row)))
-            && (term === ''
-                || [row.refsl_title, row.description, row.unit, row.lot_name, row.sor_title_ref]
-                    .some((field) => String(field ?? '').toLowerCase().includes(term)))
+            && (term === '' || SEARCHED_FIELDS.some((field) => matches(row[field], term)))
     );
 });
+
+/** Les morceaux d'un libellé, marqués ou non, pour le terme courant. */
+const parts = (text) => highlightParts(text, searchTerm.value);
+
+/** Y a-t-il quelque chose à marquer ici ? Ce qui décide si un champ éditable se fait doubler. */
+const hasHit = (text) => searchTerm.value !== '' && matches(text, searchTerm.value);
+
+/** Les libellés d'intitulé, au même endroit que leur repli de secours. */
+const sectionLabel = (section) =>
+    section.title || (section.code === null ? 'Sans section' : 'Section sans titre');
+const subSectionLabel = (sub) => sub.title || 'Sous-section sans titre';
 
 /**
  * La liste telle que FileMaker la met en page (METL_MetreComplete_List_Full) : deux niveaux
@@ -439,6 +475,15 @@ function recomputeLocally(row) {
     const option = row.is_option_b;
 
     row.computed = {
+        // Ce que ce miroir ne recalcule pas doit survivre à la frappe. `MetreLineGridResource`
+        // envoie neuf valeurs calculées, celui-ci en refait sept : sans ce report, `ref_line_code`
+        // et `price_total_gain_no_options` disparaissaient dès la première touche, et la colonne
+        // Code affichait « — » jusqu'au rechargement de la page — le serveur les renvoie bien, mais
+        // `flushRow()` ne réassigne rien quand la sauvegarde différée est déjà partie d'elle-même.
+        // Même piège que celui décrit dans CLAUDE.md pour la réponse du PATCH, côté client cette
+        // fois.
+        ...row.computed,
+
         // Mirrors MetreLine::priceRatio(): null when either price is absent, and null rather
         // than an error when the purchase price is zero.
         price_ratio:
@@ -908,7 +953,7 @@ const breadcrumbs = computed(() => [
                 <input
                     type="search"
                     :value="search"
-                    placeholder="Rechercher une ligne…"
+                    placeholder="Rechercher une ligne, une section…"
                     class="block w-full py-1.5 pl-8 pr-2.5 text-xs"
                     @input="search = $event.target.value"
                 />
@@ -1070,9 +1115,7 @@ const breadcrumbs = computed(() => [
                                 style="font-variation-settings: 'wght' 650"
                                 :title="isCollapsed(section.key) ? 'Dérouler la section' : 'Replier la section'"
                                 @click="toggleCollapsed(section.key)"
-                            >
-                                {{ section.title || (section.code === null ? 'Sans section' : 'Section sans titre') }}
-                            </span>
+                            ><template v-for="(part, i) in parts(sectionLabel(section))" :key="i"><mark v-if="part.hit" class="search-hit">{{ part.text }}</mark><template v-else>{{ part.text }}</template></template></span>
 
                             <!-- Ce qui est caché se dit, sinon une section repliée ne se distingue
                                  pas d'une section vide. -->
@@ -1230,9 +1273,7 @@ const breadcrumbs = computed(() => [
                                     style="font-variation-settings: 'wght' 600"
                                     :title="isCollapsed(sub.key) ? 'Dérouler la sous-section' : 'Replier la sous-section'"
                                     @click="toggleCollapsed(sub.key)"
-                                >
-                                    {{ sub.title || 'Sous-section sans titre' }}
-                                </span>
+                                ><template v-for="(part, i) in parts(subSectionLabel(sub))" :key="i"><mark v-if="part.hit" class="search-hit">{{ part.text }}</mark><template v-else>{{ part.text }}</template></template></span>
 
                                 <span v-if="isCollapsed(sub.key)" class="shrink-0 text-[10px] text-sand-600">
                                     {{ sub.rows.length }} ligne{{ sub.rows.length === 1 ? '' : 's' }}
@@ -1309,15 +1350,29 @@ const breadcrumbs = computed(() => [
                         {{ row.computed.ref_line_code ?? '—' }}
                     </div>
 
-                    <!-- Titre -->
-                    <input
-                        type="text"
-                        :value="row.refsl_title"
-                        :disabled="readOnly"
-                        class="cell-input focus:bg-white"
-                        @input="editText(row, 'refsl_title', $event.target.value)"
-                        @blur="flushRow(row)"
-                    />
+                    <!-- Titre. Marquer une trouvaille dans un champ éditable : on ne met pas de
+                         `<mark>` dans un `<input>`, donc le texte marqué est dessiné par-dessus et
+                         le champ ne montre le sien qu'au focus (`text-transparent` levé par
+                         `focus:`, doublure masquée par `peer-focus:hidden`). Même retrait, même
+                         taille, même encre des deux côtés : l'échange ne se voit pas, et il ne
+                         touche pas au chemin d'édition — c'est du CSS, sans état à tenir.
+                         La doublure ne s'interpose que s'il y a réellement quelque chose à
+                         marquer ; hors recherche, la cellule est exactement celle d'avant. -->
+                    <div class="relative min-w-0">
+                        <input
+                            type="text"
+                            :value="row.refsl_title"
+                            :disabled="readOnly"
+                            class="cell-input peer focus:bg-white"
+                            :class="hasHit(row.refsl_title) ? 'text-transparent focus:text-sand-900' : ''"
+                            @input="editText(row, 'refsl_title', $event.target.value)"
+                            @blur="flushRow(row)"
+                        />
+                        <div
+                            v-if="hasHit(row.refsl_title)"
+                            class="pointer-events-none absolute inset-0 truncate px-1.5 py-1 text-xs text-sand-900 peer-focus:hidden"
+                        ><template v-for="(part, i) in parts(row.refsl_title)" :key="i"><mark v-if="part.hit" class="search-hit">{{ part.text }}</mark><template v-else>{{ part.text }}</template></template></div>
+                    </div>
 
                     <div class="flex justify-center">
                         <input
@@ -1503,9 +1558,7 @@ const breadcrumbs = computed(() => [
                             :disabled="readOnly"
                             :title="row.lot_name || 'Aucun lot'"
                             @click="togglePopover(row, 'lot')"
-                        >
-                            {{ row.lot_name || '—' }}
-                        </button>
+                        ><template v-if="row.lot_name"><template v-for="(part, i) in parts(row.lot_name)" :key="i"><mark v-if="part.hit" class="search-hit">{{ part.text }}</mark><template v-else>{{ part.text }}</template></template></template><template v-else>—</template></button>
                         <div
                             v-if="isOpen(row, 'lot')"
                             class="popover absolute right-0 top-6 max-h-64 w-56 overflow-y-auto"
@@ -1546,9 +1599,7 @@ const breadcrumbs = computed(() => [
                             v-if="row.sor_title_ref"
                             class="text-sand-700"
                             :title="`${row.sor_title_ref} — l'ouverture dans FileMaker n'est pas encore branchée`"
-                        >
-                            {{ row.sor_title_ref }}
-                        </span>
+                        ><template v-for="(part, i) in parts(row.sor_title_ref)" :key="i"><mark v-if="part.hit" class="search-hit">{{ part.text }}</mark><template v-else>{{ part.text }}</template></template></span>
                         <span v-else class="text-sand-300">—</span>
                     </div>
                 </div>
