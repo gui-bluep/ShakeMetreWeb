@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue';
 import Modal from './Modal.vue';
 import SecondaryButton from './SecondaryButton.vue';
+import { fold, matches } from '@/searchMatch';
 
 /**
  * A FileMaker-style value picker over a ShakeDesign list: search at the top, a scrollable
@@ -108,16 +109,17 @@ async function load(term) {
     }
 }
 
-/** Client-side narrowing, used when serverSearch is false. */
+/** Client-side narrowing, used when serverSearch is false. Insensible aux accents comme la
+ *  recherche des lignes : « societe » doit trouver « Société ». */
 function visibleRows() {
-    const term = query.value.trim().toLowerCase();
+    const term = fold(query.value.trim());
 
     if (props.serverSearch || term === '') {
         return rows.value;
     }
 
     return rows.value.filter((row) =>
-        [row.name, row.role, row.vat, row.city].some((field) => String(field ?? '').toLowerCase().includes(term))
+        [row.name, row.role, row.vat, row.city].some((field) => matches(field, term))
     );
 }
 

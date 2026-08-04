@@ -592,6 +592,14 @@
         @apply pointer-events-none absolute right-1 top-1/2 z-[15] -translate-y-1/2 text-[10px] text-sand-600;
     }
 
+    /* Ce qu'une recherche a trouvé dans un libellé. `<mark>` arrive avec un fond jaune du
+       navigateur, qui n'est d'aucune palette : il est remplacé, pas complété. Le lime est la
+       couleur de la sélection et de l'état actif, et c'est bien ce qu'un résultat de recherche
+       est — sur de l'encre, pas en texte lime, qui ne passerait pas le contraste. */
+    .search-hit {
+        @apply rounded-[2px] bg-accent-200 px-px text-sand-950;
+    }
+
     /* ── Menu flottant ──────────────────────────────────────────────────────────────────── */
 
     .popover {

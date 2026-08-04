@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import Icon from '@/Components/Icon.vue';
 import Modal from '@/Components/Modal.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import { fold, matches as matchesTerm } from '@/searchMatch';
 
 /**
  * « Depuis le catalogue » — le sélecteur d'articles du référentiel, repris du navigateur à trois
@@ -86,7 +87,9 @@ const subReference = computed(
  * on ne voit que les articles de la sous-section ouverte.
  */
 const results = computed(() => {
-    const term = search.value.trim().toLowerCase();
+    // Replié : le catalogue est écrit en français accentué, « demolition » doit y trouver
+    // « Démolition ». Même repli que la recherche des lignes de métré.
+    const term = fold(search.value.trim());
 
     if (term === '') {
         return (subReference.value?.lines ?? []).map((line) => ({ ...line, path: null }));
@@ -97,7 +100,7 @@ const results = computed(() => {
     for (const ref of catalogue.value) {
         for (const sub of ref.sub_references) {
             for (const line of sub.lines) {
-                if ((line.title ?? '').toLowerCase().includes(term)) {
+                if (matchesTerm(line.title, term)) {
                     matches.push({ ...line, path: `${ref.code}.${sub.code} ${sub.title ?? ''}`.trim() });
                 }
             }
