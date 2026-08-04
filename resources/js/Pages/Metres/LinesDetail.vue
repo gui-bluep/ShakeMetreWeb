@@ -3,6 +3,8 @@ import { computed, ref, watch } from 'vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import AppTopBar from '@/Components/AppTopBar.vue';
 import GridToasts from '@/Components/GridToasts.vue';
+import Modal from '@/Components/Modal.vue';
+import SecondaryButton from '@/Components/SecondaryButton.vue';
 import ReferenceCatalogueModal from '@/Components/ReferenceCatalogueModal.vue';
 import Icon from '@/Components/Icon.vue';
 import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
@@ -678,6 +680,73 @@ async function createSubSectionWithLine(section) {
  */
 const showCatalogue = ref(false);
 
+/**
+ * Le lot d'une sélection, en un geste - METL_Lot_AssignToSelection.
+ *
+ * Le script source n'écrit pas depuis le bouton : il ouvre une carte (METL_ListAssignLot_Card) qui
+ * liste les lignes trouvées par leurs identifiants, triées par METL_Sort, et attend Enregistrer ou
+ * Annuler. D'où une fenêtre qui montre ce qui va changer plutôt qu'un menu qui l'a déjà changé : le
+ * geste porte sur des centaines de lignes d'argent, et la seule façon de vérifier une sélection est
+ * de la voir.
+ *
+ * Et comme le script, la sélection est vidée après un succès : elle a été consommée, la garder
+ * ferait croire qu'il reste quelque chose à faire.
+ */
+const assigningLot = ref(false);
+const lotToAssign = ref(null);
+
+/** Les lignes cochées, dans l'ordre de l'écran - le METL_Sort de la carte source. */
+const selectedRows = computed(() => rows.value.filter((row) => selected.value.has(row.id)));
+
+function openLotAssignment() {
+    // Le lot du premier coché, s'ils le partagent déjà : la fenêtre s'ouvre sur l'état, pas sur un
+    // choix vide qui ressemblerait à « aucun lot ».
+    const first = selectedRows.value[0]?.lot_id ?? null;
+    const shared = selectedRows.value.every((row) => (row.lot_id ?? null) === first);
+
+    lotToAssign.value = shared ? first : null;
+    assigningLot.value = true;
+}
+
+async function assignLotToSelection() {
+    if (readOnly.value || busy.value || selected.value.size === 0) {
+        return;
+    }
+
+    busy.value = true;
+
+    try {
+        const body = await request(`/api/metres/${props.metre.id}/lines/assign-lot`, 'POST', {
+            line_ids: selectedRows.value.map((row) => row.id),
+            lot_id: lotToAssign.value,
+        });
+
+        // Les lignes reviennent à jour : on remplace, on ne devine pas.
+        for (const updated of body.data ?? []) {
+            const row = rows.value.find((candidate) => candidate.id === updated.id);
+
+            if (row) {
+                Object.assign(row, clone(updated));
+            }
+        }
+
+        assigningLot.value = false;
+        selected.value = new Set();
+    } catch (e) {
+        notify(null, e.message);
+    } finally {
+        busy.value = false;
+    }
+}
+
+const lotLabel = (id) => {
+    const lot = props.lots.find((candidate) => candidate.id === id);
+
+    return lot === undefined
+        ? 'Aucun lot'
+        : [lot.code, lot.name || 'Lot sans titre'].filter((part) => part !== null && part !== '').join(' — ');
+};
+
 async function insertFromCatalogue(ids) {
     if (readOnly.value || busy.value) {
         return;
@@ -986,6 +1055,20 @@ const breadcrumbs = computed(() => [
             <button type="button" class="btn btn-secondary btn-sm" @click="toggleSelectAll">
                 {{ allVisibleSelected ? 'Tout désélectionner' : 'Tout sélectionner' }}
                 <span v-if="selected.size" class="badge badge-accent">{{ selected.size }}</span>
+            </button>
+
+            <!-- L'action de la sélection : n'apparaît que lorsqu'il y a une sélection à traiter. -->
+            <button
+                v-if="!readOnly && selected.size > 0"
+                type="button"
+                class="btn btn-accent btn-sm shrink-0"
+                :disabled="busy"
+                title="METL_Lot_AssignToSelection — poser un lot sur les lignes cochées"
+                @click="openLotAssignment"
+            >
+                <Icon name="layers" :size="3.5" />
+                Assigner un lot
+                <span class="badge badge-neutral">{{ selected.size }}</span>
             </button>
 
             <button
@@ -1672,6 +1755,77 @@ const breadcrumbs = computed(() => [
         @insert="insertFromCatalogue"
         @close="showCatalogue = false"
     />
+
+    <!-- La carte de METL_Lot_AssignToSelection : ce qui va changer, puis le lot, puis on écrit. -->
+    <Modal :show="assigningLot" max-width="2xl" @close="assigningLot = false">
+        <div class="p-5">
+            <h2 class="text-[15px] text-sand-900" style="font-variation-settings: 'wght' 600">
+                Assigner un lot
+            </h2>
+            <p class="mt-1 text-[13px] text-sand-700">
+                {{ selected.size }} ligne{{ selected.size === 1 ? '' : 's' }} sélectionnée{{ selected.size === 1 ? '' : 's' }}.
+                Le lot choisi remplace celui qu'elles portent, s'il y en a un.
+            </p>
+
+            <div class="mt-4">
+                <p class="field-label">Lot</p>
+                <div class="mt-1 max-h-48 space-y-1 overflow-y-auto pr-1">
+                    <label
+                        class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[13px] transition-colors"
+                        :class="lotToAssign === null ? 'bg-accent-100' : 'hover:bg-sand-100'"
+                    >
+                        <input v-model="lotToAssign" type="radio" :value="null" class="size-3.5" />
+                        <span class="text-sand-600">Aucun lot — détacher</span>
+                    </label>
+                    <label
+                        v-for="lot in lots"
+                        :key="lot.id"
+                        class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[13px] transition-colors"
+                        :class="lotToAssign === lot.id ? 'bg-accent-100' : 'hover:bg-sand-100'"
+                    >
+                        <input v-model="lotToAssign" type="radio" :value="lot.id" class="size-3.5" />
+                        <span v-if="lot.code !== null" class="code-chip shrink-0">{{ lot.code }}</span>
+                        <span class="min-w-0 truncate text-sand-900">{{ lot.name || 'Lot sans titre' }}</span>
+                    </label>
+                    <p v-if="lots.length === 0" class="px-2 py-3 text-[13px] text-sand-600">
+                        Ce projet n'a aucun lot. Ils se créent depuis la page du projet.
+                    </p>
+                </div>
+            </div>
+
+            <!-- La liste de la carte source : on voit ce qu'on change, avec le lot actuel de chacune. -->
+            <div class="mt-4">
+                <p class="field-label">Lignes concernées</p>
+                <div class="mt-1 max-h-56 overflow-y-auto rounded-md border border-sand-200">
+                    <div
+                        v-for="row in selectedRows"
+                        :key="row.id"
+                        class="flex items-baseline gap-2 border-b border-sand-200/70 px-2 py-1 text-xs last:border-b-0"
+                    >
+                        <span class="w-14 shrink-0 tabular-nums text-sand-600">
+                            {{ row.computed.ref_line_code ?? '—' }}
+                        </span>
+                        <span class="min-w-0 flex-1 truncate text-sand-900">
+                            {{ row.refsl_title || 'Ligne sans libellé' }}
+                        </span>
+                        <span class="shrink-0 text-[11px] text-sand-500">{{ lotLabel(row.lot_id) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-5 flex items-center justify-end gap-2">
+                <SecondaryButton :disabled="busy" @click="assigningLot = false">Annuler</SecondaryButton>
+                <button
+                    type="button"
+                    class="btn btn-accent"
+                    :disabled="busy || selected.size === 0"
+                    @click="assignLotToSelection"
+                >
+                    Assigner à {{ selected.size }} ligne{{ selected.size === 1 ? '' : 's' }}
+                </button>
+            </div>
+        </div>
+    </Modal>
 
     <GridToasts :toasts="toasts" @dismiss="dismiss" />
 </template>

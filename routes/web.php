@@ -94,6 +94,12 @@ Route::middleware('auth')->group(function () {
         Route::post('/api/metres/{metre}/lines/from-catalogue', [MetreLineDetailController::class, 'storeFromCatalogue'])
             ->name('metre-lines.store-from-catalogue');
 
+        // Le lot d'un paquet de lignes cochées, en un geste - METL_Lot_AssignToSelection. Scoped
+        // au métré de l'URL : la requête refuse une ligne qui n'est pas la sienne plutôt que de
+        // l'ignorer, sinon l'écran croirait avoir tout changé.
+        Route::post('/api/metres/{metre}/lines/assign-lot', [MetreLineDetailController::class, 'assignLot'])
+            ->name('metre-lines.assign-lot');
+
         Route::post('/api/metre-lines/{metreLine}/duplicate', [MetreLineDetailController::class, 'duplicate'])
             ->name('metre-lines.duplicate');
 

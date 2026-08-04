@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\AssignLotToMetreLinesRequest;
 use App\Http\Requests\StoreLinesFromCatalogueRequest;
 use App\Http\Requests\StoreMetreLineRequest;
 use App\Http\Requests\UpdateMetreLineRequest;
 use App\Http\Resources\MetreLineDetailResource;
+use App\Jobs\RecalculateMetreTotals;
 use App\Models\Lot;
 use App\Models\Metre;
 use App\Models\MetreLine;
@@ -204,6 +206,53 @@ class MetreLineDetailController extends Controller
                 collect($created)->map(fn (MetreLine $line) => $line->fresh(['lot']))
             )->resolve(),
         ], 201);
+    }
+
+    /**
+     * Pose un lot sur une sélection de lignes, ou le retire - METL_Lot_AssignToSelection.
+     *
+     * Le source écrit avec `Replace Field Contents` sur l'ensemble trouvé, dans une transaction
+     * ouverte à la main (Open Transaction / Revert on error / Commit), et vide la sélection après
+     * un succès. `Replace Field Contents` *est* une écriture de masse sur une colonne : c'est donc
+     * une seule requête ici aussi, et non une boucle de `save()`.
+     *
+     * Ce n'est pas qu'une affaire de coût. Passer par les modèles ferait tourner l'observateur sur
+     * chaque ligne : sa règle « pm » remettrait à vide les quantités d'une ligne pour mémoire qui en
+     * porterait encore, et chaque enregistrement mettrait un `RecalculateMetreTotals` en file -
+     * plusieurs centaines pour un « Tout sélectionner ». Une seule instruction n'écrit que la
+     * colonne visée et ne peut rien réécrire d'autre, ce qui est la propriété qu'on veut quand le
+     * geste porte sur des centaines de lignes d'argent.
+     *
+     * Le recalcul est donc demandé une fois, explicitement, et il est nécessaire : `GainOnPurchases_c`
+     * ne compte une ligne que si SON lot porte une société fournisseur (voir
+     * `RecalculateMetreTotals::aggregateLineTotals()`), donc changer de lot peut déplacer un total
+     * du métré même si aucun prix n'a bougé.
+     *
+     * Ce qui n'est pas repris du script : sa seconde écriture, `METL::LOT_Name_Stored`, le nom du
+     * lot recopié sur la ligne dans la langue du métré. La colonne existe (`lot_name_stored`) mais
+     * rien ne l'écrit ni ne la lit dans cette application - le nom affiché est dérivé du lot à la
+     * lecture, ce qui fait qu'un lot renommé se voit partout - et la remplir ici seulement
+     * mettrait les deux chemins d'écriture en désaccord. Voir la question ouverte dans CLAUDE.md.
+     */
+    public function assignLot(AssignLotToMetreLinesRequest $request, Metre $metre): JsonResponse
+    {
+        $this->assertWritable($metre);
+
+        $ids = $request->validated('line_ids');
+        $lotId = $request->validated('lot_id');
+
+        DB::transaction(function () use ($metre, $ids, $lotId) {
+            $metre->metreLines()->whereKey($ids)->update(['lot_id' => $lotId]);
+        });
+
+        // Après le commit, comme l'observateur le fait : le job ne doit pas lire l'état d'avant.
+        RecalculateMetreTotals::dispatch($metre)->afterCommit();
+
+        return response()->json([
+            'data' => MetreLineDetailResource::collection(
+                $metre->metreLines()->with('lot')->whereKey($ids)->get()
+            )->resolve(),
+        ]);
     }
 
     /**
