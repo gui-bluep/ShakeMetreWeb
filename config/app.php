@@ -63,24 +63,14 @@ return [
     | will be used by the PHP date and date-time functions. The timezone
     | is set to "UTC" by default as it is suitable for most use cases.
     |
-    */
-
-    'timezone' => 'UTC',
-
-    /*
-    |--------------------------------------------------------------------------
-    | Business Timezone
-    |--------------------------------------------------------------------------
-    |
-    | The timezone the working day is read in, distinct from `timezone` above,
-    | which stays UTC because that is what the timestamp columns are stored in.
-    | Used where a DATE column has to hold the day a person in the office would
-    | call today - the agreement date stamped when a métré is accepted. In UTC
-    | that date is still yesterday between midnight and 02:00 local time.
+    | It is also the clock a DATE gets stamped from when nobody says which day
+    | it is - see MetreController::stampAgreementDate(), whose normal source is
+    | the browser's own date. Set APP_TIMEZONE if that fallback should read as
+    | the office's day rather than UTC's.
     |
     */
 
-    'business_timezone' => env('APP_BUSINESS_TIMEZONE', 'Europe/Brussels'),
+    'timezone' => env('APP_TIMEZONE', 'UTC'),
 
     /*
     |--------------------------------------------------------------------------

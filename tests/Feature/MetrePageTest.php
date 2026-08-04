@@ -220,19 +220,33 @@ class MetrePageTest extends TestCase
     // --- the agreement date follows acceptance ---------------------------------------------
 
     /**
-     * Ticking "Accepté" stamps the date of the agreement, because the day somebody says yes is
-     * the day the box gets ticked - typing it by hand right afterwards was a second gesture for
-     * information the application already had.
-     *
-     * Stamped in the business timezone rather than the app's UTC: between midnight and 02:00
-     * local, UTC is still yesterday and the date would read as the wrong day.
+     * The normal path: the page sends the day the person ticking the box is living in, read from
+     * their browser, and it is stored as-is. Only their machine knows that date - the server may
+     * be in another timezone, and it is not the one anybody would put on an agreement.
      */
-    public function test_accepting_a_metre_stamps_todays_agreement_date(): void
+    public function test_the_date_the_page_sends_with_the_flag_is_the_one_stored(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre(['is_accepted_b' => false]);
+
+        $this->patchJson("/api/metres/{$metre->id}", [
+            'is_accepted_b' => true,
+            'date_agreement' => '2026-01-20',
+        ])->assertOk()->assertJsonPath('data.date_agreement', '2026-01-20');
+
+        $this->assertSame('2026-01-20', $metre->fresh()->date_agreement->toDateString());
+    }
+
+    /**
+     * The fallback, for a caller that ticks the flag without saying which day it is: the server's
+     * own clock, config('app.timezone').
+     */
+    public function test_accepting_without_a_date_stamps_the_servers_today(): void
     {
         $this->actAsWriter();
         $metre = $this->metre(['is_accepted_b' => false, 'date_agreement' => null]);
 
-        $today = now()->setTimezone(config('app.business_timezone'))->toDateString();
+        $today = now()->toDateString();
 
         $this->patchJson("/api/metres/{$metre->id}", ['is_accepted_b' => true])
             ->assertOk()
@@ -266,10 +280,7 @@ class MetrePageTest extends TestCase
         $this->patchJson("/api/metres/{$metre->id}", ['is_accepted_b' => false])->assertOk();
         $this->patchJson("/api/metres/{$metre->id}", ['is_accepted_b' => true])->assertOk();
 
-        $this->assertSame(
-            now()->setTimezone(config('app.business_timezone'))->toDateString(),
-            $metre->fresh()->date_agreement->toDateString(),
-        );
+        $this->assertSame(now()->toDateString(), $metre->fresh()->date_agreement->toDateString());
     }
 
     /**
@@ -285,23 +296,6 @@ class MetrePageTest extends TestCase
         $this->patchJson("/api/metres/{$metre->id}", ['date_agreement' => '2026-02-10'])->assertOk();
 
         $this->assertSame('2026-02-10', $metre->fresh()->date_agreement->toDateString());
-    }
-
-    /**
-     * The page batches a row's edits into one PATCH, so ticking the box and typing a date within
-     * the same debounce window arrive together. An explicit value is a decision and wins.
-     */
-    public function test_a_date_sent_with_the_flag_wins_over_the_stamp(): void
-    {
-        $this->actAsWriter();
-        $metre = $this->metre(['is_accepted_b' => false]);
-
-        $this->patchJson("/api/metres/{$metre->id}", [
-            'is_accepted_b' => true,
-            'date_agreement' => '2026-01-20',
-        ])->assertOk();
-
-        $this->assertSame('2026-01-20', $metre->fresh()->date_agreement->toDateString());
     }
 
     /**

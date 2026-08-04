@@ -83,8 +83,13 @@ class MetreController extends Controller
      * Only on the transition, hence isDirty: a PATCH on an already-accepted métré that touches
      * something else must not silently move its agreement date to today.
      *
-     * Stamped in the business timezone, not the app's UTC: between midnight and 02:00 local,
-     * UTC is still yesterday, and this is a date a person reads as "the day we agreed".
+     * WHICH "today" - the point of the third rule above. The date that belongs on an agreement
+     * is the day of the person who ticked the box, and only their browser knows that, so the
+     * page sends it (localToday(), Metres/Show.vue) and this method stands aside. What is left
+     * here is the fallback for a caller that ticks the flag without saying which day it is: the
+     * server's own clock, config('app.timezone'). Set APP_TIMEZONE if that clock should read as
+     * the office's rather than UTC - it is the fallback's only source of truth, and in UTC a
+     * date stamped just after midnight in Brussels reads as the day before.
      */
     private function stampAgreementDate(UpdateMetreRequest $request, Metre $metre): void
     {
@@ -92,9 +97,7 @@ class MetreController extends Controller
             return;
         }
 
-        $metre->date_agreement = $metre->is_accepted_b
-            ? now()->setTimezone(config('app.business_timezone'))->toDateString()
-            : null;
+        $metre->date_agreement = $metre->is_accepted_b ? now()->toDateString() : null;
     }
 
     /**
