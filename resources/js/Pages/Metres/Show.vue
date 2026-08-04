@@ -84,8 +84,11 @@ function text(field, raw) {
 }
 
 /**
- * The two status flags gate the stored totals server-side, so the response carries recomputed
- * figures - applied here rather than left until the next page load.
+ * Les deux drapeaux conditionnent les totaux stockés côté serveur, donc l'enregistrement est
+ * envoyé tout de suite au lieu d'attendre les 500 ms et la réponse est réappliquée en entier.
+ *
+ * Les quatre tuiles, elles, ne bougent pas avec les drapeaux : elles lisent les colonnes non
+ * conditionnées (voir MetreController::payload()).
  */
 async function toggle(field, checked) {
     edit(field, checked);

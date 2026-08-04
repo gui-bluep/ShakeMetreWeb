@@ -115,16 +115,24 @@ class MetrePageTest extends TestCase
      * The four totals on this screen map by source field name: achats = Buy, ventes = Sales,
      * commandes = Ordered, gains = Gain. Note "commandes" is a different column here than on
      * the project page - intentional, confirmed, and pinned so nobody aligns them by accident.
+     *
+     * They come from the UNGATED Total_*_METL_Stored columns, which is why the gated Tot_Sum_*
+     * values below - deliberately different numbers - are not what shows.
      */
     public function test_the_totals_map_by_source_field_name(): void
     {
         $this->actAsWriter();
 
         $metre = $this->metre([
-            'tot_sum_total_buy_stored' => 700,
-            'tot_sum_total_sales_stored' => 1000,
-            'tot_sum_total_ordered_stored' => 900,
-            'tot_sum_total_gain_stored' => 100,
+            'total_purchase_metl_stored' => 700,
+            'total_sales_metl_stored' => 1000,
+            'total_ordered_metl_stored' => 900,
+            'total_gain_metl_stored' => 100,
+
+            'tot_sum_total_buy_stored' => 1,
+            'tot_sum_total_sales_stored' => 2,
+            'tot_sum_total_ordered_stored' => 3,
+            'tot_sum_total_gain_stored' => 4,
         ]);
 
         $this->get("/metres/{$metre->id}")
@@ -133,6 +141,37 @@ class MetrePageTest extends TestCase
                 ->where('metre.totals.sales', 1000)
                 ->where('metre.totals.ordered', 900)
                 ->where('metre.totals.gain', 100));
+    }
+
+    /**
+     * The screen shows what the lines add up to whether or not the two flags are set. It used to
+     * read the gated columns, so a métré that was neither accepted nor on site displayed four
+     * empty tiles - which reads as a broken page, not as "nothing is committed yet".
+     */
+    public function test_the_totals_are_shown_even_when_neither_flag_is_set(): void
+    {
+        $this->actAsWriter();
+
+        $metre = $this->metre(['is_accepted_b' => false, 'is_status_site_b' => false]);
+        $this->line($metre, [
+            'quantity' => 2, 'price_buy' => 50, 'price_sales' => 100,
+            'quantity_ordered' => 2, 'price_ordered' => 80,
+        ]);
+
+        (new RecalculateMetreTotals($metre))->handle();
+
+        // Every gated column is empty, as its own formula requires...
+        $metre->refresh();
+        $this->assertNull($metre->tot_sum_total_buy_stored);
+        $this->assertNull($metre->tot_sum_total_sales_stored);
+
+        // ...and the page shows the figures anyway.
+        $this->get("/metres/{$metre->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('metre.totals.purchases', 100)
+                ->where('metre.totals.sales', 200)
+                ->where('metre.totals.ordered', 160)
+                ->where('metre.totals.gain', 40));
     }
 
     public function test_the_page_reports_how_many_lines_would_be_destroyed(): void
@@ -211,6 +250,8 @@ class MetrePageTest extends TestCase
     /**
      * isAccepted_b gates Tot_Sum_TotalBuy and isStatus_Site_b gates Sales/Ordered/Gain, so the
      * flags are inputs to those sums - flipping one without recomputing leaves every total wrong.
+     * Asserted on the columns rather than on the response, since what this page displays comes
+     * from the ungated set and does not move when a flag does.
      */
     public function test_flipping_the_site_flag_recomputes_the_totals(): void
     {
@@ -224,7 +265,7 @@ class MetrePageTest extends TestCase
 
         $response = $this->patchJson("/api/metres/{$metre->id}", ['is_status_site_b' => true]);
 
-        $response->assertOk()->assertJsonPath('data.totals.sales', 200);
+        $response->assertOk();
         $this->assertEquals(200, $metre->fresh()->tot_sum_total_sales_stored);
     }
 
@@ -234,9 +275,9 @@ class MetrePageTest extends TestCase
         $metre = $this->metre(['is_accepted_b' => false]);
         $this->line($metre, ['quantity' => 2, 'price_buy' => 50]);
 
-        $this->patchJson("/api/metres/{$metre->id}", ['is_accepted_b' => true])
-            ->assertOk()
-            ->assertJsonPath('data.totals.purchases', 100);
+        $this->patchJson("/api/metres/{$metre->id}", ['is_accepted_b' => true])->assertOk();
+
+        $this->assertEquals(100, $metre->fresh()->tot_sum_total_buy_stored);
     }
 
     public function test_a_readonly_account_cannot_edit(): void
@@ -344,6 +385,9 @@ class MetrePageTest extends TestCase
      * The consequence of not copying acceptance: Tot_Sum_TotalBuy is gated on isAccepted_b, so
      * a fresh duplicate has no purchase total until somebody accepts it. Pinned so it is not
      * mistaken for a broken recalculation later.
+     *
+     * That empty column now shows on the project page's roll-up and in the portal replica only -
+     * the métré page reads the ungated Total_Purchase_METL_Stored and shows the figure.
      */
     public function test_a_duplicate_has_no_purchase_total_until_it_is_accepted(): void
     {

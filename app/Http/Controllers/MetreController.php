@@ -221,15 +221,23 @@ class MetreController extends Controller
              * The four totals, mapped by the source field names per the ruling on this screen:
              * achats = Buy, ventes = Sales, commandes = Ordered, gains = Gain.
              *
-             * Note "commandes" here is Tot_Sum_TotalOrdered_Stored, while the SAME word on the
-             * project page means Tot_Sum_TotalSales_Stored. That divergence is intentional and
-             * confirmed - do not "fix" one to match the other without asking.
+             * Note "commandes" here is Ordered, while the SAME word on the project page means
+             * Sales. That divergence is intentional and confirmed - do not "fix" one to match
+             * the other without asking.
+             *
+             * Read from the UNGATED Total_*_METL_Stored columns, not from their Tot_Sum_*
+             * counterparts, which are the same sums gated on isAccepted_b (Buy) and
+             * IsStatus_Site_b (Sales/Ordered/Gain). Requested by the user, and right for this
+             * screen: this is where a métré is worked on, and it showed four empty tiles until
+             * somebody ticked "Accepté" and "Site" - which reads as a broken page rather than as
+             * "nothing is committed yet". The gated columns still answer that second question,
+             * on the project page's roll-up and in the ShakeDesign portal replica.
              */
             'totals' => [
-                'purchases' => $this->decimal($metre->tot_sum_total_buy_stored),
-                'sales' => $this->decimal($metre->tot_sum_total_sales_stored),
-                'ordered' => $this->decimal($metre->tot_sum_total_ordered_stored),
-                'gain' => $this->decimal($metre->tot_sum_total_gain_stored),
+                'purchases' => $this->decimal($metre->total_purchase_metl_stored),
+                'sales' => $this->decimal($metre->total_sales_metl_stored),
+                'ordered' => $this->decimal($metre->total_ordered_metl_stored),
+                'gain' => $this->decimal($metre->total_gain_metl_stored),
             ],
         ];
     }

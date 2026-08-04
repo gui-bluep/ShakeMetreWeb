@@ -104,28 +104,34 @@ class RecalculateMetreTotals implements ShouldBeUniqueUntilProcessing, ShouldQue
             'tot_sum_total_sales_offer_stored' => (float) $lineTotals->sales_no_options,
 
             /*
-             * MET_Metre::Total_Sales_METL_Stored and Total_Purchase_METL_Stored - the two
-             * inputs, and the only consumers, of Ratio_c (see Metre::ratio()).
+             * MET_Metre::Total_{Sales,Purchase,Ordered,Gain}_METL_Stored - the UNGATED set:
+             * what the lines add up to, full stop. Two consumers: Ratio_c (Sales / Purchase,
+             * see Metre::ratio()) and the four totals of the métré page.
              *
-             * WRITTEN ON AN ASSUMPTION, stated here because there is no formula behind it: both
-             * are plain Normal fields, the export gives them no calculation, and no other
-             * calculation reads them - a script maintained them and script bodies are absent.
+             * WRITTEN ON AN ASSUMPTION, stated here because there is no formula behind it: all
+             * four are plain Normal fields, the export gives them no calculation, and only
+             * Ratio_c reads any of them - a script maintained them and script bodies are absent.
              * Until now nothing wrote them, so Ratio_c had two empty operands and the métré
-             * ratio was empty on every screen that shows it, which is what surfaced this.
+             * ratio was empty on every screen showing it, which is what surfaced this.
              *
-             * The assumption is the one the field names make: the sum of the lines' sales and
-             * the sum of the lines' purchases, over the same PriceTotal*_noOptions_c
-             * expressions as every other total here. It matches the line-level ratio the
-             * application already computes (price_sales / price_buy) - a métré's ratio is that
-             * same figure over the whole métré.
+             * The assumption is the one the field names make: the sums of the lines' sales,
+             * purchases, orders and gain, over the same PriceTotal*_noOptions_c expressions as
+             * every other total here, so options are excluded exactly as they are elsewhere. It
+             * matches the line-level ratio the application already computes (price_sales /
+             * price_buy) - a métré's ratio is that same figure over the whole métré.
              *
-             * Deliberately ungated, unlike Tot_Sum_TotalBuy (isAccepted_b) and its siblings
-             * (IsStatus_Site_b): the gates answer "how much is agreed / on site", whereas a
-             * ratio is a property of what the métré says, and a margin that disappears until
-             * somebody ticks a box would read as a broken column.
+             * Ungated on purpose, unlike Tot_Sum_TotalBuy (isAccepted_b) and its siblings
+             * (IsStatus_Site_b). Those gates answer "how much is agreed, how much is on site",
+             * which is a question about commitments; these four answer "what does this métré
+             * add up to", which has an answer from the first line entered. That is what the
+             * métré page needs: it is the screen you work ON a métré from, and a screen that
+             * shows nothing until two boxes are ticked reads as broken. The gated columns stay
+             * exactly as they are for the project page's roll-up and the ShakeDesign portal.
              */
             'total_sales_metl_stored' => (float) $lineTotals->sales_no_options,
             'total_purchase_metl_stored' => (float) $lineTotals->buy_no_options,
+            'total_ordered_metl_stored' => (float) $lineTotals->ordered_no_options,
+            'total_gain_metl_stored' => (float) $lineTotals->gain_no_options,
 
             // MET_Metre::PROG_ProgressClientTotal_Amount_Valid_Stored_c
             //   PROG_ProgressClientTotal_Amount_Stored * isAccepted_b
@@ -242,10 +248,8 @@ class RecalculateMetreTotals implements ShouldBeUniqueUntilProcessing, ShouldQue
      *     Plain Normal fields written by the MET_UpdateStoredCalcs_PROG script, whose steps
      *     are absent from the export. Read as inputs above, never written.
      *
-     *   Total_Ordered_METL_Stored, Total_Gain_METL_Stored
-     *     Plain Normal fields with no formula anywhere, and unlike the two _METL_ columns
-     *     written above, nothing consumes them either - no calculation, no screen. Writing
-     *     them would be a guess with nothing depending on the answer, so they stay empty.
+     * The four Total_*_METL_Stored columns ARE written above, on an assumption spelled out
+     * there. They were on this list until the métré page needed ungated figures.
      *
      * The MET_Metre / METL_MetreLines `zsm_*` Summary fields have no columns at all: they are
      * found-set aggregates (portal, list and report totals evaluated at display time), so
