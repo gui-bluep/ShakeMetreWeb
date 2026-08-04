@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreLinesFromCatalogueRequest;
 use App\Http\Requests\UpdateMetreLineRequest;
 use App\Http\Resources\MetreLineDetailResource;
 use App\Models\Lot;
 use App\Models\Metre;
 use App\Models\MetreLine;
 use App\Models\MetreLineComponent;
+use App\Models\SubReferenceLine;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -47,6 +49,16 @@ class MetreLineDetailController extends Controller
     {
         $lines = $metre->metreLines()
             ->with('lot')
+            /*
+             * L'ordre d'affichage d'un métré, celui de METL_Sort : section, sous-section, puis
+             * rang dans la sous-section (REF_Code, REFS_Code, REFS_Title, Order). Les lignes sans
+             * section passent à la fin et gardent leur propre ordre - `sort_order` reste le rang
+             * libre d'une ligne dans le métré, et sert ici de départage.
+             *
+             * `ref_code is null` en tête du ORDER BY plutôt qu'un NULLS LAST : l'expression doit
+             * dire la même chose sur MySQL et sur SQLite.
+             */
+            ->orderByRaw('ref_code is null, ref_code, refs_code, refs_title, ref_order')
             ->orderBy('sort_order')
             ->orderBy('sequence_number')
             ->get();
@@ -93,6 +105,91 @@ class MetreLineDetailController extends Controller
 
         return response()->json([
             'data' => (new MetreLineDetailResource($line->fresh(['lot'])))->resolve(),
+        ], 201);
+    }
+
+    /**
+     * Creates one line per chosen catalogue item - METL_New_Multi, which is how a métré is
+     * actually filled in the FileMaker application.
+     *
+     * For each REFSL the source reads, in this order: its parent REFS and grandparent REF, then
+     * REF.Code and REF's localised title, REFS.Code and REFS's localised title, the item's own
+     * localised title, its Unit and its Price - then calls METL_New with all of it. METL_New
+     * writes the four section values, the title, the unit, and the price into **PriceBuy**: the
+     * catalogue is a purchase-price book, and nothing in it feeds the client price.
+     *
+     * The four values are copied, not linked - see MetreLineObserver::syncSectionSnapshot(). The
+     * foreign keys are set as well, which the source does not do, purely as provenance: knowing
+     * which catalogue entry a line came from is what a later "push this price back to the
+     * catalogue" needs, and nothing reads them to display a line.
+     *
+     * Items are inserted in the order they were chosen, and each lands at the end of its own
+     * section, so choosing three items of two different sections files them under both.
+     */
+    public function storeFromCatalogue(StoreLinesFromCatalogueRequest $request, Metre $metre): JsonResponse
+    {
+        $this->assertWritable($metre);
+
+        $items = SubReferenceLine::query()
+            ->with(['reference', 'subReference'])
+            ->whereKey($request->validated('sub_reference_line_ids'))
+            ->get()
+            ->keyBy('id');
+
+        $created = DB::transaction(function () use ($request, $metre, $items) {
+            $lines = [];
+            $sortOrder = (int) $metre->metreLines()->max('sort_order');
+
+            // The requested order, not the query's: a user who picked three items expects them
+            // in the order they picked them.
+            foreach ($request->validated('sub_reference_line_ids') as $id) {
+                $item = $items[$id] ?? null;
+
+                if ($item === null) {
+                    continue;
+                }
+
+                $line = new MetreLine;
+                $line->metre_id = $metre->getKey();
+                $line->sort_order = ++$sortOrder;
+
+                // Provenance only. The observer copies the section from these two.
+                $line->reference_id = $item->reference_id;
+                $line->sub_reference_id = $item->sub_reference_id;
+                $line->sub_reference_line_id = $item->getKey();
+
+                /*
+                 * Le libellé va dans les DEUX champs, et c'est un pont assumé, pas une étourderie.
+                 *
+                 * Dans le fichier réel, le titre d'une ligne est REFSL_Title : rempli sur 57 079
+                 * des 57 809 lignes, tandis que Description ne l'est que sur 29 - et y sert de
+                 * note libre (« 1374,07 € selon offre Collignon »). METL_NewFromREF place
+                 * d'ailleurs le curseur dans REFSL_Title après création.
+                 *
+                 * Or les deux grilles web éditent `description` comme titre de ligne. Écrire les
+                 * deux donne une ligne lisible aujourd'hui sans reconstruire ces écrans : la copie
+                 * du catalogue reste dans refsl_title, ce que la ligne dit maintenant est dans
+                 * description. Rebrancher le titre des grilles sur refsl_title est une décision à
+                 * prendre - elle change ce que la colonne « Titre » écrit - et l'import des 57 809
+                 * lignes en dépend.
+                 */
+                $line->refsl_title = $item->localisedTitle($metre->language);
+                $line->description = $line->refsl_title;
+                $line->unit = $item->unit;
+                $line->price_buy = $item->price;
+
+                $line->save();
+
+                $lines[] = $line;
+            }
+
+            return $lines;
+        });
+
+        return response()->json([
+            'data' => MetreLineDetailResource::collection(
+                collect($created)->map(fn (MetreLine $line) => $line->fresh(['lot']))
+            )->resolve(),
         ], 201);
     }
 

@@ -6,8 +6,12 @@ use App\Models\Lot;
 use App\Models\Metre;
 use App\Models\MetreLine;
 use App\Models\MetreLineComponent;
+use App\Models\Reference;
+use App\Models\SubReference;
+use App\Models\SubReferenceLine;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -356,6 +360,221 @@ class MetreLineDetailViewTest extends TestCase
     }
 
     // --- create / duplicate / delete ---------------------------------------------------------
+
+    // --- the reference catalogue -----------------------------------------------------------
+
+    /**
+     * How a métré is actually filled in the FileMaker application (METL_New_Multi): one line per
+     * chosen catalogue item, carrying its localised title, its unit and its price - and the price
+     * lands on PriceBuy, because the catalogue is a purchase-price book.
+     *
+     * The figures below are the shape of the real data: reference "SOLS" code 20, sub-reference
+     * "Carrelage" code 8, an item priced per m2.
+     */
+    public function test_it_creates_one_line_per_catalogue_item(): void
+    {
+        $this->actAsWriter();
+        [$reference, $subReference, $item] = $this->catalogue();
+
+        $response = $this->postJson("/api/metres/{$this->metre->id}/lines/from-catalogue", [
+            'sub_reference_line_ids' => [$item->id],
+        ])->assertCreated();
+
+        $response->assertJsonPath('data.0.refsl_title', 'Carrelage 30x30')
+            // Le titre du catalogue atterrit aussi dans `description`, que les deux grilles
+            // éditent comme titre de ligne - pont assumé, voir le contrôleur.
+            ->assertJsonPath('data.0.description', 'Carrelage 30x30')
+            ->assertJsonPath('data.0.unit', 'm2')
+            ->assertJsonPath('data.0.price_buy', 48.5)
+            // La section est recopiée sur la ligne, pas jointe.
+            ->assertJsonPath('data.0.ref_code', 20)
+            ->assertJsonPath('data.0.ref_title', 'SOLS')
+            ->assertJsonPath('data.0.refs_code', 8)
+            ->assertJsonPath('data.0.refs_title', 'Carrelage')
+            // METL::REFSL_Code_c
+            ->assertJsonPath('data.0.computed.ref_line_code', '20.8.1');
+
+        $line = MetreLine::sole();
+        $this->assertSame($reference->id, $line->reference_id, 'la provenance est conservée');
+        $this->assertSame($subReference->id, $line->sub_reference_id);
+        $this->assertSame($item->id, $line->sub_reference_line_id);
+        $this->assertSame(1, (int) $line->ref_order);
+    }
+
+    /**
+     * The rank counts inside one section, from 1, and is the third component of the code. Two
+     * items of the same sub-section give 1 and 2; an item of another sub-section starts again
+     * at 1, which is what makes "20.8.1" and "20.2.1" two different lines.
+     */
+    public function test_the_rank_counts_within_the_section(): void
+    {
+        $this->actAsWriter();
+        [$reference, $subReference, $item] = $this->catalogue();
+
+        $other = SubReference::forceCreate([
+            'reference_id' => $reference->id, 'code' => 2, 'title_fr' => 'Sols souples',
+        ]);
+        $otherItem = SubReferenceLine::forceCreate([
+            'sub_reference_id' => $other->id, 'reference_id' => $reference->id,
+            'code' => 1, 'title_fr' => 'Linoléum', 'unit' => 'm2', 'price' => 30,
+        ]);
+
+        $this->postJson("/api/metres/{$this->metre->id}/lines/from-catalogue", [
+            'sub_reference_line_ids' => [$item->id, $item->id, $otherItem->id],
+        ])->assertCreated()
+            ->assertJsonPath('data.0.computed.ref_line_code', '20.8.1')
+            // Le même article deux fois : deux lignes, deux rangs.
+            ->assertJsonPath('data.1.computed.ref_line_code', '20.8.2')
+            // Une autre sous-section repart à 1.
+            ->assertJsonPath('data.2.computed.ref_line_code', '20.2.1');
+    }
+
+    /**
+     * The title is copied in the MÉTRÉ's language, not the interface's - a métré is a document
+     * with a language of its own. The source read a UI global instead, so the same item entered
+     * the same day landed in French or in English depending on who was looking.
+     */
+    public function test_the_title_is_copied_in_the_metres_language(): void
+    {
+        $this->actAsWriter();
+        [, , $item] = $this->catalogue();
+        $this->metre->forceFill(['language' => 'EN'])->save();
+
+        $this->postJson("/api/metres/{$this->metre->id}/lines/from-catalogue", [
+            'sub_reference_line_ids' => [$item->id],
+        ])->assertCreated()
+            ->assertJsonPath('data.0.refsl_title', 'Tiles 30x30')
+            ->assertJsonPath('data.0.ref_title', 'FLOOR')
+            ->assertJsonPath('data.0.refs_title', 'Tiles');
+    }
+
+    /**
+     * Title_NL is empty on all 19 references, all 118 sub-references and all 507 items of the
+     * live file, so the source formula yields an empty section title for a Dutch métré. It falls
+     * back here: an empty heading on a client document is worse than a French one.
+     */
+    public function test_a_missing_translation_falls_back_rather_than_blanking_the_title(): void
+    {
+        $this->actAsWriter();
+        [, , $item] = $this->catalogue();
+        $this->metre->forceFill(['language' => 'NL'])->save();
+
+        $this->postJson("/api/metres/{$this->metre->id}/lines/from-catalogue", [
+            'sub_reference_line_ids' => [$item->id],
+        ])->assertCreated()->assertJsonPath('data.0.ref_title', 'SOLS');
+    }
+
+    /** The catalogue never becomes a way around the two guards on writing lines. */
+    public function test_a_locked_metre_and_a_readonly_account_refuse_catalogue_insertion(): void
+    {
+        [, , $item] = $this->catalogue();
+        $payload = ['sub_reference_line_ids' => [$item->id]];
+
+        $this->actAsWriter();
+        $this->metre->forceFill(['is_locked_b' => true])->save();
+        $this->postJson("/api/metres/{$this->metre->id}/lines/from-catalogue", $payload)->assertStatus(423);
+        $this->metre->forceFill(['is_locked_b' => false])->save();
+
+        $this->actingAs(User::factory()->readOnly()->create());
+        $this->postJson("/api/metres/{$this->metre->id}/lines/from-catalogue", $payload)->assertStatus(403);
+
+        $this->assertSame(0, MetreLine::count());
+    }
+
+    public function test_an_unknown_catalogue_item_is_rejected(): void
+    {
+        $this->actAsWriter();
+
+        $this->postJson("/api/metres/{$this->metre->id}/lines/from-catalogue", [
+            'sub_reference_line_ids' => [(string) Str::uuid()],
+        ])->assertStatus(422)->assertJsonValidationErrors('sub_reference_line_ids.0');
+
+        $this->postJson("/api/metres/{$this->metre->id}/lines/from-catalogue", [
+            'sub_reference_line_ids' => [],
+        ])->assertStatus(422)->assertJsonValidationErrors('sub_reference_line_ids');
+    }
+
+    /**
+     * A line's section, its title and its rank are a snapshot: renaming the catalogue entry
+     * afterwards must not rewrite a métré that may already have been sent to a client. That is
+     * the whole reason the source copies instead of linking.
+     */
+    public function test_renaming_a_catalogue_entry_leaves_existing_lines_alone(): void
+    {
+        $this->actAsWriter();
+        [$reference, , $item] = $this->catalogue();
+
+        $this->postJson("/api/metres/{$this->metre->id}/lines/from-catalogue", [
+            'sub_reference_line_ids' => [$item->id],
+        ])->assertCreated();
+
+        $reference->forceFill(['title_fr' => 'REVÊTEMENTS DE SOL', 'code' => 21])->save();
+        $item->forceFill(['title_fr' => 'Carrelage 60x60', 'price' => 99])->save();
+
+        $line = MetreLine::sole();
+        $this->assertSame('SOLS', $line->ref_title);
+        $this->assertSame(20, (int) $line->ref_code);
+        $this->assertSame('Carrelage 30x30', $line->refsl_title);
+        $this->assertEquals(48.5, $line->price_buy);
+        $this->assertSame('20.8.1', $line->refLineCode());
+    }
+
+    /** The catalogue is readable by anyone who may see a métré, including a readonly account. */
+    public function test_the_catalogue_is_served_as_a_three_level_tree(): void
+    {
+        $this->actingAs(User::factory()->readOnly()->create());
+        $this->catalogue();
+
+        $this->getJson('/api/references/catalogue')
+            ->assertOk()
+            ->assertJsonPath('data.0.code', 20)
+            ->assertJsonPath('data.0.title', 'SOLS')
+            ->assertJsonPath('data.0.sub_references.0.code', 8)
+            ->assertJsonPath('data.0.sub_references.0.title', 'Carrelage')
+            ->assertJsonPath('data.0.sub_references.0.lines.0.title', 'Carrelage 30x30')
+            ->assertJsonPath('data.0.sub_references.0.lines.0.unit', 'm2')
+            ->assertJsonPath('data.0.sub_references.0.lines.0.price', 48.5);
+    }
+
+    /**
+     * The order a métré's lines are listed in is METL_Sort's: section, sub-section, then rank.
+     * Not the order they were created in - a line added to section 20 belongs under 20, above
+     * everything in section 60, however late it was typed.
+     */
+    public function test_the_lines_are_listed_in_section_order(): void
+    {
+        $this->actAsWriter();
+        $this->line(['description' => 'sans section', 'sort_order' => 1]);
+        $this->line(['description' => 'électricité', 'ref_code' => 60, 'refs_code' => 4, 'ref_order' => 1, 'sort_order' => 2]);
+        $this->line(['description' => 'sols, rang 2', 'ref_code' => 20, 'refs_code' => 8, 'ref_order' => 2, 'sort_order' => 3]);
+        $this->line(['description' => 'sols, rang 1', 'ref_code' => 20, 'refs_code' => 8, 'ref_order' => 1, 'sort_order' => 4]);
+
+        $this->get($this->url())->assertInertia(fn ($page) => $page
+            ->where('lines.0.description', 'sols, rang 1')
+            ->where('lines.1.description', 'sols, rang 2')
+            ->where('lines.2.description', 'électricité')
+            // Les lignes sans section passent à la fin, pas en tête.
+            ->where('lines.3.description', 'sans section')
+            ->etc());
+    }
+
+    /**
+     * @return array{0: Reference, 1: SubReference, 2: SubReferenceLine}
+     */
+    private function catalogue(): array
+    {
+        $reference = Reference::forceCreate(['code' => 20, 'title_fr' => 'SOLS', 'title_en' => 'FLOOR']);
+        $subReference = SubReference::forceCreate([
+            'reference_id' => $reference->id, 'code' => 8, 'title_fr' => 'Carrelage', 'title_en' => 'Tiles',
+        ]);
+        $item = SubReferenceLine::forceCreate([
+            'sub_reference_id' => $subReference->id, 'reference_id' => $reference->id,
+            'code' => 1, 'title_fr' => 'Carrelage 30x30', 'title_en' => 'Tiles 30x30',
+            'unit' => 'm2', 'price' => 48.5,
+        ]);
+
+        return [$reference, $subReference, $item];
+    }
 
     public function test_it_appends_an_empty_line(): void
     {

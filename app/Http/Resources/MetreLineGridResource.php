@@ -26,6 +26,18 @@ class MetreLineGridResource extends JsonResource
             // Editable.
             'reference_id' => $this->reference_id,
             'sub_reference_id' => $this->sub_reference_id,
+
+            /*
+             * La section de la ligne, recopiée sur la ligne elle-même : c'est ainsi que la source
+             * fonctionne (les clés étrangères vers le catalogue sont vides sur les 57 809 lignes
+             * du fichier réel). Voir MetreLineObserver::syncSectionSnapshot().
+             */
+            'ref_code' => $this->ref_code,
+            'ref_title' => $this->ref_title,
+            'refs_code' => $this->refs_code,
+            'refs_title' => $this->refs_title,
+            'refsl_title' => $this->refsl_title,
+
             'description' => $this->description,
             'quantity' => $this->number($this->quantity),
             'quantity_ordered' => $this->number($this->quantity_ordered),
@@ -44,6 +56,9 @@ class MetreLineGridResource extends JsonResource
              */
             'computed' => [
                 'price_ratio' => $this->price_ratio,
+
+                // METL::REFSL_Code_c - « 20.2.2 », recalculé plutôt que lu (MetreLine::refLineCode()).
+                'ref_line_code' => $this->refLineCode(),
                 'price_total_buy_no_options' => $this->price_total_buy_no_options,
                 'price_total_sales_no_options' => $this->price_total_sales_no_options,
                 'price_total_ordered_no_options' => $this->price_total_ordered_no_options,

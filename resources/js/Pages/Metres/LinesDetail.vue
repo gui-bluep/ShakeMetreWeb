@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import AppTopBar from '@/Components/AppTopBar.vue';
 import GridToasts from '@/Components/GridToasts.vue';
+import ReferenceCatalogueModal from '@/Components/ReferenceCatalogueModal.vue';
 import Icon from '@/Components/Icon.vue';
 import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
 
@@ -259,6 +260,34 @@ async function addLine() {
     }
 }
 
+/**
+ * « Depuis le catalogue » — METL_New_Multi : une ligne par article coché, avec son libellé, son
+ * unité et son prix d'achat. Le serveur recopie la section sur chaque ligne et lui attribue son
+ * rang ; les lignes reviennent dans la réponse et sont ajoutées telles quelles, sans recharger.
+ */
+const showCatalogue = ref(false);
+
+async function insertFromCatalogue(ids) {
+    if (readOnly.value || busy.value) {
+        return;
+    }
+
+    busy.value = true;
+
+    try {
+        const body = await request(`/api/metres/${props.metre.id}/lines/from-catalogue`, 'POST', {
+            sub_reference_line_ids: ids,
+        });
+
+        rows.value.push(...(body.data ?? []).map(clone));
+        showCatalogue.value = false;
+    } catch (e) {
+        notify(null, e.message);
+    } finally {
+        busy.value = false;
+    }
+}
+
 async function duplicateLine(row) {
     popover.value = null;
 
@@ -418,6 +447,7 @@ const sharedQuantity = showRatio;
 
 /** Column widths, so the header and the rows stay aligned across the horizontal scroll. */
 const TEMPLATE = computed(() => [
+    '4.5rem',                               // code de ligne (REF.REFS.rang)
     'minmax(15rem, 1.4fr)',                 // titre
     '2.5rem', '2.5rem',                     // est. / option
     '5.5rem',                               // unité
@@ -440,7 +470,7 @@ const TEMPLATE = computed(() => [
  * colonnes et traînerait un défilement horizontal sur du vide.
  */
 const minWidth = computed(
-    () => `${92 - 18 * (3 - blocks.value.length) - (showRatio.value ? 0 : 4)}rem`
+    () => `${96.5 - 18 * (3 - blocks.value.length) - (showRatio.value ? 0 : 4)}rem`
 );
 
 /** Le titre de chaque vue, celui-là même que la page du métré affiche dans sa liste. */
@@ -520,6 +550,18 @@ const breadcrumbs = computed(() => [
             <button
                 v-if="!readOnly"
                 type="button"
+                class="btn btn-secondary btn-sm"
+                :disabled="busy"
+                title="Choisir des articles du référentiel : libellé, unité et prix d'achat repris"
+                @click="showCatalogue = true"
+            >
+                <Icon name="table" :size="3.5" />
+                Catalogue
+            </button>
+
+            <button
+                v-if="!readOnly"
+                type="button"
                 class="btn btn-accent btn-sm"
                 :disabled="busy"
                 @click="addLine"
@@ -545,6 +587,7 @@ const breadcrumbs = computed(() => [
                         class="grid text-[10px] uppercase tracking-[0.06em]"
                         :style="{ gridTemplateColumns: TEMPLATE, fontVariationSettings: `'wght' 650` }"
                     >
+                        <div />
                         <div class="px-1.5 py-1" />
                         <div class="col-span-3" />
                         <template v-for="block in blocks" :key="block.key">
@@ -563,6 +606,9 @@ const breadcrumbs = computed(() => [
                         class="grid bg-sand-100 text-[10px] uppercase tracking-[0.06em] text-sand-600"
                         :style="{ gridTemplateColumns: TEMPLATE, fontVariationSettings: `'wght' 600` }"
                     >
+                        <!-- METL::REFSL_Code_c — section.sous-section.rang, calculé (voir
+                             MetreLine::refLineCode()). -->
+                        <div class="px-1.5 py-1" title="Section.Sous-section.Rang">Code</div>
                         <div class="px-1.5 py-1">Titre</div>
                         <div class="px-1 py-1 text-center" title="Prix estimé">Est.</div>
                         <div class="px-1 py-1 text-center" title="Option">Opt.</div>
@@ -611,6 +657,17 @@ const breadcrumbs = computed(() => [
                         : 'bg-white hover:bg-accent-100/40'"
                     :style="{ gridTemplateColumns: TEMPLATE }"
                 >
+                    <!-- Le code de la ligne dans le métré : lecture seule, il se déduit de la
+                         section et du rang, comme METL::REFSL_Code_c. -->
+                    <div
+                        class="truncate px-1.5 py-1 text-[11px] tabular-nums text-sand-600"
+                        :title="row.ref_title
+                            ? `${row.ref_title}${row.refs_title ? ' — ' + row.refs_title : ''}`
+                            : 'Ligne sans section'"
+                    >
+                        {{ row.computed.ref_line_code ?? '—' }}
+                    </div>
+
                     <!-- Titre -->
                     <input
                         type="text"
@@ -882,6 +939,14 @@ const breadcrumbs = computed(() => [
             </span>
         </footer>
     </div>
+
+    <ReferenceCatalogueModal
+        :show="showCatalogue"
+        :read-only="readOnly"
+        :busy="busy"
+        @insert="insertFromCatalogue"
+        @close="showCatalogue = false"
+    />
 
     <GridToasts :toasts="toasts" @dismiss="dismiss" />
 </template>

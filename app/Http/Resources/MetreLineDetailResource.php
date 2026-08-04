@@ -27,6 +27,17 @@ class MetreLineDetailResource extends JsonResource
             'id' => $this->id,
             'sort_order' => $this->sort_order,
 
+            /*
+             * La section de la ligne, recopiée sur la ligne elle-même : c'est ainsi que la source
+             * fonctionne (les clés étrangères vers le catalogue sont vides sur les 57 809 lignes
+             * du fichier réel). Voir MetreLineObserver::syncSectionSnapshot().
+             */
+            'ref_code' => $this->ref_code,
+            'ref_title' => $this->ref_title,
+            'refs_code' => $this->refs_code,
+            'refs_title' => $this->refs_title,
+            'refsl_title' => $this->refsl_title,
+
             'description' => $this->description,
             'unit' => $this->unit,
             'is_estimated_price_b' => (bool) $this->is_estimated_price_b,
@@ -68,6 +79,9 @@ class MetreLineDetailResource extends JsonResource
                 // Sales unit price over purchase unit price - derived here rather than read from
                 // the stored METL::Ratio column, which nothing in the export claims to maintain.
                 'price_ratio' => $this->price_ratio,
+
+                // METL::REFSL_Code_c - « 20.2.2 », recalculé plutôt que lu (MetreLine::refLineCode()).
+                'ref_line_code' => $this->refLineCode(),
                 'price_total_buy_no_options' => $this->price_total_buy_no_options,
                 'price_total_sales_no_options' => $this->price_total_sales_no_options,
                 'price_total_ordered_no_options' => $this->price_total_ordered_no_options,

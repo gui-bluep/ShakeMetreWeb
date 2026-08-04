@@ -248,6 +248,49 @@ class MetreLine extends Model
         return $this->belongsTo(Reference::class);
     }
 
+    /**
+     * METL_MetreLines::REFSL_Code_c - the line's printed code, "20.2.2".
+     *
+     *     REF_Code & "." & REFS_Code & "." & Order
+     *
+     * Written by METL_SetREFSLCode in the source and re-read here instead, for the same reason
+     * the line ratio is computed rather than read: a stored copy can disagree with the three
+     * numbers it is made of, a derived one cannot.
+     *
+     * Null unless all three are present. A line with no section has no code, which is the
+     * honest answer - the live file has such lines.
+     */
+    public function refLineCode(): ?string
+    {
+        foreach ([$this->ref_code, $this->refs_code, $this->ref_order] as $part) {
+            if ($part === null || $part === '') {
+                return null;
+            }
+        }
+
+        return "{$this->ref_code}.{$this->refs_code}.{$this->ref_order}";
+    }
+
+    /**
+     * The next `ref_order` inside one section of one métré - METL_New's
+     * `SELECT MAX(Order) … WHERE zkf_MET = ? AND REF = ? AND REFS = ?` + 1.
+     *
+     * The source renumbers the whole group to 1..n first (METL_Reorder) and then appends; that
+     * renumbering exists because FileMaker had no reliable way to keep the ranks contiguous.
+     * Here max + 1 is enough: a gap left by a deleted line is not worth renumbering everybody's
+     * printed code for, and the code has to keep meaning the same line on a document already
+     * sent to a client.
+     */
+    public static function nextRefOrder(string $metreId, ?int $refCode, ?int $refsCode): int
+    {
+        return 1 + (int) static::query()
+            ->where('metre_id', $metreId)
+            // Un code absent est un groupe comme un autre : `= null` ne matcherait jamais.
+            ->when($refCode === null, fn ($q) => $q->whereNull('ref_code'), fn ($q) => $q->where('ref_code', $refCode))
+            ->when($refsCode === null, fn ($q) => $q->whereNull('refs_code'), fn ($q) => $q->where('refs_code', $refsCode))
+            ->max('ref_order');
+    }
+
     public function subReference(): BelongsTo
     {
         return $this->belongsTo(SubReference::class);

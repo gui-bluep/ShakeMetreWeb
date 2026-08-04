@@ -10,6 +10,7 @@ use App\Http\Controllers\MetreLineDetailController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectSearchController;
+use App\Http\Controllers\ReferenceCatalogueController;
 use App\Http\Controllers\ShakeDesignLookupController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -88,12 +89,27 @@ Route::middleware('auth')->group(function () {
         Route::post('/api/metres/{metre}/lines', [MetreLineDetailController::class, 'store'])
             ->name('metre-lines.store');
 
+        // Une ligne par article coché dans le catalogue - c'est ainsi qu'un métré se remplit
+        // dans l'application FileMaker (METL_New_Multi).
+        Route::post('/api/metres/{metre}/lines/from-catalogue', [MetreLineDetailController::class, 'storeFromCatalogue'])
+            ->name('metre-lines.store-from-catalogue');
+
         Route::post('/api/metre-lines/{metreLine}/duplicate', [MetreLineDetailController::class, 'duplicate'])
             ->name('metre-lines.duplicate');
 
         Route::delete('/api/metre-lines/{metreLine}', [MetreLineDetailController::class, 'destroy'])
             ->name('metre-lines.destroy');
     });
+});
+
+/*
+| Le catalogue de références, lu par le sélecteur « Depuis le catalogue » des deux grilles.
+| Lecture seule et ouverte à un compte en lecture seule, comme toute consultation : c'est la
+| création de lignes qui est protégée, et elle passe par role.write ci-dessus.
+*/
+Route::middleware('auth')->group(function () {
+    Route::get('/api/references/catalogue', ReferenceCatalogueController::class)
+        ->name('references.catalogue');
 });
 
 /*

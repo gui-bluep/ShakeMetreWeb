@@ -29,6 +29,16 @@ class MetreLineController extends Controller
             // Counted rather than probed per row: hasComponents() reads this, so a métré of
             // hundreds of lines costs one extra query instead of one per line.
             ->withCount('metreLineComponents')
+            /*
+             * L'ordre d'affichage d'un métré, celui de METL_Sort : section, sous-section, puis
+             * rang dans la sous-section (REF_Code, REFS_Code, REFS_Title, Order). Les lignes sans
+             * section passent à la fin et gardent leur propre ordre - `sort_order` reste le rang
+             * libre d'une ligne dans le métré, et sert ici de départage.
+             *
+             * `ref_code is null` en tête du ORDER BY plutôt qu'un NULLS LAST : l'expression doit
+             * dire la même chose sur MySQL et sur SQLite.
+             */
+            ->orderByRaw('ref_code is null, ref_code, refs_code, refs_title, ref_order')
             ->orderBy('sort_order')
             ->orderBy('sequence_number')
             ->get();
