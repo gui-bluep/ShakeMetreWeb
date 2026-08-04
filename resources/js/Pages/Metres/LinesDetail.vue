@@ -63,15 +63,16 @@ const rows = ref(props.lines.map(clone));
  * Croissant, vides d'abord, comme le ORDER BY : `ref_code, refs_code, refs_title, ref_order`,
  * puis `sort_order` pour départager.
  */
+/** Croissant, vides d'abord — partagé par le tri des lignes et par les listes de sous-sections. */
+const byNumber = (a, b) => {
+    if (a === b) return 0;
+    if (a === null || a === undefined) return -1;
+    if (b === null || b === undefined) return 1;
+
+    return Number(a) - Number(b);
+};
+
 function sortRows() {
-    const byNumber = (a, b) => {
-        if (a === b) return 0;
-        if (a === null || a === undefined) return -1;
-        if (b === null || b === undefined) return 1;
-
-        return Number(a) - Number(b);
-    };
-
     rows.value.sort((a, b) =>
         byNumber(a.ref_code, b.ref_code)
         || byNumber(a.refs_code, b.refs_code)
@@ -107,16 +108,114 @@ const grouping = ref('lots');
 const search = ref('');
 const selected = ref(new Set());
 
+/**
+ * La clé d'un groupe, construite ici et nulle part ailleurs : le repliage et l'ensemble trouvé la
+ * retrouvent à partir d'une ligne, et deux façons de la fabriquer finiraient par ne plus se
+ * répondre. Celle d'une sous-section porte celle de sa section, parce qu'un même couple code/titre
+ * peut se retrouver sous deux sections et qu'il faut une clé unique dans toute la vue.
+ */
+const sectionKeyOf = (row) => `${row.ref_code ?? ''}`;
+const subSectionKeyOf = (row) => `${sectionKeyOf(row)}::${row.refs_code ?? ''}|${row.refs_title ?? ''}`;
+
+// --- ensemble trouvé ------------------------------------------------------------------------
+
+/**
+ * « Réduire » et « étendre » l'affichage, c'est-à-dire l'ensemble trouvé de FileMaker. Quatre
+ * scripts, quatre opérations d'ensembles, et c'est tout ce qu'elles font :
+ *
+ * - METL_View_Constrain_REF   : Rechercher REF_Code = "=" & $REF          puis Réduire  → ∩
+ * - METL_View_Constrain_REFS  : Rechercher REF_Code + REFS_Code           puis Réduire  → ∩
+ * - METL_View_Extend_REF      : Rechercher zkf_MET + REF_Code             puis Étendre  → ∪
+ * - METL_View_Extend_All      : Rechercher zkf_MET seul                   puis Étendre  → tout
+ *
+ * D'où l'asymétrie, qui n'est pas un oubli : réduire n'ajoute jamais rien (une intersection ne
+ * peut que retirer), étendre n'enlève jamais rien (une union ne peut qu'ajouter). Réduire à une
+ * section qui n'affichait que deux de ses quatre sous-sections en laisse deux ; étendre une
+ * section alors que tout est affiché ne réduit pas à elle.
+ *
+ * Retenu comme un ensemble de clés de sous-section, et non de lignes : c'est le seul niveau sur
+ * lequel les quatre scripts savent chercher, et une ligne créée ensuite dans une sous-section
+ * affichée est alors affichée elle aussi, sans qu'il faille tenir une liste d'identifiants à jour.
+ *
+ * `null` veut dire « tout le métré » — l'état de départ, et celui où METL_View_Extend_All ramène.
+ * Un ensemble qui finit par couvrir toutes les clés y est ramené, sinon l'écran continuerait
+ * d'annoncer un affichage réduit qui ne réduit plus rien.
+ *
+ * La recherche reste un filtre séparé et vivant : elle se vide et les lignes reviennent. Les
+ * mélanger figerait son résultat dans l'ensemble trouvé, et l'effacer ne le défiltrerait pas.
+ */
+const foundSet = ref(null);
+
+const isConstrained = computed(() => foundSet.value !== null);
+
+const allSubSectionKeys = computed(() => new Set(rows.value.map(subSectionKeyOf)));
+
+/** Les clés de sous-section d'une section dans TOUT le métré, affichées ou non : étendre a besoin
+ *  d'ajouter ce que l'affichage écarte, donc rien ici ne peut passer par `groupedRows`. */
+const subSectionKeysOfSection = (sectionKey) =>
+    rows.value.filter((row) => sectionKeyOf(row) === sectionKey).map(subSectionKeyOf);
+
+/** Ramène à `null` (tout le métré) un ensemble qui couvre déjà tout. */
+function normalise(keys) {
+    return keys.size >= allSubSectionKeys.value.size ? null : keys;
+}
+
+function constrain(keys) {
+    const keep = new Set(keys);
+
+    foundSet.value = normalise(
+        foundSet.value === null
+            ? keep
+            : new Set([...foundSet.value].filter((key) => keep.has(key)))
+    );
+}
+
+function extend(keys) {
+    // Étendre à partir de « tout » ne peut rien ajouter.
+    if (foundSet.value === null) {
+        return;
+    }
+
+    const next = new Set(foundSet.value);
+    keys.forEach((key) => next.add(key));
+    foundSet.value = normalise(next);
+}
+
+function constrainToSection(section) {
+    constrain(subSectionKeysOfSection(section.key));
+    popover.value = null;
+}
+
+function constrainToSubSection(sub) {
+    constrain([sub.key]);
+    popover.value = null;
+}
+
+function extendToSection(section) {
+    extend(subSectionKeysOfSection(section.key));
+    popover.value = null;
+}
+
+/** METL_View_Extend_All : l'ensemble trouvé redevient le métré entier. */
+function showAllLines() {
+    foundSet.value = null;
+    popover.value = null;
+}
+
 const visibleRows = computed(() => {
     const term = search.value.trim().toLowerCase();
+    const found = foundSet.value;
 
-    if (term === '') {
+    if (term === '' && found === null) {
         return rows.value;
     }
 
-    return rows.value.filter((row) =>
-        [row.refsl_title, row.description, row.unit, row.lot_name, row.sor_title_ref]
-            .some((field) => String(field ?? '').toLowerCase().includes(term))
+    return rows.value.filter(
+        (row) =>
+            (found === null || found.has(subSectionKeyOf(row)))
+            && (term === ''
+                || [row.refsl_title, row.description, row.unit, row.lot_name, row.sor_title_ref]
+                    .some((field) => String(field ?? '').toLowerCase().includes(term)))
     );
 });
 
@@ -136,16 +235,6 @@ const visibleRows = computed(() => {
  * Calculés ici et non sur le serveur : les cellules se recalculent déjà à la frappe, donc un
  * sous-total qui attendrait la réponse serait le seul chiffre en retard de l'écran.
  */
-/**
- * La clé d'un groupe, construite ici et nulle part ailleurs : le repliage la retrouve à partir
- * d'une ligne (voir `reveal()`), et deux façons de la fabriquer finiraient par ne plus se
- * répondre. Celle d'une sous-section porte celle de sa section, parce qu'un même couple
- * code/titre peut se retrouver sous deux sections et que le repliage a besoin d'une clé unique
- * dans toute la vue.
- */
-const sectionKeyOf = (row) => `${row.ref_code ?? ''}`;
-const subSectionKeyOf = (row) => `${sectionKeyOf(row)}::${row.refs_code ?? ''}|${row.refs_title ?? ''}`;
-
 const groupedRows = computed(() => {
     const zero = () => ({ buy: 0, sales: 0, ordered: 0 });
     const add = (into, row) => {
@@ -227,18 +316,22 @@ function toggleCollapseAll() {
 }
 
 /**
- * Déplie ce qu'il faut pour qu'une ligne qu'on vient de créer soit visible. Sans cela, « + Ligne »
- * sur une sous-section repliée n'aurait l'air de rien faire.
+ * Fait le nécessaire pour qu'une ligne qu'on vient de créer soit visible : déplier son groupe, et
+ * la faire entrer dans l'ensemble trouvé. Sans cela, créer une ligne depuis un groupe replié — ou
+ * pendant un affichage réduit, dans une sous-section inventée à l'instant — n'aurait l'air de rien
+ * faire du tout.
  */
 function reveal(row) {
-    if (collapsed.value.size === 0) {
-        return;
+    if (collapsed.value.size > 0) {
+        const next = new Set(collapsed.value);
+        next.delete(sectionKeyOf(row));
+        next.delete(subSectionKeyOf(row));
+        collapsed.value = next;
     }
 
-    const next = new Set(collapsed.value);
-    next.delete(sectionKeyOf(row));
-    next.delete(subSectionKeyOf(row));
-    collapsed.value = next;
+    if (foundSet.value !== null) {
+        extend([subSectionKeyOf(row)]);
+    }
 }
 
 /** Le total général du pied — la « trailing grand summary » du même écran. */
@@ -280,17 +373,28 @@ function toggleSelected(row) {
 
 // --- popovers -----------------------------------------------------------------------------
 
-/** `{ id, kind }` for the one open popover, or null. One at a time, closed on outside click. */
+/**
+ * `{ id, kind }` for the one open popover, or null. One at a time, closed on outside click.
+ *
+ * `id` is a line id for a row's menu and a group key for a heading's, which is why the pair is
+ * keyed on an opaque id rather than on a row: a section has no line to be identified by.
+ */
 const popover = ref(null);
 
+function togglePopoverAt(id, kind) {
+    popover.value = popover.value?.id === id && popover.value?.kind === kind ? null : { id, kind };
+}
+
+function isOpenAt(id, kind) {
+    return popover.value?.id === id && popover.value?.kind === kind;
+}
+
 function togglePopover(row, kind) {
-    popover.value = popover.value?.id === row.id && popover.value?.kind === kind
-        ? null
-        : { id: row.id, kind };
+    togglePopoverAt(row.id, kind);
 }
 
 function isOpen(row, kind) {
-    return popover.value?.id === row.id && popover.value?.kind === kind;
+    return isOpenAt(row.id, kind);
 }
 
 // --- toasts -------------------------------------------------------------------------------
@@ -444,17 +548,63 @@ async function addLine(section = null) {
 }
 
 /**
- * « Définissez en une nouvelle (code et titre) » : la saisie posée dans l'intitulé de section,
- * comme les deux champs globaux zg_REF_SelectedNewCode / zg_REF_SelectedNewTitle qui l'occupent
- * dans la mise en page d'origine. Ouvert pour une section à la fois.
+ * « Nouvelle ligne de métré » depuis l'intitulé d'une section : METL_NewFromREF demande d'abord où
+ * la poser, et ses deux branches sont les deux moitiés de ce volet — une sous-section que la
+ * section possède déjà, ou une définie sur le champ (code et titre), qui n'existe dans aucun
+ * catalogue. Ce sont les deux champs globaux zg_REF_SelectedNewCode / zg_REF_SelectedNewTitle,
+ * déplacés de l'intitulé lui-même dans le volet qui pose la question.
  */
 const newSubSection = ref(null);
 
-function openNewSubSection(section) {
+/** Ouvre le volet « où ? » du menu d'une section, sa saisie de nouvelle sous-section vierge. */
+function openNewLinePane(section) {
     newSubSection.value = { sectionKey: section.key, code: null, title: '' };
+    togglePopoverAt(section.key, 'section-new-line');
 }
 
-async function createSubSection(section) {
+/**
+ * Les sous-sections que la section possède dans le métré, y compris celles que l'affichage réduit
+ * ou la recherche écartent : on choisit où poser une ligne, pas parmi ce qui est à l'écran. Une
+ * sous-section absente de la liste serait impossible à retrouver autrement qu'en rétablissant
+ * l'affichage d'abord.
+ */
+function sectionSubSections(sectionKey) {
+    const seen = new Map();
+
+    for (const row of rows.value) {
+        if (sectionKeyOf(row) !== sectionKey) {
+            continue;
+        }
+
+        const key = subSectionKeyOf(row);
+
+        if (! seen.has(key)) {
+            seen.set(key, { key, code: row.refs_code, title: row.refs_title, lines: 0 });
+        }
+
+        seen.get(key).lines += 1;
+    }
+
+    return [...seen.values()].sort(
+        (a, b) => byNumber(a.code, b.code) || (a.title ?? '').localeCompare(b.title ?? '', 'fr')
+    );
+}
+
+/** Une ligne vierge dans une sous-section qui existe déjà : la première branche du script. */
+async function addLineInSubSection(section, sub) {
+    popover.value = null;
+    newSubSection.value = null;
+
+    await addLine({
+        ref_code: section.code,
+        ref_title: section.title,
+        refs_code: sub.code,
+        refs_title: sub.title,
+    });
+}
+
+/** La seconde branche : la sous-section est inventée ici, et la ligne vierge y naît avec elle. */
+async function createSubSectionWithLine(section) {
     const draft = newSubSection.value;
 
     if (draft === null || draft.code === null || draft.code === '' || draft.title.trim() === '') {
@@ -472,6 +622,7 @@ async function createSubSection(section) {
 
     if (created) {
         newSubSection.value = null;
+        popover.value = null;
     }
 }
 
@@ -763,6 +914,20 @@ const breadcrumbs = computed(() => [
                 />
             </div>
 
+            <!-- METL_View_Extend_All. Un affichage réduit doit se dire et savoir se défaire :
+                 réduire deux fois de suite ne laisse plus rien pour retrouver le reste. -->
+            <button
+                v-if="isConstrained"
+                type="button"
+                class="btn btn-accent btn-sm shrink-0"
+                title="METL_View_Extend_All — rétablir toutes les lignes du métré"
+                @click="showAllLines"
+            >
+                <Icon name="layers" :size="3.5" />
+                Affichage réduit — tout afficher
+                <span class="badge badge-neutral">{{ visibleRows.length }} / {{ rows.length }}</span>
+            </button>
+
             <button
                 type="button"
                 class="btn btn-secondary btn-sm"
@@ -916,41 +1081,113 @@ const breadcrumbs = computed(() => [
                                 dans {{ section.subSections.length }} sous-section{{ section.subSections.length === 1 ? '' : 's' }}
                             </span>
 
-                            <template v-if="!readOnly">
+                            <!-- Le menu de la section : une nouvelle ligne (en demandant où), et les
+                                 deux opérations d'ensemble trouvé de la mise en page d'origine. -->
+                            <div class="relative shrink-0" @click.stop>
                                 <button
-                                    v-if="newSubSection?.sectionKey !== section.key"
                                     type="button"
-                                    class="btn btn-ghost shrink-0 rounded px-1 py-0.5 text-[10px]"
-                                    title="Définir une nouvelle sous-section dans cette section"
-                                    @click="openNewSubSection(section)"
+                                    class="btn btn-ghost rounded px-1 py-0.5"
+                                    title="Actions de la section"
+                                    @click="togglePopoverAt(section.key, 'section-menu')"
                                 >
-                                    <Icon name="plus" :size="3" />
-                                    Sous-section
+                                    <Icon name="ellipsis" :size="3.5" />
                                 </button>
-                                <span v-else class="flex shrink-0 items-center gap-1" @click.stop>
-                                    <input
-                                        type="number"
-                                        :value="newSubSection.code"
-                                        placeholder="code"
-                                        class="w-14 px-1 py-0.5 text-[11px] tabular-nums"
-                                        @input="newSubSection.code = $event.target.value"
-                                    />
-                                    <input
-                                        type="text"
-                                        :value="newSubSection.title"
-                                        placeholder="titre de la sous-section"
-                                        class="w-52 px-1 py-0.5 text-[11px]"
-                                        @input="newSubSection.title = $event.target.value"
-                                        @keydown.enter="createSubSection(section)"
-                                    />
-                                    <button type="button" class="btn btn-accent btn-sm px-1.5 py-0.5 text-[10px]" :disabled="busy" @click="createSubSection(section)">
-                                        Créer
+
+                                <div v-if="isOpenAt(section.key, 'section-menu')" class="popover absolute left-0 top-6 w-72">
+                                    <button
+                                        type="button"
+                                        class="popover-item"
+                                        :disabled="readOnly || busy"
+                                        @click="openNewLinePane(section)"
+                                    >
+                                        Nouvelle ligne de métré…
                                     </button>
-                                    <button type="button" class="btn btn-ghost rounded px-1 py-0.5 text-[10px]" @click="newSubSection = null">
-                                        Annuler
+                                    <div class="my-1 border-t border-sand-200" />
+                                    <button
+                                        type="button"
+                                        class="popover-item"
+                                        title="METL_View_Constrain_REF — n'affiche plus que cette section, sans rien y rajouter"
+                                        @click="constrainToSection(section)"
+                                    >
+                                        Réduire l'affichage à cette section
                                     </button>
-                                </span>
-                            </template>
+                                    <button
+                                        type="button"
+                                        class="popover-item"
+                                        :disabled="!isConstrained"
+                                        :title="isConstrained
+                                            ? 'METL_View_Extend_REF — rajoute toutes les sous-sections de cette section, sans rien retirer'
+                                            : 'Tout le métré est déjà affiché : il n\'y a rien à rajouter'"
+                                        @click="extendToSection(section)"
+                                    >
+                                        Étendre l'affichage de cette section
+                                    </button>
+                                </div>
+
+                                <!-- « Où ? » : les deux branches de METL_NewFromREF. -->
+                                <div
+                                    v-else-if="isOpenAt(section.key, 'section-new-line')"
+                                    class="popover absolute left-0 top-6 w-80"
+                                >
+                                    <p class="eyebrow px-3 pb-1 pt-1.5">Dans quelle sous-section ?</p>
+
+                                    <div class="max-h-56 overflow-y-auto">
+                                        <button
+                                            v-for="sub in sectionSubSections(section.key)"
+                                            :key="sub.key"
+                                            type="button"
+                                            class="popover-item flex items-baseline gap-2"
+                                            :disabled="busy"
+                                            @click="addLineInSubSection(section, sub)"
+                                        >
+                                            <span class="shrink-0 tabular-nums text-sand-600">
+                                                {{ section.code ?? '—' }}.{{ sub.code ?? '—' }}
+                                            </span>
+                                            <span class="min-w-0 flex-1 truncate">
+                                                {{ sub.title || 'Sous-section sans titre' }}
+                                            </span>
+                                            <span class="shrink-0 text-[10px] text-sand-500">{{ sub.lines }}</span>
+                                        </button>
+                                        <p
+                                            v-if="sectionSubSections(section.key).length === 0"
+                                            class="px-3 py-2 text-[12px] text-sand-600"
+                                        >
+                                            Cette section n'a aucune sous-section.
+                                        </p>
+                                    </div>
+
+                                    <div class="my-1 border-t border-sand-200" />
+
+                                    <div class="space-y-1.5 px-3 pb-2 pt-1">
+                                        <p class="field-label">Ou une nouvelle sous-section</p>
+                                        <div class="flex items-center gap-1.5">
+                                            <input
+                                                type="number"
+                                                :value="newSubSection?.code"
+                                                placeholder="code"
+                                                class="w-16 px-1 py-0.5 text-[11px] tabular-nums"
+                                                @input="newSubSection.code = $event.target.value"
+                                            />
+                                            <input
+                                                type="text"
+                                                :value="newSubSection?.title"
+                                                placeholder="titre"
+                                                class="min-w-0 flex-1 px-1 py-0.5 text-[11px]"
+                                                @input="newSubSection.title = $event.target.value"
+                                                @keydown.enter="createSubSectionWithLine(section)"
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            class="btn btn-accent btn-sm w-full py-0.5 text-[11px]"
+                                            :disabled="busy"
+                                            @click="createSubSectionWithLine(section)"
+                                        >
+                                            Créer et y ajouter une ligne
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <template v-for="block in blocks" :key="block.key">
@@ -1000,22 +1237,40 @@ const breadcrumbs = computed(() => [
                                 <span v-if="isCollapsed(sub.key)" class="shrink-0 text-[10px] text-sand-600">
                                     {{ sub.rows.length }} ligne{{ sub.rows.length === 1 ? '' : 's' }}
                                 </span>
-                                <button
-                                    v-if="!readOnly"
-                                    type="button"
-                                    class="btn btn-ghost shrink-0 rounded px-1 py-0.5 text-[10px]"
-                                    title="Ajouter une ligne dans cette sous-section"
-                                    :disabled="busy"
-                                    @click="addLine({
-                                        ref_code: section.code,
-                                        ref_title: section.title,
-                                        refs_code: sub.code,
-                                        refs_title: sub.title,
-                                    })"
-                                >
-                                    <Icon name="plus" :size="3" />
-                                    Ligne
-                                </button>
+                                <!-- Le menu de la sous-section. Pas d'« étendre » ici : la mise en
+                                     page d'origine n'en a pas non plus — il n'existe pas de
+                                     METL_View_Extend_REFS, une sous-section n'ayant rien sous elle
+                                     qu'une union pourrait rajouter. -->
+                                <div class="relative shrink-0" @click.stop>
+                                    <button
+                                        type="button"
+                                        class="btn btn-ghost rounded px-1 py-0.5"
+                                        title="Actions de la sous-section"
+                                        @click="togglePopoverAt(sub.key, 'sub-menu')"
+                                    >
+                                        <Icon name="ellipsis" :size="3" />
+                                    </button>
+
+                                    <div v-if="isOpenAt(sub.key, 'sub-menu')" class="popover absolute left-0 top-5 w-72">
+                                        <button
+                                            type="button"
+                                            class="popover-item"
+                                            :disabled="readOnly || busy"
+                                            @click="addLineInSubSection(section, sub)"
+                                        >
+                                            Nouvelle ligne de métré
+                                        </button>
+                                        <div class="my-1 border-t border-sand-200" />
+                                        <button
+                                            type="button"
+                                            class="popover-item"
+                                            title="METL_View_Constrain_REFS — n'affiche plus que cette sous-section, sous l'intitulé de sa section"
+                                            @click="constrainToSubSection(sub)"
+                                        >
+                                            Réduire l'affichage à cette sous-section
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             <template v-for="block in blocks" :key="block.key">
