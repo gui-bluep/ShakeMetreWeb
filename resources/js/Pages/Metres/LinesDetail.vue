@@ -1183,7 +1183,7 @@ const breadcrumbs = computed(() => [
                      comme les sous-totaux au-dessus. -->
                 <div
                     v-if="visibleRows.length > 0"
-                    class="sticky bottom-0 z-10 grid items-center border-t-2 border-sand-300 bg-sand-100 text-xs"
+                    class="sticky bottom-0 z-20 grid items-center border-t-2 border-sand-300 bg-sand-100 text-xs"
                     :style="{ gridTemplateColumns: TEMPLATE }"
                 >
                     <div />

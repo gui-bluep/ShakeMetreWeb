@@ -584,11 +584,12 @@
        À poser dans un parent `relative` portant la teinte de la colonne ; le champ réserve la
        place avec un `pr-4`.
 
-       `pointer-events-none` pour que le clic tombe dans le champ et non sur le symbole, et
-       `z-20` pour rester visible au focus : `.cell-input:focus` passe en `z-10` et repeint son
-       fond en blanc, ce qui masquerait un symbole resté en dessous. */
+       `pointer-events-none` pour que le clic tombe dans le champ et non sur le symbole, et un
+       z-index intermédiaire : au-dessus du 10 que prend `.cell-input:focus` (qui repeint son fond
+       en blanc et masquerait un symbole resté dessous), en dessous du 20 de la ligne de total
+       collante — sinon les « € » des lignes se dessinent par-dessus elle quand on défile. */
     .euro-suffix {
-        @apply pointer-events-none absolute right-1 top-1/2 z-20 -translate-y-1/2 text-[10px] text-sand-600;
+        @apply pointer-events-none absolute right-1 top-1/2 z-[15] -translate-y-1/2 text-[10px] text-sand-600;
     }
 
     /* ── Menu flottant ──────────────────────────────────────────────────────────────────── */
