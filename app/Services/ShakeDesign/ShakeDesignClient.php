@@ -2,6 +2,7 @@
 
 namespace App\Services\ShakeDesign;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
@@ -46,6 +47,9 @@ class ShakeDesignClient
     private const LAYOUT_VALUE = 'API_ZVAL';
 
     private const LAYOUT_USER = 'API_ZUSR';
+
+    /** Un métré n'a pas cinquante offres ; la borne garde contre une réponse démesurée. */
+    private const OFFER_LIST_LIMIT = 50;
 
     private const LAYOUT_OFFER = 'API_OFF';
 
@@ -514,6 +518,56 @@ class ShakeDesignClient
     }
 
     /**
+     * Les offres client d'un métré - `OFF_Offers.zkf_MET`, la référence dure que ce projet doit
+     * préserver (voir la contrainte critique de CLAUDE.md).
+     *
+     * `OFL_Total_PriceNoTax_cU` plutôt que son jumeau `_Stored` : un calcul non stocké est évalué
+     * par FileMaker à la lecture, donc toujours à jour, tandis que la version stockée dépend d'un
+     * recalcul dont nous ne savons rien depuis ici. Pour afficher les données d'un autre système,
+     * la valeur vivante est la seule honnête. C'est aussi le montant HORS TVA, celui qui se compare
+     * au total des ventes du métré - lui non plus ne porte pas de TVA.
+     *
+     * Un métré sans offre est un résultat normal : FileMaker le signale par l'erreur 401, avalée
+     * ici en liste vide.
+     *
+     * @return list<array{zkp: string, title: ?string, date: ?string, category: ?string, language: ?string, total_no_tax: ?float}>
+     *
+     * @throws ShakeDesignApiException on a genuine failure
+     */
+    /** Un champ FileMaker vide arrive en chaîne vide ; nul veut dire nul. */
+    private static function nullIfBlank(mixed $value): ?string
+    {
+        $text = trim((string) ($value ?? ''));
+
+        return $text === '' ? null : $text;
+    }
+
+    public function listOffersForMetre(string $metreZkp): array
+    {
+        $rows = $this->rows(
+            'post',
+            'layouts/'.self::LAYOUT_OFFER.'/_find',
+            [
+                'query' => [['zkf_MET' => '=='.$this->escapeFindValue($metreZkp)]],
+                'limit' => self::OFFER_LIST_LIMIT,
+                'sort' => [['fieldName' => 'Date', 'sortOrder' => 'descend']],
+            ],
+            'client offer list',
+        );
+
+        return array_values(array_map(fn (array $row) => [
+            'zkp' => (string) ($row['zkp'] ?? ''),
+            'title' => $this->nullIfBlank($row['Title'] ?? null),
+            'date' => $this->nullIfBlank($row['Date'] ?? null),
+            'category' => $this->nullIfBlank($row['Category'] ?? null),
+            'language' => $this->nullIfBlank($row['Language'] ?? null),
+            'total_no_tax' => ($row['OFL_Total_PriceNoTax_cU'] ?? null) === null || $row['OFL_Total_PriceNoTax_cU'] === ''
+                ? null
+                : (float) $row['OFL_Total_PriceNoTax_cU'],
+        ], $rows));
+    }
+
+    /**
      * @param  array<string, mixed>  $fieldData
      * @return string the internal recordId FileMaker assigned
      */
@@ -574,9 +628,16 @@ class ShakeDesignClient
     {
         $request = $this->http()->withToken($token);
 
-        return $payload === null
-            ? $request->{$method}($this->url($path))
-            : $request->{$method}($this->url($path), $payload);
+        // Un échec de transport (hôte injoignable, délai dépassé) remonte en
+        // ShakeDesignApiException comme les autres : c'est ce que le contrat de ce client annonce,
+        // et c'est ce qui permet à un écran de dégrader au lieu de rendre une erreur 500.
+        try {
+            return $payload === null
+                ? $request->{$method}($this->url($path))
+                : $request->{$method}($this->url($path), $payload);
+        } catch (ConnectionException $e) {
+            throw ShakeDesignApiException::fromTransport($path, $e);
+        }
     }
 
     /**
@@ -628,10 +689,16 @@ class ShakeDesignClient
 
     private function authenticate(): string
     {
-        $response = $this->http()
-            ->withBasicAuth($this->config('username'), $this->config('password'))
-            // FileMaker rejects a session request without a JSON body.
-            ->post($this->url('sessions'), (object) []);
+        // Même règle que `dispatch()` : l'ouverture de session est le premier appel, donc le
+        // premier endroit où un hôte injoignable se manifeste.
+        try {
+            $response = $this->http()
+                ->withBasicAuth($this->config('username'), $this->config('password'))
+                // FileMaker rejects a session request without a JSON body.
+                ->post($this->url('sessions'), (object) []);
+        } catch (ConnectionException $e) {
+            throw ShakeDesignApiException::fromTransport('authentication', $e);
+        }
 
         $body = $this->decode($response, 'authentication');
         $token = $body['response']['token'] ?? null;

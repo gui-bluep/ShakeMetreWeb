@@ -57,6 +57,13 @@ class MetrePageTest extends TestCase
                 'response' => ['data' => [['fieldData' => ['zkp' => self::PROJECT, 'Name' => 'Chantier Nord'], 'recordId' => '1']]],
                 'messages' => [['code' => '0', 'message' => 'OK']],
             ]),
+            // La page lit aussi les offres client du métré. Un motif non couvert par Http::fake()
+            // n'est PAS bloqué : il part pour de vrai, et le test finit par appeler un serveur
+            // FileMaker. D'où ce faux-ci, qui répond « aucun enregistrement » (code 401).
+            '*/layouts/API_OFF/_find' => Http::response([
+                'messages' => [['code' => '401', 'message' => 'No records match the request']],
+                'response' => [],
+            ]),
         ]);
     }
 

@@ -46,6 +46,21 @@ class ShakeDesignApiException extends RuntimeException
         parent::__construct($message);
     }
 
+    /**
+     * L'appel n'a même pas abouti : hôte injoignable, DNS muet, délai dépassé.
+     *
+     * Le contrat de ce client annonce depuis le début qu'un échec de transport arrive sous cette
+     * exception ; il n'était pas tenu, et une `ConnectionException` de Laravel traversait tous les
+     * appelants. Un écran qui sait dégrader quand ShakeDesign répond mal doit aussi savoir dégrader
+     * quand il ne répond pas du tout - c'est le même événement vu de l'utilisateur.
+     */
+    public static function fromTransport(string $context, \Throwable $previous): self
+    {
+        return new self(
+            sprintf('ShakeDesign %s failed: %s', $context, $previous->getMessage()),
+        );
+    }
+
     public static function fromResponse(
         string $context,
         ?string $code,
