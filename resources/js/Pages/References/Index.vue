@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
-import { Head, usePage } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import Icon from '@/Components/Icon.vue';
@@ -267,6 +267,14 @@ function csrfToken() {
         title="Référentiel de postes"
         :breadcrumbs="[{ label: 'Projets', href: route('dashboard') }, { label: 'Références' }]"
     >
+        <!-- Le catalogue n'est pas un écran de travail : on y vient, on y revient. -->
+        <template #actions>
+            <Link :href="route('dashboard')" class="btn btn-secondary">
+                <Icon name="arrow-left" :size="4" />
+                Retour
+            </Link>
+        </template>
+
         <template #meta>
             <span>{{ counts.references }} section{{ counts.references === 1 ? '' : 's' }}</span>
             <span>{{ counts.subReferences }} sous-section{{ counts.subReferences === 1 ? '' : 's' }}</span>
