@@ -2,12 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Models\Lot;
 use App\Models\Metre;
 use App\Models\MetreLine;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -227,7 +228,7 @@ class MetreClientOfferTest extends TestCase
 
         // Le total est faussé SANS passer par les modèles, donc sans déclencher l'observateur :
         // c'est l'état d'un métré dont les totaux stockés ont pris du retard.
-        \Illuminate\Support\Facades\DB::table('metres')
+        DB::table('metres')
             ->where('id', $this->metre->id)
             ->update(['total_sales_metl_stored' => 1]);
 
@@ -325,7 +326,7 @@ class MetreClientOfferTest extends TestCase
                 'response' => ['data' => [['fieldData' => ['zkp' => self::PROJECT, 'Name' => 'X'], 'recordId' => '1']]],
                 'messages' => [['code' => '0', 'message' => 'OK']],
             ]),
-            '*/layouts/API_OFF/_find' => fn () => throw new \Illuminate\Http\Client\ConnectionException('Could not resolve host'),
+            '*/layouts/API_OFF/_find' => fn () => throw new ConnectionException('Could not resolve host'),
         ]);
 
         $this->get("/metres/{$this->metre->id}")
