@@ -103,13 +103,42 @@ Route::middleware('auth')->group(function () {
 });
 
 /*
-| Le catalogue de références, lu par le sélecteur « Depuis le catalogue » des deux grilles.
-| Lecture seule et ouverte à un compte en lecture seule, comme toute consultation : c'est la
-| création de lignes qui est protégée, et elle passe par role.write ci-dessus.
+| Le référentiel de postes : l'écran qui le gère, et le JSON que lit le sélecteur « Depuis le
+| catalogue » des vues de lignes.
+|
+| Consultation ouverte à un compte en lecture seule comme partout ailleurs ; les neuf écritures
+| passent par role.write. Trois niveaux, et le parent est toujours dans l'URL, jamais dans le
+| corps : déplacer une sous-section sous une autre section changerait le code de toutes les
+| lignes de métré qui l'ont citée, ce n'est pas une modification mais une migration.
 */
 Route::middleware('auth')->group(function () {
-    Route::get('/api/references/catalogue', ReferenceCatalogueController::class)
+    Route::get('/references', [ReferenceCatalogueController::class, 'page'])->name('references.index');
+
+    Route::get('/api/references/catalogue', [ReferenceCatalogueController::class, 'catalogue'])
         ->name('references.catalogue');
+
+    Route::middleware('role.write')->group(function () {
+        Route::post('/api/references', [ReferenceCatalogueController::class, 'storeReference'])
+            ->name('references.store');
+        Route::patch('/api/references/{reference}', [ReferenceCatalogueController::class, 'updateReference'])
+            ->name('references.update');
+        Route::delete('/api/references/{reference}', [ReferenceCatalogueController::class, 'destroyReference'])
+            ->name('references.destroy');
+
+        Route::post('/api/references/{reference}/sub-references', [ReferenceCatalogueController::class, 'storeSubReference'])
+            ->name('sub-references.store');
+        Route::patch('/api/sub-references/{subReference}', [ReferenceCatalogueController::class, 'updateSubReference'])
+            ->name('sub-references.update');
+        Route::delete('/api/sub-references/{subReference}', [ReferenceCatalogueController::class, 'destroySubReference'])
+            ->name('sub-references.destroy');
+
+        Route::post('/api/sub-references/{subReference}/lines', [ReferenceCatalogueController::class, 'storeSubReferenceLine'])
+            ->name('sub-reference-lines.store');
+        Route::patch('/api/sub-reference-lines/{subReferenceLine}', [ReferenceCatalogueController::class, 'updateSubReferenceLine'])
+            ->name('sub-reference-lines.update');
+        Route::delete('/api/sub-reference-lines/{subReferenceLine}', [ReferenceCatalogueController::class, 'destroySubReferenceLine'])
+            ->name('sub-reference-lines.destroy');
+    });
 });
 
 /*

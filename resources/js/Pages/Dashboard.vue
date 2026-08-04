@@ -126,6 +126,15 @@ function onKeydown(event) {
             <span>Les projets viennent de ShakeDesign</span>
         </template>
 
+        <!-- Le référentiel de postes ne dépend d'aucun projet : il se gère depuis l'accueil,
+             comme dans l'application FileMaker où il a son propre écran. -->
+        <template #actions>
+            <Link :href="route('references.index')" class="btn btn-secondary">
+                <Icon name="table" :size="4" />
+                Références
+            </Link>
+        </template>
+
         <div class="surface overflow-hidden">
             <!-- Le champ -->
             <div class="border-b border-sand-200 p-4">
