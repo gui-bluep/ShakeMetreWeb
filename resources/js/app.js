@@ -3,8 +3,13 @@ import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 // Breeze's auth pages call route(), so Ziggy has to be registered globally.
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
+import { installNumberInputWheelGuard } from './numberInputWheelGuard';
 
 const appName = import.meta.env.VITE_APP_NAME || 'ShakeMetre';
+
+// One document listener, outside the Inertia app so it survives every navigation. See the module:
+// a focused number input would otherwise spend the wheel tick editing money instead of scrolling.
+installNumberInputWheelGuard();
 
 createInertiaApp({
     title: (title) => (title ? `${title} — ${appName}` : appName),
