@@ -67,6 +67,14 @@ class MetreLineDetailResource extends JsonResource
                 : ($this->lot->title_custom ?: $this->lot->title_fr ?: $this->lot->title_en ?: $this->lot->title_nl),
 
             /*
+             * Le code du lot, à part de son nom : la colonne Lot les affiche tous les deux, et un
+             * lot sans nom doit rester visible en tant que lot. Avec le seul nom, une ligne portant
+             * un lot non nommé s'affichait comme une ligne sans lot du tout - une confusion qui a
+             * déjà trompé une vérification.
+             */
+            'lot_code' => $this->lot?->code,
+
+            /*
              * The ShakeDesign supplier order this line was ordered through. `sor_title_ref` is
              * the denormalized title (METL::SOR_TitleRef); `supplier_order_id` is the zkp, kept
              * so the row can link into FileMaker once that link exists.

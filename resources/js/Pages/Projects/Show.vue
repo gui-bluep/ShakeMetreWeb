@@ -322,8 +322,8 @@ const tiles = computed(() => [
                             class="flex items-center gap-2 px-3 py-2 text-[13px] text-sand-800"
                         >
                             <span v-if="lot.code" class="code-chip shrink-0">{{ lot.code }}</span>
-                            <span class="min-w-0 truncate" :title="lot.title || 'Lot sans titre'">
-                                {{ lot.title || 'Lot sans titre' }}
+                            <span class="min-w-0 truncate" :title="lot.title || 'Lot sans nom'">
+                                {{ lot.title || 'Lot sans nom' }}
                             </span>
                         </li>
 

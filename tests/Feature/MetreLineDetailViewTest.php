@@ -267,6 +267,31 @@ class MetreLineDetailViewTest extends TestCase
             ->where('lines.0.lot_name', 'Toiture'));
     }
 
+    /**
+     * Le code du lot voyage à part de son nom : la colonne les affiche tous les deux, et un lot
+     * sans nom doit rester lisible en tant que lot plutôt que de ressembler à une ligne sans lot.
+     */
+    public function test_the_page_carries_the_lot_code_beside_its_name(): void
+    {
+        $this->actAsWriter();
+
+        $named = Lot::forceCreate(['project_id' => self::PROJECT, 'code' => 12, 'title_fr' => 'Toiture']);
+        $unnamed = Lot::forceCreate(['project_id' => self::PROJECT, 'code' => 30]);
+
+        $this->line(['lot_id' => $named->id, 'ref_code' => 1]);
+        $this->line(['lot_id' => $unnamed->id, 'ref_code' => 2]);
+        $this->line(['ref_code' => 3]);
+
+        $this->get($this->url())->assertInertia(fn ($page) => $page
+            ->where('lines.0.lot_code', 12)
+            ->where('lines.0.lot_name', 'Toiture')
+            // Le nom manque, le code est là : c'est ce qui distingue les deux cas à l'écran.
+            ->where('lines.1.lot_code', 30)
+            ->where('lines.1.lot_name', null)
+            ->where('lines.2.lot_code', null)
+            ->where('lines.2.lot_name', null));
+    }
+
     public function test_a_readonly_account_may_view_the_page(): void
     {
         $this->actingAs(User::factory()->readOnly()->create());

@@ -555,6 +555,7 @@ async function assignLot(row, lot) {
     const previousId = row.lot_id;
     row.lot_id = lot?.id ?? null;
     row.lot_name = lot?.name ?? null;
+    row.lot_code = lot?.code ?? null;
 
     queue(row.id, 'lot_id', row.lot_id, previousId);
     await flushRow(row);
@@ -739,12 +740,23 @@ async function assignLotToSelection() {
     }
 }
 
+/** L'infobulle de la cellule Lot : le lot en entier, même quand la colonne le tronque. */
+const lotTitle = (row) => {
+    if (! row.lot_id) {
+        return 'Aucun lot';
+    }
+
+    return [row.lot_code, row.lot_name || 'Lot sans nom']
+        .filter((part) => part !== null && part !== undefined && part !== '')
+        .join(' — ');
+};
+
 const lotLabel = (id) => {
     const lot = props.lots.find((candidate) => candidate.id === id);
 
     return lot === undefined
         ? 'Aucun lot'
-        : [lot.code, lot.name || 'Lot sans titre'].filter((part) => part !== null && part !== '').join(' — ');
+        : [lot.code, lot.name || 'Lot sans nom'].filter((part) => part !== null && part !== '').join(' — ');
 };
 
 async function insertFromCatalogue(ids) {
@@ -1634,14 +1646,28 @@ const breadcrumbs = computed(() => [
 
                     <!-- Lot (or tag) -->
                     <div v-if="grouping === 'lots'" class="relative min-w-0 px-1" @click.stop>
+                        <!-- Le code ET le nom : un lot sans nom reste un lot, et n'a pas à se lire
+                             comme une ligne qui n'en porte aucun. Seul « — » veut dire « aucun lot ». -->
                         <button
                             type="button"
-                            class="w-full truncate rounded px-1 py-0.5 text-left text-xs transition-colors hover:bg-sand-100 disabled:hover:bg-transparent"
-                            :class="row.lot_name ? 'text-sand-900' : 'text-sand-400'"
+                            class="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-xs transition-colors hover:bg-sand-100 disabled:hover:bg-transparent"
+                            :class="row.lot_id ? 'text-sand-900' : 'text-sand-400'"
                             :disabled="readOnly"
-                            :title="row.lot_name || 'Aucun lot'"
+                            :title="lotTitle(row)"
                             @click="togglePopover(row, 'lot')"
-                        ><template v-if="row.lot_name"><template v-for="(part, i) in parts(row.lot_name)" :key="i"><mark v-if="part.hit" class="search-hit">{{ part.text }}</mark><template v-else>{{ part.text }}</template></template></template><template v-else>—</template></button>
+                        >
+                            <template v-if="row.lot_id">
+                                <span v-if="row.lot_code !== null && row.lot_code !== undefined" class="code-chip shrink-0">
+                                    {{ row.lot_code }}
+                                </span>
+                                <span
+                                    v-if="row.lot_name"
+                                    class="min-w-0 truncate"
+                                ><template v-for="(part, i) in parts(row.lot_name)" :key="i"><mark v-if="part.hit" class="search-hit">{{ part.text }}</mark><template v-else>{{ part.text }}</template></template></span>
+                                <span v-else class="min-w-0 truncate italic text-sand-500">Lot sans nom</span>
+                            </template>
+                            <span v-else>—</span>
+                        </button>
                         <div
                             v-if="isOpen(row, 'lot')"
                             class="popover absolute right-0 top-6 max-h-64 w-56 overflow-y-auto"
@@ -1658,7 +1684,7 @@ const breadcrumbs = computed(() => [
                                 @click="assignLot(row, lot)"
                             >
                                 <span v-if="lot.code" class="code-chip shrink-0">{{ lot.code }}</span>
-                                <span class="min-w-0 truncate">{{ lot.name || 'Lot sans titre' }}</span>
+                                <span class="min-w-0 truncate">{{ lot.name || 'Lot sans nom' }}</span>
                             </button>
                             <p v-if="lots.length === 0" class="px-3 py-2 text-xs text-sand-600">
                                 Aucun lot sur ce projet.
@@ -1785,7 +1811,7 @@ const breadcrumbs = computed(() => [
                     >
                         <input v-model="lotToAssign" type="radio" :value="lot.id" class="size-3.5" />
                         <span v-if="lot.code !== null" class="code-chip shrink-0">{{ lot.code }}</span>
-                        <span class="min-w-0 truncate text-sand-900">{{ lot.name || 'Lot sans titre' }}</span>
+                        <span class="min-w-0 truncate text-sand-900">{{ lot.name || 'Lot sans nom' }}</span>
                     </label>
                     <p v-if="lots.length === 0" class="px-2 py-3 text-[13px] text-sand-600">
                         Ce projet n'a aucun lot. Ils se créent depuis la page du projet.
