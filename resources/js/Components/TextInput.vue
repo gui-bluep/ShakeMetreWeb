@@ -18,9 +18,8 @@ defineExpose({ focus: () => input.value.focus() });
 </script>
 
 <template>
-    <input
-        class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-        v-model="model"
-        ref="input"
-    />
+    <!-- Aucune classe de couleur ni de focus : la couche `base` de app.css habille tous les
+         champs de l'application de la même façon, y compris ceux écrits en `<input>` nu dans
+         les grilles. Un seul endroit à changer. -->
+    <input v-model="model" ref="input" class="px-2.5 py-1.5" />
 </template>

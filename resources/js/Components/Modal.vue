@@ -115,8 +115,10 @@ const maxWidthClass = computed(() => {
         ref="dialog"
         @cancel="onCancel"
     >
+        <!-- `sm:py-20` : posée à 24 px du haut, la boîte chevauchait la barre supérieure encre et
+             se lisait comme un panneau collé au bord de l'écran plutôt que comme une modale. -->
         <div
-            class="fixed inset-0 z-50 overflow-y-auto px-4 py-6 sm:px-0"
+            class="fixed inset-0 z-50 overflow-y-auto px-4 py-6 sm:px-0 sm:py-20"
             scroll-region
         >
             <Transition
@@ -132,9 +134,9 @@ const maxWidthClass = computed(() => {
                     class="fixed inset-0 transform transition-all"
                     @click="close"
                 >
-                    <div
-                        class="absolute inset-0 bg-gray-500 opacity-75"
-                    />
+                    <!-- Voile à l'encre plutôt qu'au gris : sur un fond chaud, un gris neutre
+                         vire au bleu. -->
+                    <div class="absolute inset-0 bg-sand-950/60" />
                 </div>
             </Transition>
 
@@ -148,7 +150,7 @@ const maxWidthClass = computed(() => {
             >
                 <div
                     v-show="show"
-                    class="relative z-10 mb-6 transform overflow-hidden rounded-lg bg-white shadow-xl transition-all sm:mx-auto sm:w-full"
+                    class="relative z-10 mb-6 transform overflow-hidden rounded-lg border border-sand-200 bg-white shadow-pop transition-all sm:mx-auto sm:w-full"
                     :class="maxWidthClass"
                 >
                     <slot v-if="showSlot" />
