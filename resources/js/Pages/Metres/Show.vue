@@ -142,6 +142,58 @@ async function duplicate() {
     });
 }
 
+/**
+ * Verrouiller / déverrouiller - MET_LockUnlock, qui n'est qu'un `Set Field` sur `isLocked_b`.
+ *
+ * L'état visé est envoyé plutôt que basculé : deux onglets ouverts sur le même métré se
+ * renverraient sinon le verrou l'un à l'autre. Les modifications en attente sont écrites avant,
+ * comme pour la duplication - verrouiller juste après avoir tapé ne doit pas perdre la frappe.
+ */
+async function setLocked(locked) {
+    if (readOnly.value || busy.value) {
+        return;
+    }
+
+    busy.value = true;
+    await flush(props.metre.id);
+
+    try {
+        const response = await fetch(`/api/metres/${props.metre.id}/lock`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-XSRF-TOKEN': csrfToken(),
+            },
+            body: JSON.stringify({ locked }),
+        });
+
+        const body = await response.json().catch(() => null);
+
+        if (! response.ok) {
+            throw new Error(body?.message ?? `Échec (HTTP ${response.status})`);
+        }
+
+        Object.assign(form, body.data, { totals: { ...body.data.totals } });
+    } catch (e) {
+        lockError.value = e.message;
+    } finally {
+        busy.value = false;
+    }
+}
+
+const lockError = ref(null);
+
+function csrfToken() {
+    const cookie = document.cookie.split('; ').find((entry) => entry.startsWith('XSRF-TOKEN='));
+
+    return cookie
+        ? decodeURIComponent(cookie.slice('XSRF-TOKEN='.length))
+        : (document.querySelector('meta[name="csrf-token"]')?.content ?? '');
+}
+
 function destroy() {
     busy.value = true;
     router.delete(`/metres/${props.metre.id}`, {
@@ -425,6 +477,27 @@ function statusClasses(active) {
                             <Icon name="copy" :size="4" />
                             Dupliquer le métré
                         </SecondaryButton>
+
+                        <!-- Le verrou. Ce qu'il empêche est dit sous le bouton : un état dont on
+                             ne voit pas l'effet se lit comme un écran cassé. -->
+                        <SecondaryButton
+                            v-if="!readOnly"
+                            class="btn-block"
+                            :disabled="busy"
+                            @click="setLocked(!form.is_locked_b)"
+                        >
+                            <Icon name="lock" :size="4" />
+                            {{ form.is_locked_b ? 'Déverrouiller le métré' : 'Verrouiller le métré' }}
+                        </SecondaryButton>
+
+                        <p v-if="form.is_locked_b" class="text-[12px] text-sand-600">
+                            Métré verrouillé : ses lignes ne peuvent plus être modifiées.
+                        </p>
+
+                        <p v-if="lockError" class="banner banner-danger">
+                            <Icon name="alert" :size="4" class="mt-px" />
+                            <span>{{ lockError }}</span>
+                        </p>
 
                         <!-- Variante sourde : le rouge plein est gardé pour la confirmation. -->
                         <button

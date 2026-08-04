@@ -246,6 +246,35 @@ const visibleRows = computed(() => {
     );
 });
 
+/**
+ * L'état d'une ligne, dit par la couleur de son texte — le format conditionnel de la liste source :
+ * rouge quand le prix est estimé, bleu et penché quand la ligne est en option.
+ *
+ * Une seule couleur est rendue à la fois, jamais les deux : `text-danger-700` et `text-info-700`
+ * sont deux utilitaires de même spécificité, donc leur ordre dans l'attribut `class` ne déciderait
+ * rien — seul l'ordre du CSS compilé trancherait, ce qui est un tirage au sort. L'estimation gagne :
+ * elle dit qu'un chiffre n'est pas fiable, ce qui pèse plus lourd que le statut d'option. Et une
+ * ligne en option reste penchée dans les deux cas, l'inclinaison n'entrant en conflit avec rien.
+ */
+const toneColour = (row) => {
+    if (row.is_estimated_price_b) {
+        return 'line-tone-danger';
+    }
+
+    return row.is_option_b ? 'line-tone-info' : '';
+};
+
+const toneItalic = (row) => (row.is_option_b ? 'italic' : '');
+
+/** L'encre d'une cellule qui pose la sienne : celle de l'état s'il y en a un, la sienne sinon. */
+const toneInk = (row, fallback) => {
+    if (row.is_estimated_price_b) {
+        return 'text-danger-700';
+    }
+
+    return row.is_option_b ? 'text-info-700' : fallback;
+};
+
 /** Les morceaux d'un libellé, marqués ou non, pour le terme courant. */
 const parts = (text) => highlightParts(text, searchTerm.value);
 
@@ -1446,15 +1475,20 @@ const breadcrumbs = computed(() => [
                     v-for="row in rowsOf(sub)"
                     :key="row.id"
                     class="grid items-center border-b border-sand-200/70 text-xs transition-colors"
-                    :class="selected.has(row.id)
-                        ? 'bg-accent-100 shadow-[inset_2px_0_0_0_var(--color-accent-500)]'
-                        : 'bg-white hover:bg-accent-100/40'"
+                    :class="[
+                        selected.has(row.id)
+                            ? 'bg-accent-100 shadow-[inset_2px_0_0_0_var(--color-accent-500)]'
+                            : 'bg-white hover:bg-accent-100/40',
+                        toneColour(row),
+                        toneItalic(row),
+                    ]"
                     :style="{ gridTemplateColumns: TEMPLATE }"
                 >
                     <!-- Le code de la ligne dans le métré : lecture seule, il se déduit de la
                          section et du rang, comme METL::REFSL_Code_c. -->
                     <div
-                        class="truncate px-1.5 py-1 text-[11px] tabular-nums text-sand-600"
+                        class="truncate px-1.5 py-1 text-[11px] tabular-nums"
+                        :class="toneInk(row, 'text-sand-600')"
                         :title="row.ref_title
                             ? `${row.ref_title}${row.refs_title ? ' — ' + row.refs_title : ''}`
                             : 'Ligne sans section'"
@@ -1550,7 +1584,7 @@ const breadcrumbs = computed(() => [
                              l'écartent. Grisée pour que la différence se voie. -->
                         <div
                             class="px-1.5 py-1 text-right tabular-nums"
-                            :class="[block.cellClass, row.is_option_b ? 'text-sand-400 italic' : 'text-sand-700']"
+                            :class="[block.cellClass, row.is_option_b ? 'text-sand-400 italic' : toneInk(row, 'text-sand-700')]"
                             :title="row.is_option_b ? 'Option : ce montant ne compte dans aucun total' : undefined"
                         >
                             {{ money(row.computed[block.totalKey]) }}
@@ -1560,7 +1594,8 @@ const breadcrumbs = computed(() => [
                              out of step with them. Read-only by construction: there is nothing to write. -->
                         <div
                             v-if="showRatio && block.key === 'achats'"
-                            class="px-1.5 py-1 text-right tabular-nums text-sand-600"
+                            class="px-1.5 py-1 text-right tabular-nums"
+                            :class="toneInk(row, 'text-sand-600')"
                             title="P.U. vendu client ÷ P.U. estimation achat — calculé, non modifiable"
                         >
                             {{ row.computed.price_ratio ?? '—' }}

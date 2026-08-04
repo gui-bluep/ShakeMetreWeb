@@ -65,6 +65,12 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('role.write')->group(function () {
         Route::patch('/api/metres/{metre}', [MetreController::class, 'update'])->name('metres.update');
+
+        // Verrouiller / déverrouiller un métré - MET_LockUnlock. À part de la mise à jour du
+        // métré : `is_locked_b` n'est pas dans son whitelist, et un verrou qui passerait par le
+        // même chemin qu'un garde-fou « verrouillé » se refermerait sur sa propre clé.
+        Route::post('/api/metres/{metre}/lock', [MetreController::class, 'lock'])
+            ->name('metres.lock');
         Route::post('/metres/{metre}/duplicate', [MetreController::class, 'duplicate'])->name('metres.duplicate');
         Route::delete('/metres/{metre}', [MetreController::class, 'destroy'])->name('metres.destroy');
     });

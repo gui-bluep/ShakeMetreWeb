@@ -77,6 +77,97 @@ class MetrePageTest extends TestCase
         return MetreLine::forceCreate($attributes + ['metre_id' => $metre->id]);
     }
 
+    // --- verrou (MET_LockUnlock) ------------------------------------------------------------
+
+    public function test_it_locks_a_metre(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre();
+
+        $this->postJson("/api/metres/{$metre->id}/lock", ['locked' => true])
+            ->assertOk()
+            ->assertJsonPath('data.is_locked_b', true);
+
+        $this->assertTrue((bool) $metre->fresh()->is_locked_b);
+    }
+
+    /**
+     * Le déverrouillage doit passer alors que le métré EST verrouillé - sinon le verrou se
+     * refermerait sur sa propre clé. C'est la raison du point d'entrée séparé.
+     */
+    public function test_it_unlocks_a_locked_metre(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre(['is_locked_b' => true]);
+
+        $this->postJson("/api/metres/{$metre->id}/lock", ['locked' => false])
+            ->assertOk()
+            ->assertJsonPath('data.is_locked_b', false);
+
+        $this->assertFalse((bool) $metre->fresh()->is_locked_b);
+    }
+
+    /** L'état visé est envoyé : deux appels de suite ne font pas l'aller-retour d'une bascule. */
+    public function test_locking_twice_leaves_it_locked(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre();
+
+        $this->postJson("/api/metres/{$metre->id}/lock", ['locked' => true])->assertOk();
+        $this->postJson("/api/metres/{$metre->id}/lock", ['locked' => true])->assertOk();
+
+        $this->assertTrue((bool) $metre->fresh()->is_locked_b);
+    }
+
+    public function test_the_target_state_is_required(): void
+    {
+        $this->actAsWriter();
+
+        $this->postJson("/api/metres/{$this->metre()->id}/lock", [])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('locked');
+    }
+
+    /** Ce que le verrou empêche : écrire les lignes. */
+    public function test_a_locked_metre_refuses_line_writes(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre();
+        $line = $this->line($metre, ['refsl_title' => 'Avant']);
+
+        $this->postJson("/api/metres/{$metre->id}/lock", ['locked' => true])->assertOk();
+
+        $this->postJson("/api/metres/{$metre->id}/lines", [])->assertStatus(423);
+        $this->assertSame('Avant', $line->fresh()->refsl_title);
+
+        // Et l'inverse : déverrouillé, la même écriture passe.
+        $this->postJson("/api/metres/{$metre->id}/lock", ['locked' => false])->assertOk();
+        $this->postJson("/api/metres/{$metre->id}/lines", [])->assertStatus(201);
+    }
+
+    public function test_a_readonly_account_may_not_lock(): void
+    {
+        $this->actingAs(User::factory()->readOnly()->create());
+        $metre = $this->metre();
+
+        $this->postJson("/api/metres/{$metre->id}/lock", ['locked' => true])->assertForbidden();
+
+        $this->assertFalse((bool) $metre->fresh()->is_locked_b);
+    }
+
+    /** `is_locked_b` reste hors du whitelist du métré : il ne s'écrit que par son point d'entrée. */
+    public function test_the_metre_patch_still_refuses_the_lock_column(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre();
+
+        $this->patchJson("/api/metres/{$metre->id}", ['is_locked_b' => true])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('is_locked_b');
+
+        $this->assertFalse((bool) $metre->fresh()->is_locked_b);
+    }
+
     // --- the page --------------------------------------------------------------------------
 
     public function test_the_page_shows_the_project_name_and_the_metre_fields(): void

@@ -592,6 +592,29 @@
         @apply pointer-events-none absolute right-1 top-1/2 z-[15] -translate-y-1/2 text-[10px] text-sand-600;
     }
 
+    /* L'état d'une ligne de métré, dit par la couleur de son texte — le format conditionnel de
+       METL_MetreComplete_List_Full. Rouge quand le prix est estimé, bleu et penché quand la ligne
+       est en option. (Le format conditionnel lui-même n'est pas dans l'export FileMaker, qui ne
+       porte aucun détail de mise en page ; la règle vient de l'utilisateur, les teintes de la DA.)
+
+       Une seule des deux couleurs est posée à la fois : ce sont deux utilitaires de même
+       spécificité, donc l'ordre dans l'attribut `class` ne déciderait rien — c'est l'ordre dans le
+       CSS qui trancherait, au hasard de la compilation. Le choix est fait dans la page (`toneColour`).
+
+       La règle descendante sur `.cell-input` est nécessaire : le champ pose sa propre encre dans la
+       couche `components`, qu'une couleur héritée de la ligne ne peut pas remplacer. Deux classes
+       valent mieux qu'une (0,2,0 contre 0,1,0), donc celle-ci gagne. Le `focus:text-sand-900` du
+       champ, lui, reste au-dessus : un utilitaire bat toujours la couche components. */
+    .line-tone-danger,
+    .line-tone-danger .cell-input {
+        @apply text-danger-700;
+    }
+
+    .line-tone-info,
+    .line-tone-info .cell-input {
+        @apply text-info-700;
+    }
+
     /* Ce qu'une recherche a trouvé dans un libellé. `<mark>` arrive avec un fond jaune du
        navigateur, qui n'est d'aucune palette : il est remplacé, pas complété. Le lime est la
        couleur de la sélection et de l'état actif, et c'est bien ce qu'un résultat de recherche

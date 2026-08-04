@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\LockMetreRequest;
 use App\Http\Requests\UpdateMetreRequest;
 use App\Jobs\RecalculateMetreTotals;
 use App\Models\Metre;
@@ -59,6 +60,37 @@ class MetreController extends Controller
             (new RecalculateMetreTotals($metre))->handle();
             $metre->refresh();
         }
+
+        return response()->json(['data' => $this->payload($metre)]);
+    }
+
+    /**
+     * Verrouille ou déverrouille le métré - MET_LockUnlock.
+     *
+     * Le script source tient en une ligne : `Set Field [ MET::isLocked_b ; GetAsBoolean ( Abs (
+     * isLocked_b - 1 ) ) ]`. Pas de confirmation, pas de contrôle de privilège, aucune cascade -
+     * un booléen que l'on retourne.
+     *
+     * Deux écarts assumés :
+     *
+     *  - L'état visé est envoyé (`locked`), plutôt que retourné en aveugle. Une bascule vaut pour
+     *    un écran qui a le record sous les yeux ; ici deux onglets ouverts sur le même métré
+     *    verrouilleraient et déverrouilleraient l'un après l'autre sans que personne ne l'ait
+     *    demandé. Envoyer la cible rend l'appel idempotent.
+     *  - Un point d'entrée à part, et non `is_locked_b` ajouté à `UpdateMetreRequest::EDITABLE` :
+     *    un verrou est une transition d'état, pas la valeur d'un champ. Surtout, tout garde-fou
+     *    « ce métré est verrouillé » posé un jour sur la mise à jour du métré empêcherait alors de
+     *    le déverrouiller - le verrou se refermerait sur sa propre clé.
+     *
+     * Ce que le verrou empêche : l'écriture des lignes (423 par `MetreLineDetailController`), et
+     * les deux grilles se mettent en lecture seule en le disant. C'est l'interprétation déjà en
+     * place dans cette application ; la source ne la documente pas, `MET::isLocked_b` n'étant lu
+     * par aucun calcul ni aucun autre script - le reste vivait dans le comportement des mises en
+     * page, que l'export ne porte pas.
+     */
+    public function lock(LockMetreRequest $request, Metre $metre): JsonResponse
+    {
+        $metre->forceFill(['is_locked_b' => $request->validated('locked')])->save();
 
         return response()->json(['data' => $this->payload($metre)]);
     }
