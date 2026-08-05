@@ -295,14 +295,48 @@ function destroy() {
  * se lit comme cassé ou comme un droit manquant.
  */
 const DOCUMENTS = [
-    'Budget client — complet',
-    'Budget client — complet avec composition',
-    'Budget client — simplifié',
-    'Budget client — simplifié avec composition',
-    'Budget client — sous-catégories',
-    'Budget client — catégories',
-    'Fournisseur — budget achats',
+    ['budget-client-complet', 'Budget client — complet'],
+    ['budget-client-complet-composition', 'Budget client — complet avec composition'],
+    ['budget-client-simplifie', 'Budget client — simplifié'],
+    ['budget-client-simplifie-composition', 'Budget client — simplifié avec composition'],
+    ['budget-client-sous-categories', 'Budget client — sous-catégories'],
+    ['budget-client-categories', 'Budget client — catégories'],
+    ['fournisseur-budget-achats', 'Fournisseur — budget achats'],
 ];
+
+/**
+ * Les sept documents, avec l'URL qui les rend.
+ *
+ * Les slugs doublent ceux de `App\Documents\MetreDocument`, et c'est assumé : le serveur reste
+ * l'autorité - il renvoie 404 sur tout ce qu'il ne connaît pas - et un écran qui listerait des
+ * documents envoyés par le serveur ne dirait rien de plus tout en ajoutant une clé à la payload
+ * de chaque affichage de métré.
+ */
+const documents = computed(() =>
+    DOCUMENTS.map(([slug, label]) => ({
+        slug,
+        label,
+        url: `/metres/${props.metre.id}/documents/${slug}`,
+    }))
+);
+
+/**
+ * L'aperçu, qui est ce que fait la source : `METL_GoTo_Print` ouvre une fenêtre en mode
+ * Prévisualisation sur la mise en page d'impression, et c'est de là qu'on enregistre un PDF.
+ *
+ * Ici, une fenêtre modale montrant le PDF dans un `<iframe>` - le lecteur du navigateur - et un
+ * lien de téléchargement vers la même URL avec `?download=1`. La même URL des deux côtés : ce
+ * qu'on regarde et ce qu'on enregistre sont le même document, pas deux rendus qui pourraient
+ * diverger.
+ *
+ * `src` n'est posé qu'à l'ouverture : sept `<iframe>` montés d'avance déclencheraient sept rendus
+ * PDF à chaque affichage de la page.
+ */
+const preview = ref(null);
+
+function openDocument(document) {
+    preview.value = document;
+}
 
 /**
  * Les quatre vues monétaires des lignes, toutes construites : une seule page les rend, la coupe
@@ -614,23 +648,29 @@ function statusClasses(active) {
                          grille dépareillée. -->
                     <ul class="grid gap-px bg-sand-200 sm:grid-cols-2">
                         <li
-                            v-for="document in DOCUMENTS"
-                            :key="document"
-                            class="flex items-center justify-between gap-2 bg-white px-4 py-2.5 text-[13px] text-sand-500"
-                            title="Pas encore disponible"
+                            v-for="document in documents"
+                            :key="document.slug"
+                            class="bg-white"
                         >
-                            <span class="flex min-w-0 items-center gap-2">
-                                <Icon name="document" :size="4" class="text-sand-300" />
-                                <span class="truncate">{{ document }}</span>
-                            </span>
-                            <Badge tone="soon">Bientôt</Badge>
+                            <button
+                                type="button"
+                                class="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-[13px] text-sand-800 hover:bg-sand-50 focus:bg-sand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sand-950"
+                                :title="`Aperçu de « ${document.label} »`"
+                                @click="openDocument(document)"
+                            >
+                                <span class="flex min-w-0 items-center gap-2">
+                                    <Icon name="document" :size="4" class="text-sand-400" />
+                                    <span class="truncate">{{ document.label }}</span>
+                                </span>
+                                <Icon name="chevron-right" :size="4" class="shrink-0 text-sand-300" />
+                            </button>
                         </li>
 
                         <!-- Sept documents sur deux colonnes : sans ce bouche-trou, la case
                              manquante laisse voir le fond qui sert de filet et se lit comme un
                              bloc gris posé là par erreur. -->
                         <li
-                            v-if="DOCUMENTS.length % 2 === 1"
+                            v-if="documents.length % 2 === 1"
                             class="hidden bg-white sm:block"
                             aria-hidden="true"
                         />
@@ -806,6 +846,36 @@ function statusClasses(active) {
                         Créer l'offre
                     </button>
                 </div>
+            </div>
+        </Modal>
+
+        <!--
+            L'aperçu d'un document, qui tient la place de la fenêtre de prévisualisation de
+            FileMaker. Le PDF est affiché par le lecteur du navigateur dans un <iframe> ; le
+            bouton « Télécharger » pointe la même URL avec ?download=1, donc le même document.
+
+            L'<iframe> n'est monté qu'à l'ouverture (`v-if="preview"`), sinon chaque affichage de
+            la page métré lancerait sept rendus PDF côté serveur.
+        -->
+        <Modal :show="preview !== null" max-width="6xl" @close="preview = null">
+            <div v-if="preview" class="flex h-[85vh] flex-col">
+                <div class="flex items-center justify-between gap-3 border-b border-sand-200 px-5 py-3">
+                    <h2 class="truncate text-[15px] text-sand-900" style="font-variation-settings: 'wght' 600">
+                        {{ preview.label }}
+                    </h2>
+                    <div class="flex shrink-0 items-center gap-2">
+                        <a :href="`${preview.url}?download=1`" class="btn btn-accent" download>
+                            Télécharger
+                        </a>
+                        <SecondaryButton @click="preview = null">Fermer</SecondaryButton>
+                    </div>
+                </div>
+
+                <iframe
+                    :src="preview.url"
+                    :title="preview.label"
+                    class="min-h-0 flex-1 border-0 bg-sand-100"
+                />
             </div>
         </Modal>
 

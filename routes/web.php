@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\SsoConsumeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LotController;
 use App\Http\Controllers\MetreController;
+use App\Http\Controllers\MetreDocumentController;
 use App\Http\Controllers\MetreLineComponentController;
 use App\Http\Controllers\MetreLineController;
 use App\Http\Controllers\MetreLineDetailController;
@@ -62,6 +63,17 @@ Route::middleware('auth')->group(function () {
 */
 Route::middleware('auth')->group(function () {
     Route::get('/metres/{metre}', [MetreController::class, 'show'])->name('metres.show');
+
+    /*
+     * Les sept documents du cadre « Documents » - METL_GoTo_Print. Un GET qui rend un PDF, hors
+     * de `role.write` et hors du verrou : imprimer est une lecture. `?download=1` bascule
+     * l'en-tête de disposition, l'aperçu et le fichier étant le même document.
+     *
+     * Pas sous /api : la réponse n'est pas du JSON et l'URL est ouverte par un <iframe> et par un
+     * lien, donc par le navigateur lui-même, pas par fetch().
+     */
+    Route::get('/metres/{metre}/documents/{document}', [MetreDocumentController::class, 'show'])
+        ->name('metres.document');
 
     Route::middleware('role.write')->group(function () {
         Route::patch('/api/metres/{metre}', [MetreController::class, 'update'])->name('metres.update');

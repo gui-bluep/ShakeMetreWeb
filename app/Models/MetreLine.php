@@ -288,6 +288,22 @@ class MetreLine extends Model
 
     public const SQL_ORDERED_NO_OPTIONS = 'CASE WHEN metre_lines.is_option_b = 1 THEN 0 ELSE ROUND(COALESCE(metre_lines.price_ordered, 0) * COALESCE(metre_lines.quantity_ordered, 0), 2) END';
 
+    /**
+     * Les mêmes sans le garde-fou « option » - `PriceTotal*All_c`, ce qu'une ligne affiche.
+     *
+     * En SQL et non par les accesseurs du même nom, pour les documents imprimés : `round()` de PHP
+     * travaille sur un flottant binaire et la base sur un décimal, et les deux ne tranchent pas
+     * pareil un demi-centime. Sur le métré de démonstration, 357 lignes sommées en PHP donnaient
+     * 2 426 250,06 € contre 2 426 250,08 € pour le total stocké du métré, calculé par ces
+     * fragments-ci. Deux centimes, sur un document qui part chez un client à côté d'une page qui
+     * affiche l'autre chiffre. Un document compte donc comme le métré compte.
+     *
+     * Pas d'équivalent « achat » : aucun des sept documents ne montre le prix d'achat.
+     */
+    public const SQL_SALES_ALL = 'ROUND(COALESCE(metre_lines.price_sales, 0) * COALESCE(metre_lines.quantity, 0), 2)';
+
+    public const SQL_ORDERED_ALL = 'ROUND(COALESCE(metre_lines.price_ordered, 0) * COALESCE(metre_lines.quantity_ordered, 0), 2)';
+
     public function metre(): BelongsTo
     {
         return $this->belongsTo(Metre::class);
