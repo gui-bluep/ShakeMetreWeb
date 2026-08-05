@@ -62,6 +62,27 @@ return [
         */
         'token_cache_key' => 'shakedesign:data-api:token',
         'token_ttl' => 840,
+
+        /*
+        | Ouvrir un enregistrement ShakeDesign dans le client FileMaker de la personne, par le
+        | protocole `fmp://`. C'est le pendant web de METL::SOR_GoTo, qui faisait « Open File
+        | [ShakeDesign] » puis « Perform Script [ShakeDesign :: SOR_GoTo] » : une URL fait
+        | l'ouverture du fichier et l'appel du script d'un seul coup.
+        |
+        | L'hôte se règle à part, et ce n'est pas de la précaution : celui du bloc ci-dessus est
+        | résolu par le serveur web, celui-ci l'est par la machine de la personne qui clique. Un
+        | nom interne peut convenir à l'un et pas à l'autre. Sans valeur propre il retombe sur le
+        | même hôte, qui est le cas courant et évite une variable de plus à renseigner.
+        |
+        | Absent, le lien n'est pas rendu du tout - une URL fmp:// cassée ouvre une boîte de
+        | dialogue FileMaker incompréhensible, alors qu'un intitulé non cliquable ne promet rien.
+        |
+        | `?:` plutôt que le second argument de env() : une clé présente mais vide - ce que donne
+        | une copie de .env.example - vaut la chaîne vide et non null, et le défaut de env() ne
+        | s'appliquerait donc jamais.
+        */
+        'fmp_host' => env('SHAKEDESIGN_FMP_HOST') ?: env('SHAKEDESIGN_HOST'),
+        'fmp_database' => env('SHAKEDESIGN_FMP_DATABASE') ?: env('SHAKEDESIGN_DATABASE'),
     ],
 
     /*
