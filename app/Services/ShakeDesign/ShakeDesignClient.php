@@ -7,6 +7,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 
 /**
@@ -81,6 +82,8 @@ class ShakeDesignClient
 
     private const FIELDS_OFFER = [
         'zkf_PRJ', 'zkf_CPY', 'zkf_CTC', 'zkf_MET',
+        // Posé après création, avec le numéro rendu par ZSET_Numbering - voir nextNumber().
+        'Number',
         'Language', 'Title', 'Description', 'Comments', 'Date', 'Category',
     ];
 
@@ -91,6 +94,8 @@ class ShakeDesignClient
 
     private const FIELDS_SUPPLIER_ORDER = [
         'zkf_PRJ', 'zkf_CPY', 'zkf_CTC', 'zkf_MET',
+        // Posé après coup, avec le numéro rendu par ZSET_Numbering - voir nextNumber().
+        'Number',
         'Language', 'Title', 'Description', 'Comments', 'Date', 'Category',
         'Delivery_Address', 'Delivery_AddressCity',
         'Delivery_AddressPostalCode', 'Delivery_AddressCountry',
@@ -414,6 +419,102 @@ class ShakeDesignClient
             lineParentField: 'zkf_SOR',
             lines: $lines,
         );
+    }
+
+    /**
+     * Repose des champs sur une commande fournisseur déjà créée, par son `recordId`.
+     *
+     * Sert au numéro, qui ne peut être obtenu qu'après coup : `ZSET_Numbering` s'exécute à part,
+     * et la source elle-même crée d'abord puis numérote. La même liste blanche que la création
+     * s'applique - un champ hors `FIELDS_SUPPLIER_ORDER` est refusé avant tout appel réseau.
+     *
+     * @param  array<string, mixed>  $fields
+     *
+     * @throws InvalidArgumentException sur un champ inconnu
+     * @throws ShakeDesignApiException
+     */
+    public function updateSupplierOrder(string $recordId, array $fields): void
+    {
+        $this->assertKnownFields($fields, self::FIELDS_SUPPLIER_ORDER, 'supplier order');
+
+        $this->send(
+            'patch',
+            'layouts/'.self::LAYOUT_SUPPLIER_ORDER."/records/{$recordId}",
+            ['fieldData' => (object) $fields],
+            'supplier order update',
+        );
+    }
+
+    /**
+     * Le pendant pour une offre client. Même raison : le numéro n'existe qu'après création.
+     *
+     * @param  array<string, mixed>  $fields
+     *
+     * @throws InvalidArgumentException sur un champ inconnu
+     * @throws ShakeDesignApiException
+     */
+    public function updateOffer(string $recordId, array $fields): void
+    {
+        $this->assertKnownFields($fields, self::FIELDS_OFFER, 'offer');
+
+        $this->send(
+            'patch',
+            'layouts/'.self::LAYOUT_OFFER."/records/{$recordId}",
+            ['fieldData' => (object) $fields],
+            'offer update',
+        );
+    }
+
+    /**
+     * Le prochain numéro de document de ShakeDesign - « SOR-2026-0625 » -, ou `null` s'il n'a pas
+     * pu être obtenu.
+     *
+     * **Le seul endroit de ce projet qui exécute un script FileMaker**, et c'est délibéré. La
+     * numérotation vit dans `ZSET_Settings`, elle est partagée par les deux applications, et
+     * `ZSET_Numbering` ouvre le compteur par un `Open Record/Request` avant de l'incrémenter :
+     * ce verrou est précisément ce qui interdit qu'une commande créée du web et une créée dans
+     * FileMaker tombent sur le même numéro. Refaire le calcul en PHP, c'est perdre le verrou et
+     * gagner des doublons - sur des numéros de commande, ce qui se paie cher.
+     *
+     * Le Data API sait exécuter un script (`/layouts/{layout}/script/{nom}`) ; ce que ce projet
+     * évitait jusqu'ici était de faire écrire ShakeDesign PAR un script dont le corps nous
+     * échappait. Ici le corps est lu, le script porte lui-même « exécuter avec privilèges
+     * d'accès complets », et le compte API n'a besoin que du droit de l'exécuter.
+     *
+     * **Dégradé, jamais fatal.** Sans le droit d'exécution, FileMaker répond code 104 « script is
+     * missing » - le même code que pour un script absent, on ne peut pas distinguer les deux. Un
+     * document sans numéro reste un document ; refuser de le créer serait pire. L'échec est
+     * journalisé en nommant le type demandé, parce qu'un numéro manquant se remarque tard.
+     *
+     * @param  string  $type  le type de ZSET_Numbering : « SOR », « OFF », « INV », …
+     */
+    public function nextNumber(string $type): ?string
+    {
+        try {
+            $body = $this->send(
+                'get',
+                'layouts/'.self::LAYOUT_SUPPLIER_ORDER.'/script/ZSET_Numbering',
+                ['script.param' => "<Type>{$type}</Type>"],
+                'document numbering',
+            );
+        } catch (ShakeDesignApiException $e) {
+            Log::warning("ShakeDesign numbering unavailable for {$type}: {$e->getMessage()}");
+
+            return null;
+        }
+
+        // Le script signale ses propres échecs à part du transport : `scriptError` non nul, ou un
+        // résultat négatif, qui est la convention de sortie de ces scripts.
+        $error = (string) ($body['response']['scriptError'] ?? '0');
+        $result = trim((string) ($body['response']['scriptResult'] ?? ''));
+
+        if ($error !== '0' || $result === '' || str_starts_with($result, '-')) {
+            Log::warning("ShakeDesign numbering failed for {$type}: error={$error} result={$result}");
+
+            return null;
+        }
+
+        return $result;
     }
 
     /**

@@ -127,9 +127,25 @@ class MetreController extends Controller
 
         $created = $client->createOffer($header, $metre->offerLinesByVat());
 
+        /*
+         * Le numéro, obtenu de `ZSET_Numbering` comme pour la commande fournisseur : la
+         * numérotation vit dans ShakeDesign et son verrou est ce qui interdit qu'une offre créée
+         * du web et une créée dans FileMaker partagent un numéro. Sans lui - le droit d'exécuter
+         * le script peut être fermé - l'offre existe quand même, sans référence.
+         */
+        $number = $client->nextNumber('OFF');
+
+        if ($number !== null) {
+            try {
+                $client->updateOffer($created['recordId'], ['Number' => $number]);
+            } catch (ShakeDesignApiException) {
+                $number = null;
+            }
+        }
+
         return response()->json([
             'data' => [
-                'offer' => ['zkp' => $created['zkp'] ?? null],
+                'offer' => ['zkp' => $created['zkp'] ?? null, 'number' => $number],
                 'offers' => $this->offers($metre, $client),
             ],
         ], 201);

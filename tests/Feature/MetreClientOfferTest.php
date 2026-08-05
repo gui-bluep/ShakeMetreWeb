@@ -98,6 +98,16 @@ class MetreClientOfferTest extends TestCase
                 'response' => ['recordId' => '900', 'modId' => '0'],
                 'messages' => [['code' => '0', 'message' => 'OK']],
             ]),
+            // La numérotation, appelée après création. Un motif non couvert ne serait pas bloqué :
+            // il partirait pour de vrai (voir la note du CLAUDE.md sur Http::fake()).
+            '*/script/ZSET_Numbering*' => Http::response([
+                'response' => ['scriptResult' => 'OFF-2026-0007', 'scriptError' => '0'],
+                'messages' => [['code' => '0', 'message' => 'OK']],
+            ]),
+            '*/layouts/API_OFF/records/501' => Http::response([
+                'response' => ['data' => [['fieldData' => ['zkp' => 'OFF-NEW'], 'recordId' => '501']], 'modId' => '1'],
+                'messages' => [['code' => '0', 'message' => 'OK']],
+            ]),
             '*/layouts/API_OFF/_find' => Http::response([
                 'response' => ['data' => array_map(fn ($o) => ['fieldData' => $o, 'recordId' => '1'], $offers)],
                 'messages' => [['code' => '0', 'message' => 'OK']],
@@ -325,6 +335,61 @@ class MetreClientOfferTest extends TestCase
         $this->get("/metres/{$this->metre->id}")->assertInertia(fn ($page) => $page
             ->where('filemakerLink.host', null)
             ->where('filemakerLink.database', null));
+    }
+
+    /**
+     * L'offre reçoit son numéro de `ZSET_Numbering`, comme la commande fournisseur.
+     *
+     * Le compteur vit dans ShakeDesign et son `Open Record/Request` est ce qui interdit qu'une
+     * offre créée du web et une créée dans FileMaker portent le même numéro. Le refuser au web
+     * laisserait des offres sans référence, ce qui a été le cas jusqu'ici.
+     */
+    public function test_a_created_offer_is_numbered(): void
+    {
+        $this->actAsWriter();
+        $this->fakeShakeDesign();
+        $this->line(['price_sales' => 100, 'quantity' => 1]);
+
+        $this->postJson("/api/metres/{$this->metre->id}/offer")
+            ->assertCreated()
+            ->assertJsonPath('data.offer.number', 'OFF-2026-0007');
+
+        $patched = collect(Http::recorded())
+            ->map(fn ($pair) => $pair[0])
+            ->first(fn ($r) => $r->method() === 'PATCH' && str_contains($r->url(), 'API_OFF/records/'));
+
+        $this->assertNotNull($patched, 'Le numéro doit être reposé sur l\'offre créée.');
+        $this->assertSame('OFF-2026-0007', ((array) $patched->data()['fieldData'])['Number']);
+    }
+
+    /** Numérotation fermée au compte API : l'offre existe quand même, sans référence. */
+    public function test_an_unavailable_numbering_still_creates_the_offer(): void
+    {
+        $this->actAsWriter();
+        Http::fake([
+            '*/sessions' => Http::response(['response' => ['token' => 't'], 'messages' => [['code' => '0']]]),
+            '*/layouts/API_PRJ/_find' => Http::response([
+                'response' => ['data' => [['fieldData' => ['zkp' => self::PROJECT], 'recordId' => '1']]],
+                'messages' => [['code' => '0']],
+            ]),
+            '*/script/ZSET_Numbering*' => Http::response(['messages' => [['code' => '104', 'message' => 'missing']]], 500),
+            '*/layouts/API_OFF/records/501' => Http::response([
+                'response' => ['data' => [['fieldData' => ['zkp' => 'OFF-NEW'], 'recordId' => '501']]],
+                'messages' => [['code' => '0']],
+            ]),
+            '*/layouts/API_OFF/records' => Http::response([
+                'response' => ['recordId' => '501', 'modId' => '0'], 'messages' => [['code' => '0']],
+            ]),
+            '*/layouts/API_OFL/records' => Http::response([
+                'response' => ['recordId' => '900', 'modId' => '0'], 'messages' => [['code' => '0']],
+            ]),
+            '*/layouts/API_OFF/_find' => Http::response(['response' => ['data' => []], 'messages' => [['code' => '0']]]),
+        ]);
+        $this->line(['price_sales' => 100, 'quantity' => 1]);
+
+        $this->postJson("/api/metres/{$this->metre->id}/offer")
+            ->assertCreated()
+            ->assertJsonPath('data.offer.number', null);
     }
 
     /** La recherche est bornée au métré : c'est zkf_MET qui filtre, pas le projet. */
