@@ -959,6 +959,45 @@ class MetreLineDetailViewTest extends TestCase
         $this->get($this->url())->assertRedirect('/login');
     }
 
+    // --- le jeu trouvé d'un lot ---------------------------------------------------------------
+
+    /**
+     * `?lot=` réduit la vue aux lignes d'un lot - `MET_LOT_ShowOrder_METL`, le bouton du cadre
+     * Fournisseurs. Un jeu trouvé posé par le serveur, que la page annonce et sait quitter.
+     */
+    public function test_a_lot_filter_narrows_the_view_to_that_lots_lines(): void
+    {
+        $this->actAsWriter();
+
+        $lot = Lot::forceCreate([
+            'project_id' => self::PROJECT, 'code' => 7, 'title_fr' => 'Toiture',
+        ]);
+
+        $this->line(['lot_id' => $lot->id, 'refsl_title' => 'Sur le lot']);
+        $this->line(['refsl_title' => 'Hors lot']);
+
+        $this->get($this->url().'?lot='.$lot->id)->assertInertia(fn ($page) => $page
+            ->has('lines', 1)
+            ->where('lines.0.refsl_title', 'Sur le lot')
+            ->where('lotFilter.code', 7)
+            ->where('lotFilter.name', 'Toiture'));
+
+        // Sans le paramètre, le métré entier, et la page ne prétend aucune restriction.
+        $this->get($this->url())->assertInertia(fn ($page) => $page
+            ->has('lines', 2)
+            ->where('lotFilter', null));
+    }
+
+    /** Le lot d'un autre chantier n'est pas une vue vide, c'est un mauvais lien. */
+    public function test_a_lot_from_another_project_is_not_found(): void
+    {
+        $this->actAsWriter();
+
+        $foreign = Lot::forceCreate(['project_id' => 'PRJ-OTHER', 'code' => 1]);
+
+        $this->get($this->url().'?lot='.$foreign->id)->assertNotFound();
+    }
+
     // --- opening a supplier order in the FileMaker client ------------------------------------
 
     /**

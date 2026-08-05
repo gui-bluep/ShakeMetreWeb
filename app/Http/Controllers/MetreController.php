@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\LockMetreRequest;
 use App\Http\Requests\UpdateMetreRequest;
 use App\Jobs\RecalculateMetreTotals;
+use App\Models\Lot;
 use App\Models\Metre;
 use App\Models\MetreLine;
 use App\Models\MetreLineComponent;
@@ -13,6 +14,7 @@ use App\Services\ShakeDesign\ShakeDesignApiException;
 use App\Services\ShakeDesign\ShakeDesignClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -23,7 +25,7 @@ use Inertia\Response;
  */
 class MetreController extends Controller
 {
-    public function show(Metre $metre, ShakeDesignClient $client): Response
+    public function show(Request $request, Metre $metre, ShakeDesignClient $client): Response
     {
         $project = $metre->project_id === null ? null : $client->findProject($metre->project_id);
 
@@ -48,10 +50,33 @@ class MetreController extends Controller
             // l'offre, que la liste ci-dessus porte déjà. Voir FileMakerClientTarget.
             'filemakerLink' => FileMakerClientTarget::toArray(),
 
+            /*
+             * Le lot que le cadre Fournisseurs doit retrouver sélectionné - `?lot=`, que les
+             * boutons « Métré » de la vue des lignes et de l'appel d'offres reportent. La
+             * sélection reste un état d'écran ; ce paramètre ne fait que la rendre après un
+             * aller-retour, plutôt que d'obliger à la refaire.
+             *
+             * Silencieusement ignoré si le lot n'est pas de ce projet : rien n'est affirmé par
+             * cette URL, donc rien ne justifie un 404 - contrairement à `?lot=` sur la vue des
+             * lignes, où il commande le jeu trouvé.
+             */
+            'initialLotId' => $this->chosenLotId($request, $metre),
+
             // Shown in the delete confirmation, so what is about to be destroyed is stated
             // rather than left to be discovered.
             'lineCount' => $metre->metreLines()->count(),
         ]);
+    }
+
+    private function chosenLotId(Request $request, Metre $metre): ?string
+    {
+        $id = trim((string) $request->query('lot'));
+
+        if ($id === '' || $metre->project_id === null) {
+            return null;
+        }
+
+        return Lot::where('id', $id)->where('project_id', $metre->project_id)->exists() ? $id : null;
     }
 
     public function update(UpdateMetreRequest $request, Metre $metre): JsonResponse

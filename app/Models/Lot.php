@@ -234,6 +234,31 @@ class Lot extends Model
     /**
      * @return array<string, float|null>
      */
+    /**
+     * Restreint tous les totaux d'appel d'offres de ce lot aux lignes d'un seul métré.
+     *
+     * `METT_LOT_ShowLOT` arrive sur l'écran de comparaison avec un jeu trouvé réduit à
+     * `zkf_LOT = lot AND zkf_MET = métré`, et les champs de synthèse de `METT_LOT_Form` totalisent
+     * **le jeu trouvé** : venir d'un métré restreint donc aussi les scores, pas seulement la
+     * liste. Ne restreindre que l'affichage donnerait un écran où les lignes disent une chose et
+     * les scores une autre.
+     *
+     * Posé sur le modèle plutôt qu'ajouté en argument aux six méthodes de score : elles
+     * s'appellent l'une l'autre - `finalScore` → `priceScore` → `bestPricePercentage` → `sum` -
+     * et un argument oublié dans la chaîne serait un score juste à l'écran et faux au total.
+     *
+     * `null` rend la portée au lot entier, qui est ce que montre la page projet.
+     */
+    public function restrictToMetre(?string $metreId): static
+    {
+        $this->scopeMetreId = $metreId === null || trim($metreId) === '' ? null : $metreId;
+        $this->tenderTotals = null;   // le mémo porte sur une portée : il change avec elle
+
+        return $this;
+    }
+
+    private ?string $scopeMetreId = null;
+
     private function tenderTotals(): array
     {
         if ($this->tenderTotals !== null) {
@@ -250,6 +275,7 @@ class Lot extends Model
 
         $row = DB::table('metre_lines')
             ->where('lot_id', $this->getKey())
+            ->when($this->scopeMetreId !== null, fn ($q) => $q->where('metre_id', $this->scopeMetreId))
             ->selectRaw(implode(', ', $columns))
             ->first();
 

@@ -752,4 +752,40 @@ class MetrePageTest extends TestCase
     {
         $this->get("/metres/{$this->metre()->id}")->assertRedirect('/login');
     }
+
+    // --- la sélection du cadre Fournisseurs ----------------------------------------------------
+
+    /**
+     * `?lot=` rend au cadre Fournisseurs le lot qu'on avait choisi avant d'ouvrir ses lignes ou
+     * son appel d'offres. Les deux boutons « Métré » le reportent ; la sélection reste par
+     * ailleurs un état d'écran, jamais enregistré.
+     */
+    public function test_the_metre_page_restores_a_chosen_lot_from_the_url(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre();
+        $lot = Lot::forceCreate(['project_id' => self::PROJECT, 'code' => 4]);
+
+        $this->get("/metres/{$metre->id}?lot={$lot->id}")
+            ->assertInertia(fn ($page) => $page->where('initialLotId', $lot->id));
+
+        $this->get("/metres/{$metre->id}")
+            ->assertInertia(fn ($page) => $page->where('initialLotId', null));
+    }
+
+    /**
+     * Un lot d'un autre chantier est ignoré, sans 404 : cette URL n'affirme rien - elle propose
+     * une sélection d'écran. C'est l'inverse de `?lot=` sur la vue des lignes, où le paramètre
+     * commande le jeu trouvé et où se tromper de lot est un mauvais lien.
+     */
+    public function test_a_foreign_lot_in_the_url_is_ignored_rather_than_refused(): void
+    {
+        $this->actAsWriter();
+        $metre = $this->metre();
+        $foreign = Lot::forceCreate(['project_id' => 'PRJ-OTHER', 'code' => 1]);
+
+        $this->get("/metres/{$metre->id}?lot={$foreign->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('initialLotId', null));
+    }
 }

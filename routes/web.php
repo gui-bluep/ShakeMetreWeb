@@ -8,6 +8,7 @@ use App\Http\Controllers\MetreDocumentController;
 use App\Http\Controllers\MetreLineComponentController;
 use App\Http\Controllers\MetreLineController;
 use App\Http\Controllers\MetreLineDetailController;
+use App\Http\Controllers\MetreSupplierOrderController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectSearchController;
@@ -75,8 +76,20 @@ Route::middleware('auth')->group(function () {
     Route::get('/metres/{metre}/documents/{document}', [MetreDocumentController::class, 'show'])
         ->name('metres.document');
 
+    /*
+     * Ce qui partirait dans une commande fournisseur pour un lot - l'écran de contrôle de
+     * MET_SOR_CreateCSupplierOrder. Une lecture : regarder ce qu'on s'apprête à commander n'est
+     * pas commander, et un compte en lecture seule doit pouvoir vérifier un chiffre.
+     */
+    Route::get('/api/metres/{metre}/lots/{lot}/supplier-order', [MetreSupplierOrderController::class, 'preview'])
+        ->name('metres.supplier-order.preview');
+
     Route::middleware('role.write')->group(function () {
         Route::patch('/api/metres/{metre}', [MetreController::class, 'update'])->name('metres.update');
+
+        // La création elle-même : une écriture chez ShakeDesign, comme l'offre client.
+        Route::post('/api/metres/{metre}/lots/{lot}/supplier-order', [MetreSupplierOrderController::class, 'store'])
+            ->name('metres.supplier-order.store');
 
         // Verrouiller / déverrouiller un métré - MET_LockUnlock. À part de la mise à jour du
         // métré : `is_locked_b` n'est pas dans son whitelist, et un verrou qui passerait par le

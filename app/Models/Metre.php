@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -100,6 +101,7 @@ class Metre extends Model
                 lots.title_custom, lots.title_fr, lots.title_en, lots.title_nl,
                 lots.cpy_name_ae AS company,
                 COALESCE(SUM('.MetreLine::SQL_BUY_NO_OPTIONS.'), 0) AS buy,
+                COALESCE(SUM('.MetreLine::SQL_SALES_NO_OPTIONS.'), 0) AS sales,
                 COALESCE(SUM('.MetreLine::SQL_ORDERED_NO_OPTIONS.'), 0) AS ordered,
                 COUNT(*) AS lines_count
             ')
@@ -135,6 +137,8 @@ class Metre extends Model
                 ])->displayTitle($language ?? $this->language),
                 'company' => $row->company,
                 'buy' => round($buy, 2),
+                // Les trois totaux que le cadre Fournisseurs affiche pour le lot choisi.
+                'sales' => round((float) $row->sales, 2),
                 'ordered' => round($ordered, 2),
                 'lines_count' => (int) $row->lines_count,
             ];
@@ -149,6 +153,42 @@ class Metre extends Model
             'assigned_ordered' => round($assignedOrdered, 2),
             'lots' => $lots,
         ];
+    }
+
+    /**
+     * Les lignes de ce métré qui partent dans une commande fournisseur pour un lot -
+     * le jeu trouvé de `MET_SOR_CreateCSupplierOrder`, celui qu'affiche son écran de contrôle
+     * `METL_SupplierOrderValidation` et sur lequel il écrit ensuite `zkf_SOR`.
+     *
+     * La source cherche `zkf_LOT = lot AND zkf_MET = métré AND isTenderLine_b = 0` : une ligne
+     * d'appel d'offres n'est pas une ligne à commander, c'est une variante qu'on compare.
+     *
+     * **Une divergence, et c'est la seule.** La source n'exclut pas les options ici : son garde
+     * `If [ $Action = "Order" ] → isOption_b = 0` est à l'intérieur de la branche
+     * `$Action = "Validation"`, donc il ne se déclenche jamais - le bouton passe « Validation ».
+     * C'est un reste : le même bloc, dans `MET_LOT_ShowOrder_METL`, est atteignable et exclut
+     * bien les options. Et le montant envoyé à ShakeDesign, lui, est
+     * `zsm_SumTotalOrdered_noOptions`, options exclues sans ambiguïté. Les inclure dans le jeu
+     * ferait donc deux choses fausses : montrer sur l'écran de contrôle des lignes qui ne pèsent
+     * rien dans le total, et estampiller une référence de commande sur une ligne en option, qui
+     * la verrouillerait. Options exclues, donc, en accord avec le montant. À dire si l'on
+     * préfère la lettre au sens : c'est un `where` à retirer.
+     */
+    public function supplierOrderLines(Lot $lot): Collection
+    {
+        return $this->metreLines()
+            ->where('lot_id', $lot->getKey())
+            ->where('is_tender_line_b', false)
+            ->where('is_option_b', false)
+            ->select('metre_lines.*')
+            ->selectRaw(MetreLine::SQL_ORDERED_NO_OPTIONS.' as ordered_amount')
+            // METL_Sort, l'ordre de travail d'un métré.
+            ->orderBy('ref_code')
+            ->orderBy('refs_code')
+            ->orderBy('refs_title')
+            ->orderBy('ref_order')
+            ->orderBy('sort_order')
+            ->get();
     }
 
     /**

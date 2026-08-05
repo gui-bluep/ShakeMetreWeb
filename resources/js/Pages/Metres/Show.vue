@@ -12,6 +12,7 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
 import { localToday } from '@/localDate';
 import { offerUrl } from '@/fileMakerLink';
+import { apiRequest as request, csrfToken } from '@/apiRequest';
 
 /**
  * One métré's own page. Header fields save as they are edited, through the same debounced
@@ -35,10 +36,19 @@ const props = defineProps({
      * propriété de l'installation ; le zkp de l'offre vient de la ligne du tableau.
      */
     filemakerLink: { type: Object, default: null },
+    /**
+     * Le lot à retrouver sélectionné dans le cadre Fournisseurs, quand on revient d'une vue
+     * ouverte depuis lui. La sélection reste un état d'écran : ceci ne fait que la rendre après
+     * un aller-retour.
+     */
+    initialLotId: { type: String, default: null },
 });
 
 const page = usePage();
 const readOnly = computed(() => page.props.auth?.canWrite === false);
+const readOnlyReason = computed(() =>
+    form.is_locked_b ? 'Métré verrouillé' : 'Compte en lecture seule'
+);
 
 /** Local working copy: edits land here first, the server confirms afterwards. */
 const form = reactive({ ...props.metre, totals: { ...props.metre.totals } });
@@ -193,6 +203,203 @@ async function setLocked(locked) {
     }
 }
 
+/*
+ * Le cadre « Fournisseurs » de MET_Form : un lot se choisit, puis deux actions portent sur lui.
+ *
+ * Le choix vit à l'écran et nulle part ailleurs, comme dans la source où `MET_LOT_Set` écrit dans
+ * `MET::zkg_LOT_Chosen` - un champ GLOBAL, donc propre à la session et jamais enregistré. Deux
+ * personnes sur le même métré ne se volent pas leur sélection.
+ */
+const chosenLotId = ref(props.initialLotId);
+
+/** Le popover de choix du lot - le cadre de MET_Form en a un, la liste étant longue. */
+const lotPickerOpen = ref(false);
+
+/*
+ * Copie locale de la répartition par lot : créer une commande déplace des montants de « acheté »
+ * vers « commandé », et le serveur renvoie la répartition recalculée pour que la carte le montre
+ * tout de suite. Re-semée quand la page change de métré, comme `form` - le piège documenté.
+ */
+const breakdown = ref(props.lotBreakdown);
+watch(() => props.lotBreakdown, (value) => { breakdown.value = value; });
+
+const chosenLot = computed(
+    () => breakdown.value.lots.find((l) => l.id === chosenLotId.value) ?? null
+);
+
+// Un métré chasse l'autre : Inertia réutilise ce composant d'un métré au suivant, et une
+// sélection qui survivrait désignerait un lot qu'on ne voit plus. Même raison que `form`.
+watch(() => props.metre.id, () => { chosenLotId.value = props.initialLotId; lotPickerOpen.value = false; });
+
+function chooseLot(lot) {
+    chosenLotId.value = lot.id;
+    lotPickerOpen.value = false;
+}
+
+const orderButtonTitle = computed(() => {
+    if (!chosenLot.value) return 'Choisissez un lot';
+    if (readOnly.value) return readOnlyReason.value;
+
+    return `Commander « ${chosenLot.value.name || 'ce lot'} » chez ${chosenLot.value.company || 'son fournisseur'}`;
+});
+
+/**
+ * L'écran de contrôle avant création - `Action = "Validation"` de MET_SOR_CreateCSupplierOrder.
+ *
+ * Le serveur dit ce qui partirait ET ce qui l'empêche, en une réponse : la source pose ses
+ * refus un par un, en boîtes de dialogue successives, si bien qu'on corrige un problème pour
+ * découvrir le suivant. Ici les quatre sont montrés ensemble.
+ */
+const orderPreview = ref(null);
+const orderError = ref(null);
+const orderCreated = ref(null);
+
+async function openSupplierOrder() {
+    if (!chosenLot.value || readOnly.value || busy.value) {
+        return;
+    }
+
+    busy.value = true;
+    orderError.value = null;
+
+    try {
+        const body = await request(
+            `/api/metres/${props.metre.id}/lots/${chosenLot.value.id}/supplier-order`,
+            'GET'
+        );
+        orderPreview.value = body.data;
+    } catch (e) {
+        orderError.value = e.message;
+    } finally {
+        busy.value = false;
+    }
+}
+
+/**
+ * La bande de l'écran de contrôle : en-tête de section, en-tête de sous-section, lignes.
+ *
+ * Plate et non imbriquée, comme les états imprimés et pour la même raison - c'est ce que fait une
+ * sous-totalisation FileMaker, et cela rend impossible un décalage entre l'ordre des lignes et
+ * celui des titres. Les sous-totaux sont recalculés ici plutôt que renvoyés par le serveur : les
+ * cellules changent sous les doigts, et un sous-total venu du serveur serait le seul chiffre
+ * périmé à l'écran. Même règle que les vues de lignes.
+ */
+const orderRows = computed(() => {
+    if (orderPreview.value === null) return [];
+
+    const rows = [];
+    let ref = null;
+    let refs = null;
+
+    const sum = (predicate) => round2(
+        orderPreview.value.lines
+            .filter((l) => predicate(l) && ! l.is_option_b)
+            .reduce((total, l) => total + (l.total ?? 0), 0)
+    );
+
+    for (const line of orderPreview.value.lines) {
+        const refKey = `${line.ref_code} ${line.ref_title}`;
+        const refsKey = `${refKey} ${line.refs_title}`;
+
+        if (refKey !== ref) {
+            ref = refKey;
+            refs = null;
+            rows.push({
+                kind: 'ref', key: `ref:${refKey}`, code: line.ref_code, title: line.ref_title,
+                total: sum((l) => `${l.ref_code} ${l.ref_title}` === refKey),
+            });
+        }
+
+        if (refsKey !== refs) {
+            refs = refsKey;
+            rows.push({
+                kind: 'refs', key: `refs:${refsKey}`, code: line.refs_code, title: line.refs_title,
+                total: sum((l) => `${l.ref_code} ${l.ref_title} ${l.refs_title}` === refsKey),
+            });
+        }
+
+        rows.push({ kind: 'line', key: line.id, line });
+    }
+
+    return rows;
+});
+
+/** Le total engagé : options exclues, comme le montant envoyé à ShakeDesign. */
+const orderTotal = computed(() => round2(
+    (orderPreview.value?.lines ?? [])
+        .filter((l) => ! l.is_option_b)
+        .reduce((total, l) => total + (l.total ?? 0), 0)
+));
+
+const round2 = (value) => Math.round(value * 100) / 100;
+const numberOrNull = (raw) => (raw === '' ? null : Number(raw));
+
+const { queue: queueLine } = useDebouncedRowSave({
+    endpoint: '/api/metre-lines',
+    delay: 500,
+    onError: ({ rowId, rollback, message }) => {
+        const line = orderPreview.value?.lines.find((l) => l.id === rowId);
+
+        if (line) {
+            Object.assign(line, rollback);
+            line.total = round2((line.price_ordered ?? 0) * (line.quantity_ordered ?? 0));
+        }
+
+        orderError.value = message;
+    },
+});
+
+/**
+ * Une cellule de l'écran de contrôle.
+ *
+ * Le total de la ligne est recalculé sur place - `Round ( PriceOrdered * QuantityOrdered ; 2 )`,
+ * la formule de `PriceTotalOrderedAll_c` - pour que le sous-total et le total suivent la frappe
+ * plutôt que d'attendre la réponse. Le serveur reste l'autorité : une erreur remet la valeur
+ * d'avant et le dit.
+ */
+function editOrderLine(line, field, value) {
+    if (readOnly.value || busy.value || line[field] === value) {
+        return;
+    }
+
+    const previous = line[field];
+    line[field] = value;
+    line.total = round2((line.price_ordered ?? 0) * (line.quantity_ordered ?? 0));
+    orderError.value = null;
+
+    queueLine(line.id, field, value, previous);
+}
+
+async function createSupplierOrder() {
+    if (!orderPreview.value || readOnly.value || busy.value) {
+        return;
+    }
+
+    busy.value = true;
+    orderError.value = null;
+
+    try {
+        const body = await request(
+            `/api/metres/${props.metre.id}/lots/${orderPreview.value.lot.id}/supplier-order`,
+            'POST'
+        );
+
+        orderPreview.value = null;
+        orderCreated.value = body.data.supplier_order;
+
+        // Les montants « commandé » de la carte viennent de changer : le serveur renvoie la
+        // répartition recalculée plutôt que de laisser l'écran mentir jusqu'au prochain
+        // rafraîchissement.
+        if (body.data.lot_breakdown) {
+            breakdown.value = body.data.lot_breakdown;
+        }
+    } catch (e) {
+        orderError.value = e.message;
+    } finally {
+        busy.value = false;
+    }
+}
+
 /**
  * Une offre client dans ShakeDesign - MET_OFF_CreateClientOffer.
  *
@@ -268,14 +475,6 @@ async function createOffer() {
 }
 
 const lockError = ref(null);
-
-function csrfToken() {
-    const cookie = document.cookie.split('; ').find((entry) => entry.startsWith('XSRF-TOKEN='));
-
-    return cookie
-        ? decodeURIComponent(cookie.slice('XSRF-TOKEN='.length))
-        : (document.querySelector('meta[name="csrf-token"]')?.content ?? '');
-}
 
 function destroy() {
     busy.value = true;
@@ -356,6 +555,18 @@ const currency = new Intl.NumberFormat('fr-BE', { minimumFractionDigits: 2, maxi
 
 function money(value) {
     return value === null || value === undefined ? '—' : `${currency.format(value)} €`;
+}
+
+/**
+ * Une quantité, sans ses zéros de fin : la colonne est un `decimal(15,4)` et « 2,0000 » se lit
+ * comme une précision qu'on n'a pas. Deux décimales au plus, et aucune quand il n'y en a pas.
+ */
+function quantity(value) {
+    if (value === null || value === undefined || value === '') {
+        return '—';
+    }
+
+    return new Intl.NumberFormat('fr-BE', { maximumFractionDigits: 2 }).format(Number(value));
 }
 
 /**
@@ -726,41 +937,126 @@ function statusClasses(active) {
                      portent aucun montant dans ce métré sont omis - la carte est étroite, et un lot
                      à zéro n'apprend rien ici (la page du projet, elle, les liste tous). -->
                 <AppCard title="Fournisseur" class="lg:col-span-4">
-                    <div v-if="lotBreakdown.lots.length > 0 || lotBreakdown.unassigned_buy > 0" class="flex flex-col gap-3">
-                        <!-- Les trois totaux. « Sans lot » n'est pas un manque à afficher plus tard :
-                             c'est le montant qui n'a encore été attribué à personne. -->
-                        <dl class="grid grid-cols-3 gap-2 text-center">
-                            <div class="rounded-md bg-clay-50/70 px-2 py-1.5">
-                                <dt class="eyebrow">Avec lot</dt>
-                                <dd class="num text-[13px] text-sand-900">{{ money(lotBreakdown.assigned_buy) }}</dd>
+                    <div v-if="breakdown.lots.length > 0 || breakdown.unassigned_buy > 0" class="flex flex-col gap-3">
+                        <!--
+                            La disposition de MET_Form, dans son ordre : deux champs en lecture
+                            seule (le lot, son fournisseur) et le bouton qui ouvre le popover de
+                            choix ; puis, une fois un lot choisi, une croix pour l'effacer, les
+                            trois totaux du lot avec le bouton qui mène à ses lignes, et les deux
+                            actions. Rien de tout cela n'est affiché grisé d'avance : la source le
+                            fait apparaître, et un écran qui montre six commandes mortes se lit
+                            comme un écran cassé.
+                        -->
+                        <div class="flex items-end gap-2">
+                            <div class="min-w-0 flex-1">
+                                <span class="field-label">Lot</span>
+                                <p class="readonly-value truncate text-left" :class="chosenLot ? '' : 'text-sand-400 italic'">
+                                    {{ chosenLot ? (chosenLot.name || 'Lot sans nom') : 'Aucun lot sélectionné' }}
+                                </p>
                             </div>
-                            <div class="rounded-md bg-sand-100 px-2 py-1.5">
-                                <dt class="eyebrow">Sans lot</dt>
-                                <dd class="num text-[13px] text-sand-900">{{ money(lotBreakdown.unassigned_buy) }}</dd>
+                            <div class="min-w-0 flex-1">
+                                <span class="field-label">Fournisseur</span>
+                                <p class="readonly-value truncate text-left" :class="chosenLot?.company ? '' : 'text-sand-400 italic'">
+                                    {{ chosenLot ? (chosenLot.company || 'Aucun fournisseur') : '—' }}
+                                </p>
                             </div>
-                            <div class="rounded-md bg-mallow-50/70 px-2 py-1.5">
-                                <dt class="eyebrow">Commandé</dt>
-                                <dd class="num text-[13px] text-sand-900">{{ money(lotBreakdown.assigned_ordered) }}</dd>
-                            </div>
-                        </dl>
 
-                        <ul class="divide-y divide-sand-200/70">
-                            <li v-for="lot in lotBreakdown.lots" :key="lot.id" class="flex items-baseline gap-2 py-1.5">
-                                <span v-if="lot.code !== null" class="code-chip shrink-0">{{ lot.code }}</span>
-                                <span class="min-w-0 flex-1">
-                                    <span class="block truncate text-[13px] text-sand-900">
-                                        {{ lot.name || 'Lot sans nom' }}
-                                    </span>
-                                    <span class="block truncate text-[11px]" :class="lot.company ? 'text-sand-600' : 'text-sand-400 italic'">
-                                        {{ lot.company || 'Aucun fournisseur' }}
-                                    </span>
-                                </span>
-                                <span class="shrink-0 text-right">
-                                    <span class="block num text-[12px] text-clay-700">{{ money(lot.buy) }}</span>
-                                    <span class="block num text-[11px] text-mallow-700">{{ money(lot.ordered) }}</span>
-                                </span>
-                            </li>
-                        </ul>
+                            <!-- Le choix : un popover, comme la source. La liste des lots est
+                                 longue sur un vrai chantier et n'a pas à occuper la carte en
+                                 permanence. -->
+                            <div class="relative shrink-0">
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary"
+                                    :aria-expanded="lotPickerOpen"
+                                    @click="lotPickerOpen = !lotPickerOpen"
+                                >
+                                    <Icon name="search" :size="4" />
+                                </button>
+
+                                <div v-if="lotPickerOpen" class="popover absolute right-0 top-full mt-1 w-80" @keydown.escape="lotPickerOpen = false">
+                                    <p class="border-b border-sand-200 px-3 pb-1.5 text-[11px] uppercase tracking-[0.06em] text-sand-600">Choisir un lot</p>
+                                    <ul class="max-h-72 overflow-y-auto">
+                                        <li v-for="lot in breakdown.lots" :key="lot.id">
+                                            <button
+                                                type="button"
+                                                class="flex w-full items-baseline gap-2 px-3 py-1.5 text-left hover:bg-sand-50"
+                                                :class="chosenLotId === lot.id ? 'bg-accent-400/25' : ''"
+                                                @click="chooseLot(lot)"
+                                            >
+                                                <span v-if="lot.code !== null" class="code-chip shrink-0">{{ lot.code }}</span>
+                                                <span class="min-w-0 flex-1">
+                                                    <span class="block truncate text-[13px] text-sand-900">{{ lot.name || 'Lot sans nom' }}</span>
+                                                    <span class="block truncate text-[11px]" :class="lot.company ? 'text-sand-600' : 'text-sand-400 italic'">
+                                                        {{ lot.company || 'Aucun fournisseur' }}
+                                                    </span>
+                                                </span>
+                                                <span class="num shrink-0 text-[11px] text-clay-700">{{ money(lot.buy) }}</span>
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- N'apparaît qu'une fois un lot choisi - HIDE: IsEmpty ( zkg_LOT_Chosen ). -->
+                            <button
+                                v-if="chosenLot"
+                                type="button"
+                                class="btn btn-secondary shrink-0"
+                                title="Retirer la sélection"
+                                @click="chosenLotId = null"
+                            >
+                                <Icon name="x" :size="4" />
+                            </button>
+                        </div>
+
+                        <template v-if="chosenLot">
+                            <!-- Les trois totaux DU LOT dans ce métré, et le bouton qui mène à ses
+                                 lignes - MET_LOT_ShowOrder_METL, qui restreint le jeu trouvé à
+                                 `zkf_LOT AND zkf_MET`. -->
+                            <div class="flex items-end gap-2">
+                                <dl class="grid flex-1 grid-cols-3 gap-2 text-center">
+                                    <div class="rounded-md bg-clay-50/70 px-2 py-1.5">
+                                        <dt class="eyebrow">Achats</dt>
+                                        <dd class="num text-[13px] text-sand-900">{{ money(chosenLot.buy) }}</dd>
+                                    </div>
+                                    <div class="rounded-md bg-olive-50/70 px-2 py-1.5">
+                                        <dt class="eyebrow">Ventes</dt>
+                                        <dd class="num text-[13px] text-sand-900">{{ money(chosenLot.sales) }}</dd>
+                                    </div>
+                                    <div class="rounded-md bg-mallow-50/70 px-2 py-1.5">
+                                        <dt class="eyebrow">Commandé</dt>
+                                        <dd class="num text-[13px] text-sand-900">{{ money(chosenLot.ordered) }}</dd>
+                                    </div>
+                                </dl>
+
+                                <Link
+                                    :href="`/metres/${metre.id}/lines/achats-ventes-commandes?lot=${chosenLot.id}`"
+                                    class="btn btn-secondary shrink-0"
+                                    title="Voir les lignes de ce lot"
+                                >
+                                    <Icon name="chevron-right" :size="4" />
+                                </Link>
+                            </div>
+
+                            <div class="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    class="btn btn-accent"
+                                    :disabled="readOnly || busy"
+                                    :title="orderButtonTitle"
+                                    @click="openSupplierOrder"
+                                >
+                                    Création d'une commande fournisseur
+                                </button>
+                                <Link
+                                    :href="`/lots/${chosenLot.id}/tender-comparison?metre=${metre.id}`"
+                                    class="btn btn-secondary"
+                                >
+                                    Appel d'offres
+                                </Link>
+                            </div>
+                        </template>
                     </div>
 
                     <div v-else class="flex flex-col items-center gap-1.5 py-6 text-center">
@@ -876,6 +1172,182 @@ function statusClasses(active) {
                     :title="preview.label"
                     class="min-h-0 flex-1 border-0 bg-sand-100"
                 />
+            </div>
+        </Modal>
+
+        <!--
+            L'écran de contrôle avant commande - METL_SupplierOrderValidation. Il montre ce qui
+            partirait ligne par ligne, parce que le geste écrit chez quelqu'un d'autre et n'est
+            pas défaisable d'ici : le compte API de ShakeDesign n'a même pas le droit de supprimer.
+        -->
+        <Modal :show="orderPreview !== null" max-width="4xl" @close="orderPreview = null">
+            <div v-if="orderPreview" class="flex max-h-[80vh] flex-col">
+                <header class="surface-head">
+                    <h2 class="text-[15px] text-sand-900" style="font-variation-settings: 'wght' 600">
+                        Commande fournisseur — {{ orderPreview.lot.name || 'lot sans nom' }}
+                    </h2>
+                    <p class="mt-0.5 text-[12px] text-sand-600">
+                        {{ orderPreview.lot.company || 'Aucun fournisseur assigné' }}
+                    </p>
+                </header>
+
+                <div class="min-h-0 flex-1 overflow-y-auto p-5">
+                    <!-- Les empêchements d'abord, tous ensemble : la source les pose un par un
+                         en boîtes successives, si bien qu'on en corrige un pour découvrir le
+                         suivant. -->
+                    <ul v-if="orderPreview.blockers.length > 0" class="mb-4 flex flex-col gap-1.5">
+                        <li v-for="blocker in orderPreview.blockers" :key="blocker.code" class="banner banner-danger">
+                            <Icon name="alert" :size="4" class="mt-px" />
+                            <span>{{ blocker.message }}</span>
+                        </li>
+                    </ul>
+
+                    <p v-else class="mb-4 text-[13px] text-sand-700">
+                        Une commande sera créée dans <strong>ShakeDesign</strong> pour ce lot, avec
+                        <strong>une seule ligne</strong> portant le total commandé — c'est ce que fait
+                        la source. Le détail ci-dessous reste dans le métré.
+                    </p>
+
+                    <!--
+                        Groupé par section puis sous-section, avec un sous-total par groupe :
+                        METL_SupplierOrderValidation a les deux mêmes sous-totalisations que la vue
+                        Achats/Ventes/Commandes, et une commande se relit par corps de métier.
+
+                        Les quatre colonnes de droite sont modifiables, comme là-bas : c'est ici
+                        qu'on ajuste avant d'engager. Elles passent par PATCH /api/metre-lines/{id},
+                        la même surface d'écriture que les deux grilles - aucun écran n'a son propre
+                        avis sur ce qui est modifiable. Cocher « Opt. » sort la ligne de la commande,
+                        ce qui est la façon dont la source exclut un poste.
+                    -->
+                    <table v-if="orderPreview.lines.length > 0" class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="w-[4.5rem] text-left">Code</th>
+                                <th class="text-left">Poste</th>
+                                <th class="w-10 text-center">Opt.</th>
+                                <th class="w-20 text-left">Unité</th>
+                                <th class="w-24 text-right">Qté cdée</th>
+                                <th class="w-28 text-right">P.U.</th>
+                                <!-- Assez large pour « 10 000 000,00 € » d'un seul tenant : plus
+                                     étroite, la colonne repliait le symbole sous le montant. -->
+                                <th class="w-36 whitespace-nowrap text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template v-for="row in orderRows" :key="row.key">
+                                <tr v-if="row.kind === 'ref'" class="bg-sand-100">
+                                    <td colspan="6" class="text-sand-900" style="font-variation-settings: 'wght' 650">
+                                        <span v-if="row.code !== null" class="mr-1.5">{{ row.code }}</span>{{ row.title }}
+                                    </td>
+                                    <td class="num whitespace-nowrap text-right text-sand-900" style="font-variation-settings: 'wght' 650">{{ money(row.total) }}</td>
+                                </tr>
+
+                                <tr v-else-if="row.kind === 'refs'" class="bg-sand-50">
+                                    <td colspan="6" class="pl-4 text-sand-800">
+                                        <span v-if="row.code !== null" class="mr-1.5">{{ row.code }}</span>{{ row.title }}
+                                    </td>
+                                    <td class="num whitespace-nowrap text-right text-sand-800">{{ money(row.total) }}</td>
+                                </tr>
+
+                                <tr v-else>
+                                    <td class="num text-sand-600">{{ row.line.code || '—' }}</td>
+                                    <td>{{ row.line.title || 'Poste sans libellé' }}</td>
+                                    <td class="text-center">
+                                        <input
+                                            type="checkbox"
+                                            :checked="row.line.is_option_b"
+                                            :disabled="readOnly || busy"
+                                            title="Sortir cette ligne de la commande"
+                                            @change="editOrderLine(row.line, 'is_option_b', $event.target.checked)"
+                                        />
+                                    </td>
+                                    <td>
+                                        <select
+                                            :value="row.line.unit"
+                                            :disabled="readOnly || busy"
+                                            class="cell-input pr-5 focus:bg-white"
+                                            @change="editOrderLine(row.line, 'unit', $event.target.value || null)"
+                                        >
+                                            <option value="" />
+                                            <option v-for="u in orderPreview.units" :key="u" :value="u">{{ u }}</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number" step="any"
+                                            :value="row.line.quantity_ordered"
+                                            :disabled="readOnly || busy"
+                                            class="cell-input text-right focus:bg-white"
+                                            @input="editOrderLine(row.line, 'quantity_ordered', numberOrNull($event.target.value))"
+                                        />
+                                    </td>
+                                    <td>
+                                        <div class="relative">
+                                            <input
+                                                type="number" step="any"
+                                                :value="row.line.price_ordered"
+                                                :disabled="readOnly || busy"
+                                                class="cell-input pr-4 text-right tabular-nums focus:bg-white"
+                                                @input="editOrderLine(row.line, 'price_ordered', numberOrNull($event.target.value))"
+                                            />
+                                            <span class="euro-suffix">€</span>
+                                        </div>
+                                    </td>
+                                    <td class="num whitespace-nowrap text-right" :class="row.line.is_option_b ? 'italic text-sand-400' : ''">
+                                        {{ money(row.line.total) }}
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="6" class="text-right uppercase tracking-[0.04em] text-sand-700">Total commandé</td>
+                                <td class="num whitespace-nowrap text-right text-sand-950" style="font-variation-settings: 'wght' 650">
+                                    {{ money(orderTotal) }}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <p v-if="orderError" class="banner banner-danger mx-5 mb-3">
+                    <Icon name="alert" :size="4" class="mt-px" />
+                    <span>{{ orderError }}</span>
+                </p>
+
+                <div class="flex justify-end gap-2 border-t border-sand-200 bg-sand-50 px-5 py-3">
+                    <SecondaryButton :disabled="busy" @click="orderPreview = null">Annuler</SecondaryButton>
+                    <button
+                        type="button"
+                        class="btn btn-accent"
+                        :disabled="busy || orderPreview.blockers.length > 0"
+                        @click="createSupplierOrder"
+                    >
+                        Créer la commande
+                    </button>
+                </div>
+            </div>
+        </Modal>
+
+        <Modal :show="orderCreated !== null" max-width="md" @close="orderCreated = null">
+            <div v-if="orderCreated" class="p-5">
+                <h2 class="text-[15px] text-sand-900" style="font-variation-settings: 'wght' 600">
+                    Commande fournisseur créée
+                </h2>
+                <p class="mt-2 text-[13px] text-sand-700">
+                    <template v-if="orderCreated.number">
+                        Créée dans ShakeDesign sous la référence
+                        <span class="code-chip">{{ orderCreated.number }}</span>.
+                    </template>
+                    <template v-else>
+                        Créée dans ShakeDesign, <strong>sans numéro</strong> : la numérotation
+                        n'a pas pu être obtenue. La commande existe et les lignes y sont
+                        rattachées ; il lui manque sa référence.
+                    </template>
+                </p>
+                <div class="mt-5 flex justify-end">
+                    <SecondaryButton @click="orderCreated = null">Fermer</SecondaryButton>
+                </div>
             </div>
         </Modal>
 

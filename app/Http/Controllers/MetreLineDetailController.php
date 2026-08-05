@@ -15,6 +15,7 @@ use App\Models\MetreLineComponent;
 use App\Models\SubReferenceLine;
 use App\Services\ShakeDesign\FileMakerClientTarget;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -49,9 +50,20 @@ class MetreLineDetailController extends Controller
         'ventes' => ['ventes'],
     ];
 
-    public function show(Metre $metre, string $view): Response
+    /**
+     * `?lot=` réduit la vue aux lignes d'un lot - `MET_LOT_ShowOrder_METL`, le bouton posé à
+     * droite des trois totaux du cadre Fournisseurs, qui cherche `zkf_LOT AND zkf_MET`.
+     *
+     * Filtré par le serveur et non par le jeu trouvé de la page : c'est le jeu trouvé de la
+     * source, pas un affinage de l'existant, et le distinguer évite qu'un « tout étendre » le
+     * fasse disparaître sans qu'on comprenne pourquoi. La page le dit et offre d'en sortir.
+     */
+    public function show(Request $request, Metre $metre, string $view): Response
     {
+        $lot = $this->filterLot($request, $metre);
+
         $lines = $metre->metreLines()
+            ->when($lot !== null, fn ($q) => $q->where('lot_id', $lot->getKey()))
             ->with(['lot', 'metre'])
             /*
              * L'ordre d'affichage d'un métré, celui de METL_Sort tel que l'appellent les écrans de
@@ -100,6 +112,14 @@ class MetreLineDetailController extends Controller
              */
             'filemakerLink' => FileMakerClientTarget::toArray(),
 
+            // Le lot auquel la vue est réduite, s'il y en a un : la page l'annonce et propose
+            // d'en sortir, sinon on croit le métré vide.
+            'lotFilter' => $lot === null ? null : [
+                'id' => $lot->getKey(),
+                'code' => $lot->code,
+                'name' => $lot->displayTitle($metre->language),
+            ],
+
             // The lots a line may be assigned to: this project's, and only this project's - the
             // same constraint UpdateMetreLineRequest enforces on the way in.
             'lots' => $metre->project_id === null ? [] : Lot::query()
@@ -114,6 +134,22 @@ class MetreLineDetailController extends Controller
                     'name' => $lot->displayTitle($metre->language),
                 ])->values(),
         ]);
+    }
+
+    /** Le lot de `?lot=`, s'il est bien un lot du projet de ce métré. */
+    private function filterLot(Request $request, Metre $metre): ?Lot
+    {
+        $id = trim((string) $request->query('lot'));
+
+        if ($id === '') {
+            return null;
+        }
+
+        $lot = Lot::find($id);
+
+        abort_if($lot === null || $lot->project_id !== $metre->project_id, 404);
+
+        return $lot;
     }
 
     /**

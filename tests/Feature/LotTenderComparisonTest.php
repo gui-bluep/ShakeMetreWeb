@@ -300,4 +300,55 @@ class LotTenderComparisonTest extends TestCase
         $this->deleteJson("/api/lots/{$this->lot->id}")->assertStatus(403);
         $this->assertDatabaseHas('lots', ['id' => $this->lot->id]);
     }
+
+    // --- restriction à un métré ---------------------------------------------------------------
+
+    /**
+     * `?metre=` est la voie du bouton « Appel d'offres » du cadre Fournisseurs :
+     * `METT_LOT_ShowLOT` cherche `zkf_LOT = lot AND zkf_MET = métré`.
+     *
+     * La restriction porte AUSSI sur les scores. Dans la source, les synthèses de METT_LOT_Form
+     * totalisent le jeu trouvé ; ne filtrer que la liste donnerait un écran où les lignes disent
+     * une chose et les totaux une autre.
+     */
+    public function test_a_metre_scope_narrows_the_lines_and_the_scores(): void
+    {
+        $this->actAsWriter();
+
+        $this->line(['tender_supp1_price' => 100, 'tender_supp1_quantity' => 1]);
+
+        $other = Metre::forceCreate(['name' => 'Autre métré', 'project_id' => 'PRJ-1']);
+        MetreLine::forceCreate([
+            'metre_id' => $other->id, 'lot_id' => $this->lot->id, 'is_tender_line_b' => true,
+            'tender_supp1_price' => 900, 'tender_supp1_quantity' => 1,
+        ]);
+
+        // Sans portée : les deux métrés.
+        $this->get("/lots/{$this->lot->id}/tender-comparison")
+            ->assertInertia(fn ($page) => $page->has('lines', 2)->where('metre', null));
+
+        // Avec : celui-ci seulement, scores compris.
+        $this->get("/lots/{$this->lot->id}/tender-comparison?metre={$this->metre->id}")
+            ->assertInertia(fn ($page) => $page
+                ->has('lines', 1)
+                ->where('metre.id', $this->metre->id)
+                // Le score du fournisseur 1 ne compte plus que la ligne de ce métré.
+                // En valeur et non à l'identique : un décimal revient en float sur SQLite et en
+                // chaîne zéro-remplie sur MySQL - le piège consigné dans le CLAUDE.md.
+                ->where('scoring.suppliers.1.sum', fn ($sum) => (float) $sum === 100.0));
+
+        $this->getJson("/api/lots/{$this->lot->id}/tender-scoring?metre={$this->metre->id}")
+            ->assertOk()
+            ->assertJsonPath('data.scoring.suppliers.1.sum', fn ($sum) => (float) $sum === 100.0);
+    }
+
+    /** Un métré d'un autre chantier n'est pas une portée vide, c'est un mauvais lien. */
+    public function test_a_metre_from_another_project_is_not_found(): void
+    {
+        $this->actAsWriter();
+        $foreign = Metre::forceCreate(['name' => 'Ailleurs', 'project_id' => 'PRJ-2']);
+
+        $this->get("/lots/{$this->lot->id}/tender-comparison?metre={$foreign->id}")
+            ->assertNotFound();
+    }
 }

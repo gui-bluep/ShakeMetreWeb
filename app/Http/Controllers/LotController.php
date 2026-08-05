@@ -8,10 +8,12 @@ use App\Http\Requests\AwardTenderSupplierRequest;
 use App\Http\Requests\UpdateLotRequest;
 use App\Http\Resources\TenderMetreLineResource;
 use App\Models\Lot;
+use App\Models\Metre;
 use App\Models\MetreLine;
 use App\Services\ShakeDesign\ShakeDesignApiException;
 use App\Services\ShakeDesign\ShakeDesignClient;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -33,18 +35,39 @@ use InvalidArgumentException;
  */
 class LotController extends Controller
 {
-    public function show(Lot $lot): Response
+    /**
+     * `?metre=` restreint la comparaison aux lignes d'un métré - c'est par là qu'arrive le bouton
+     * « Appel d'offres » du cadre Fournisseurs, `METT_LOT_ShowLOT` cherchant
+     * `zkf_LOT = lot AND zkf_MET = métré`. Sans le paramètre, l'écran reste celui du lot entier,
+     * qui est celui de la page projet.
+     *
+     * La restriction descend jusqu'aux scores (`Lot::restrictToMetre()`) : dans la source, les
+     * synthèses de METT_LOT_Form totalisent le jeu trouvé, donc filtrer la liste sans filtrer les
+     * scores donnerait un écran qui se contredit.
+     */
+    public function show(Request $request, Lot $lot): Response
     {
+        $metre = $this->scopeMetre($request, $lot);
+
+        $lot->restrictToMetre($metre?->getKey());
+
         $slots = $this->assignedSlots($lot);
 
         $lines = $lot->metreLines()
             ->where('is_tender_line_b', true)
+            ->when($metre !== null, fn ($q) => $q->where('metre_id', $metre->getKey()))
             ->orderBy('sort_order')
             ->orderBy('sequence_number')
             ->get();
 
         return Inertia::render('Lots/TenderComparison', [
             ...$this->weightingAndScoring($lot),
+            // De quoi revenir d'où l'on vient, et dire à l'écran qu'il ne montre qu'un métré.
+            'metre' => $metre === null ? null : [
+                'id' => $metre->getKey(),
+                'name' => $metre->name,
+                'ind_project' => $metre->ind_project,
+            ],
             'suppliers' => $slots->map(fn (int $slot) => [
                 'slot' => $slot,
                 'company_id' => $lot->{"tender_supplier_{$slot}_id"},
@@ -59,9 +82,35 @@ class LotController extends Controller
      * resending the whole page. Read-only: available to a readonly account like the rest of
      * the comparison screen.
      */
-    public function scoring(Lot $lot): JsonResponse
+    public function scoring(Request $request, Lot $lot): JsonResponse
     {
+        // La même portée que la page, sinon un rafraîchissement de scores remplacerait les
+        // chiffres du métré par ceux du lot entier, sans que rien ne le dise.
+        $lot->restrictToMetre($this->scopeMetre($request, $lot)?->getKey());
+
         return response()->json(['data' => $this->weightingAndScoring($lot)]);
+    }
+
+    /**
+     * Le métré de `?metre=`, s'il en est un de ce lot.
+     *
+     * Un métré d'un autre chantier est un 404 plutôt qu'une restriction vide : l'URL affirmerait
+     * alors une appartenance qui n'existe pas, et un écran vide se lit comme « pas d'offres »
+     * plutôt que comme « mauvais lien ».
+     */
+    private function scopeMetre(Request $request, Lot $lot): ?Metre
+    {
+        $id = trim((string) $request->query('metre'));
+
+        if ($id === '') {
+            return null;
+        }
+
+        $metre = Metre::find($id);
+
+        abort_if($metre === null || $metre->project_id !== $lot->project_id, 404);
+
+        return $metre;
     }
 
     public function update(UpdateLotRequest $request, Lot $lot, ShakeDesignClient $client): JsonResponse

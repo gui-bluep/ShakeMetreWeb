@@ -10,6 +10,7 @@ import Icon from '@/Components/Icon.vue';
 import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
 import { fold, highlightParts, matches } from '@/searchMatch';
 import { supplierOrderUrl } from '@/fileMakerLink';
+import { apiRequest as request, csrfToken } from '@/apiRequest';
 
 /**
  * Les quatre vues monétaires des lignes d'un métré : « Achats — Ventes — Commandes » et ses trois
@@ -49,6 +50,12 @@ const props = defineProps({
      * ce qui varie d'une ligne à l'autre est son `supplier_order_id`.
      */
     filemakerLink: { type: Object, default: null },
+    /**
+     * Le lot auquel la vue est réduite, quand on arrive par le cadre Fournisseurs
+     * (`MET_LOT_ShowOrder_METL`). C'est un jeu trouvé, pas un filtre de la page : il est posé par
+     * le serveur, et l'écran doit le dire et offrir d'en sortir - sinon le métré paraît vide.
+     */
+    lotFilter: { type: Object, default: null },
 });
 
 const page = usePage();
@@ -903,41 +910,6 @@ async function deleteLine(row) {
 
 // --- transport ----------------------------------------------------------------------------
 
-async function request(url, method, payload = null) {
-    const response = await fetch(url, {
-        method,
-        credentials: 'same-origin',
-        headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-XSRF-TOKEN': csrfToken(),
-        },
-        body: payload === null ? undefined : JSON.stringify(payload),
-    });
-
-    if (response.status === 204) {
-        return {};
-    }
-
-    const body = await response.json().catch(() => null);
-
-    if (!response.ok) {
-        throw new Error(
-            body?.errors ? Object.values(body.errors).flat()[0] : (body?.message ?? `Échec (HTTP ${response.status})`)
-        );
-    }
-
-    return body;
-}
-
-function csrfToken() {
-    const cookie = document.cookie.split('; ').find((entry) => entry.startsWith('XSRF-TOKEN='));
-
-    return cookie
-        ? decodeURIComponent(cookie.slice('XSRF-TOKEN='.length))
-        : (document.querySelector('meta[name="csrf-token"]')?.content ?? '');
-}
 
 // --- display ------------------------------------------------------------------------------
 
@@ -1095,9 +1067,34 @@ const breadcrumbs = computed(() => [
     <div class="flex h-screen flex-col bg-sand-100" @click="popover = null">
         <AppTopBar :breadcrumbs="breadcrumbs" />
 
+        <!-- Le jeu trouvé venu du cadre Fournisseurs. Annoncé et réversible : c'est le serveur
+             qui l'a posé, aucun bouton de la grille ne le retire, et sans cette bande on croirait
+             le métré presque vide. -->
+        <div
+            v-if="lotFilter"
+            class="flex shrink-0 items-center gap-2 border-b border-sand-200 bg-accent-400/20 px-3 py-1.5 text-[12px] text-sand-900"
+        >
+            <Icon name="layers" :size="3.5" class="shrink-0 text-sand-700" />
+            <span class="min-w-0 truncate">
+                Réduit aux lignes du lot
+                <span v-if="lotFilter.code !== null" class="code-chip mx-1">{{ lotFilter.code }}</span>
+                <span style="font-variation-settings: 'wght' 600">{{ lotFilter.name || 'sans nom' }}</span>
+            </span>
+            <Link :href="`/metres/${metre.id}/lines/${view}`" class="btn btn-ghost btn-sm ml-auto shrink-0">
+                Voir tout le métré
+            </Link>
+        </div>
+
         <!-- Barre d'outils : ce qu'on fait de la grille, séparé de où l'on se trouve. -->
         <div class="flex shrink-0 flex-wrap items-center gap-2 border-b border-sand-200 bg-white px-3 py-2">
-            <Link :href="`/metres/${metre.id}`" class="btn btn-ghost btn-sm">
+            <!-- Le lot revient avec nous : on est arrivé ici depuis le cadre Fournisseurs, et
+                 retrouver le métré avec sa sélection perdue oblige à la refaire pour rien. Seul
+                 ce bouton la reporte - une navigation quelconque n'a pas à ressusciter un choix
+                 d'écran. -->
+            <Link
+                :href="lotFilter ? `/metres/${metre.id}?lot=${lotFilter.id}` : `/metres/${metre.id}`"
+                class="btn btn-ghost btn-sm"
+            >
                 <Icon name="arrow-left" :size="3.5" />
                 Métré
             </Link>

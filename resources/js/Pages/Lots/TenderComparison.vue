@@ -1,7 +1,8 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
-import { Head, usePage } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import AppTopBar from '../../Components/AppTopBar.vue';
+import Icon from '../../Components/Icon.vue';
 import { useDebouncedRowSave } from '../../composables/useDebouncedRowSave';
 
 /**
@@ -21,6 +22,12 @@ const props = defineProps({
     suppliers: { type: Array, required: true },
     lines: { type: Array, required: true },
     scoring: { type: Object, required: true },
+    /**
+     * Le métré d'où l'on vient, quand l'écran a été ouvert par « Appel d'offres » du cadre
+     * Fournisseurs. La comparaison est alors restreinte à ses lignes - `METT_LOT_ShowLOT` cherche
+     * `zkf_LOT AND zkf_MET` - et il faut de quoi y revenir : la source revient sur MET_Form.
+     */
+    metre: { type: Object, default: null },
 });
 
 const page = usePage();
@@ -403,18 +410,37 @@ function shortId(id) {
 
     <div class="min-h-screen bg-sand-100 pb-16">
         <AppTopBar
-            :breadcrumbs="[
-                { label: 'Projets', href: route('dashboard') },
-                { label: `Appel d'offres — ${lot.title ?? 'Lot ' + lot.code}` },
-            ]"
+            :breadcrumbs="metre
+                ? [
+                    { label: 'Projets', href: route('dashboard') },
+                    { label: metre.name ?? `Métré ${metre.ind_project}`, href: `/metres/${metre.id}` },
+                    { label: `Appel d'offres — ${lot.title ?? 'Lot ' + lot.code}` },
+                ]
+                : [
+                    { label: 'Projets', href: route('dashboard') },
+                    { label: `Appel d'offres — ${lot.title ?? 'Lot ' + lot.code}` },
+                ]"
         />
 
         <!-- Le badge « lecture seule » est dans la barre supérieure : c'est une propriété du
              compte, pas de cet écran. -->
-        <header class="border-b border-sand-200 bg-white px-6 py-3">
-            <h1 class="text-[17px] leading-tight text-sand-900" style="font-variation-settings: 'wght' 600">
-                Comparaison fournisseurs — {{ lot.title ?? `Lot ${lot.code}` }}
-            </h1>
+        <header class="flex items-center justify-between gap-4 border-b border-sand-200 bg-white px-6 py-3">
+            <div class="min-w-0">
+                <h1 class="truncate text-[17px] leading-tight text-sand-900" style="font-variation-settings: 'wght' 600">
+                    Comparaison fournisseurs — {{ lot.title ?? `Lot ${lot.code}` }}
+                </h1>
+                <!-- Dire la restriction : sans cela, un écran qui ne montre qu'une partie des
+                     offres du lot se lit comme un lot qui en a peu. -->
+                <p v-if="metre" class="mt-0.5 text-[12px] text-sand-600">
+                    Restreint aux lignes de {{ metre.name ?? `métré ${metre.ind_project}` }}
+                </p>
+            </div>
+
+            <!-- Avec le lot, pour la même raison que le bouton « Métré » des vues de lignes. -->
+            <Link v-if="metre" :href="`/metres/${metre.id}?lot=${lot.id}`" class="btn btn-secondary shrink-0">
+                <Icon name="arrow-left" :size="4" />
+                Retour au métré
+            </Link>
         </header>
 
         <!-- Weighting: shared across every supplier. Notes per supplier live in the panels below. -->
