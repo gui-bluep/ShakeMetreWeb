@@ -958,4 +958,88 @@ class MetreLineDetailViewTest extends TestCase
     {
         $this->get($this->url())->assertRedirect('/login');
     }
+
+    // --- opening a supplier order in the FileMaker client ------------------------------------
+
+    /**
+     * De quoi fabriquer le lien `fmp://` d'une commande fournisseur : la cible est envoyée une
+     * fois pour la page, le zkp de la commande vient de la ligne. C'est la page qui les assemble
+     * (resources/js/fileMakerLink.js, testé côté Vitest) - une URL par ligne ne dirait rien de
+     * plus et pèserait sur chacune des milliers de lignes d'un métré.
+     */
+    public function test_the_page_carries_the_filemaker_target_and_the_orders_zkp(): void
+    {
+        $this->actAsWriter();
+
+        config([
+            'services.shakedesign.fmp_host' => 'fms.example.test',
+            'services.shakedesign.fmp_database' => 'ShakeDesign',
+        ]);
+
+        $this->line([
+            'supplier_order_id' => 'SOR-1',
+            'sor_title_ref' => 'Commande 42',
+        ]);
+
+        $this->get($this->url())->assertInertia(fn ($page) => $page
+            ->where('filemakerLink.host', 'fms.example.test')
+            ->where('filemakerLink.database', 'ShakeDesign')
+            ->where('lines.0.supplier_order_id', 'SOR-1')
+            ->where('lines.0.sor_title_ref', 'Commande 42'));
+    }
+
+    /**
+     * SHAKEDESIGN_HOST porte couramment son schéma - la valeur en production est
+     * `https://fms23.mycloud.fm`, ShakeDesignClient l'acceptant avec ou sans. Une URL `fmp://`
+     * ne veut que le nom d'hôte, et `fmp://https://…` ne mène nulle part.
+     *
+     * Trouvé en regardant la configuration réelle, pas en la supposant : le lien ne se serait
+     * simplement pas affiché en production, sans rien dire de pourquoi.
+     */
+    public function test_the_data_api_scheme_is_stripped_from_the_filemaker_host(): void
+    {
+        $this->actAsWriter();
+
+        config([
+            'services.shakedesign.fmp_host' => 'https://fms23.mycloud.fm/',
+            'services.shakedesign.fmp_database' => 'ShakeDesign',
+        ]);
+
+        $this->line(['supplier_order_id' => 'SOR-1', 'sor_title_ref' => 'Commande 42']);
+
+        $this->get($this->url())->assertInertia(fn ($page) => $page
+            ->where('filemakerLink.host', 'fms23.mycloud.fm'));
+    }
+
+    /** Un port fait partie de l'adresse : le retirer enverrait le client sur un autre service. */
+    public function test_a_port_survives_the_host_normalisation(): void
+    {
+        $this->actAsWriter();
+
+        config(['services.shakedesign.fmp_host' => 'http://fms.example.test:5003']);
+
+        $this->get($this->url())->assertInertia(fn ($page) => $page
+            ->where('filemakerLink.host', 'fms.example.test:5003'));
+    }
+
+    /**
+     * Non configurée, la cible arrive vide plutôt qu'absente ou devinée : la page rend alors le
+     * libellé de la commande sans lien. Une URL fmp:// fabriquée sur un hôte au hasard ouvrirait
+     * une erreur FileMaker qui ne nomme pas sa cause.
+     */
+    public function test_an_unconfigured_filemaker_target_yields_no_link_rather_than_a_guess(): void
+    {
+        $this->actAsWriter();
+
+        config([
+            'services.shakedesign.fmp_host' => null,
+            'services.shakedesign.fmp_database' => null,
+        ]);
+
+        $this->line(['supplier_order_id' => 'SOR-1', 'sor_title_ref' => 'Commande 42']);
+
+        $this->get($this->url())->assertInertia(fn ($page) => $page
+            ->where('filemakerLink.host', null)
+            ->where('filemakerLink.database', null));
+    }
 }

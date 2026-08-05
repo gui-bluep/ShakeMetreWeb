@@ -289,6 +289,44 @@ class MetreClientOfferTest extends TestCase
             ->where('offers.1.total_no_tax', null));
     }
 
+    /**
+     * De quoi ouvrir une offre dans le client FileMaker : la cible `fmp://` arrive une fois pour
+     * la page, le zkp de l'offre vient de sa ligne. La page les assemble en
+     * `fmp://…/ShakeDesign?script=OFF_GoTo&param=<OFF>{zkp}</OFF>` - `ShakeDesign :: OFF_GoTo`
+     * (id 89) étant `SOR_GoTo` à la balise près. L'assemblage lui-même est testé côté Vitest.
+     *
+     * Le setUp remplace tout le bloc `services.shakedesign`, donc la cible y est absente : elle
+     * est posée ici, ce qui est aussi la preuve qu'elle vient bien de la configuration.
+     */
+    public function test_the_page_carries_what_it_takes_to_open_an_offer_in_filemaker(): void
+    {
+        $this->actAsWriter();
+        config([
+            'services.shakedesign.fmp_host' => 'https://fms23.mycloud.fm',
+            'services.shakedesign.fmp_database' => 'ShakeDesign',
+        ]);
+        $this->fakeShakeDesign([
+            ['zkp' => 'OFF-1', 'Title' => 'Offre initiale', 'OFL_Total_PriceNoTax_cU' => 5000],
+        ]);
+
+        $this->get("/metres/{$this->metre->id}")->assertInertia(fn ($page) => $page
+            // Le schéma du host Data API est retiré : `fmp://https://…` ne mène nulle part.
+            ->where('filemakerLink.host', 'fms23.mycloud.fm')
+            ->where('filemakerLink.database', 'ShakeDesign')
+            ->where('offers.0.zkp', 'OFF-1'));
+    }
+
+    /** Sans cible configurée, la page rend le titre de l'offre sans lien plutôt qu'un lien mort. */
+    public function test_an_unconfigured_filemaker_target_reaches_the_page_empty(): void
+    {
+        $this->actAsWriter();
+        $this->fakeShakeDesign([['zkp' => 'OFF-1', 'Title' => 'Offre initiale']]);
+
+        $this->get("/metres/{$this->metre->id}")->assertInertia(fn ($page) => $page
+            ->where('filemakerLink.host', null)
+            ->where('filemakerLink.database', null));
+    }
+
     /** La recherche est bornée au métré : c'est zkf_MET qui filtre, pas le projet. */
     public function test_the_list_is_filtered_on_the_metres_own_key(): void
     {

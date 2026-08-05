@@ -8,6 +8,7 @@ use App\Jobs\RecalculateMetreTotals;
 use App\Models\Metre;
 use App\Models\MetreLine;
 use App\Models\MetreLineComponent;
+use App\Services\ShakeDesign\FileMakerClientTarget;
 use App\Services\ShakeDesign\ShakeDesignApiException;
 use App\Services\ShakeDesign\ShakeDesignClient;
 use Illuminate\Http\JsonResponse;
@@ -41,6 +42,12 @@ class MetreController extends Controller
             // Les offres client de ce métré, par OFF_Offers.zkf_MET. Un appel distant de plus sur
             // cette page, assumé : c'est le seul moyen de les connaître, et il est dégradable.
             'offers' => $this->offers($metre, $client),
+
+            // De quoi ouvrir une offre dans le client FileMaker (fmp:// → OFF_GoTo). Une
+            // propriété de l'installation, envoyée une fois : ce qui varie est le zkp de
+            // l'offre, que la liste ci-dessus porte déjà. Voir FileMakerClientTarget.
+            'filemakerLink' => FileMakerClientTarget::toArray(),
+
             // Shown in the delete confirmation, so what is about to be destroyed is stated
             // rather than left to be discovered.
             'lineCount' => $metre->metreLines()->count(),

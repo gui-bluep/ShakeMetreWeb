@@ -11,6 +11,7 @@ import StatTile from '@/Components/StatTile.vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
 import { localToday } from '@/localDate';
+import { offerUrl } from '@/fileMakerLink';
 
 /**
  * One métré's own page. Header fields save as they are edited, through the same debounced
@@ -29,6 +30,11 @@ const props = defineProps({
     lotBreakdown: { type: Object, required: true },
     /** Les offres client du métré, ou `null` si ShakeDesign n'a pas répondu. */
     offers: { type: Array, default: null },
+    /**
+     * L'hôte et le fichier ShakeDesign, pour ouvrir une offre dans le client FileMaker. Une
+     * propriété de l'installation ; le zkp de l'offre vient de la ligne du tableau.
+     */
+    filemakerLink: { type: Object, default: null },
 });
 
 const page = usePage();
@@ -200,6 +206,28 @@ const offerCreated = ref(false);
 const offers = ref(props.offers);
 
 watch(() => props.offers, (value) => { offers.value = value; });
+
+/**
+ * Le titre d'une offre : un lien qui l'ouvre dans le client FileMaker quand on peut en fabriquer
+ * un, le même libellé sinon. Même règle que la commande fournisseur des vues de lignes — voir
+ * `sorLink()` dans LinesDetail.vue et fileMakerLink.js.
+ *
+ * Une offre créée à l'instant est linkable comme les autres : la réponse de création renvoie la
+ * liste relue chez ShakeDesign, zkp compris.
+ */
+const offerLink = (offer) => {
+    const href = offerUrl(props.filemakerLink, offer.zkp);
+    const label = offer.title || 'Offre sans titre';
+
+    return {
+        is: href ? 'a' : 'span',
+        href,
+        class: href
+            ? 'text-sand-800 underline decoration-sand-300 underline-offset-2 hover:text-sand-950 hover:decoration-sand-800'
+            : '',
+        title: href ? `Ouvrir « ${label} » dans ShakeDesign (FileMaker Pro)` : null,
+    };
+};
 
 async function createOffer() {
     if (readOnly.value || busy.value) {
@@ -636,7 +664,12 @@ function statusClasses(active) {
                         </thead>
                         <tbody>
                             <tr v-for="offer in offers" :key="offer.zkp">
-                                <td>{{ offer.title || 'Offre sans titre' }}</td>
+                                <!-- `is` explicitement lié : le compilateur de Vue ne le prend
+                                     pas dans un v-bind étalé, et le lien se rendrait en <span>
+                                     sans rien signaler. Même piège que sur les vues de lignes. -->
+                                <td>
+                                    <component :is="offerLink(offer).is" v-bind="offerLink(offer)">{{ offer.title || 'Offre sans titre' }}</component>
+                                </td>
                                 <td class="num">{{ offer.date || '—' }}</td>
                                 <td>{{ offer.category || '—' }}</td>
                                 <td>{{ offer.language || '—' }}</td>
@@ -647,8 +680,6 @@ function statusClasses(active) {
                         </tbody>
                     </table>
 
-                    <!-- L'ouverture d'une offre dans FileMaker est en attente : la cible, le script
-                         et le format du paramètre restent à confirmer, comme pour SOR_GoTo. -->
                 </AppCard>
 
                 <!-- Fournisseurs : le portail des lots de MET_Form. Les lots du projet qui ne

@@ -13,6 +13,7 @@ use App\Models\Metre;
 use App\Models\MetreLine;
 use App\Models\MetreLineComponent;
 use App\Models\SubReferenceLine;
+use App\Services\ShakeDesign\FileMakerClientTarget;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -87,6 +88,17 @@ class MetreLineDetailController extends Controller
             ],
             'lines' => MetreLineDetailResource::collection($lines)->resolve(),
             'units' => UpdateMetreLineRequest::UNITS,
+
+            /*
+             * De quoi fabriquer les liens `fmp://` qui ouvrent un enregistrement ShakeDesign dans
+             * le client FileMaker - aujourd'hui la commande fournisseur d'une ligne.
+             *
+             * Envoyé une fois pour la page et non par ligne : c'est une propriété de
+             * l'installation, pas de la ligne, et une URL par ligne pèserait une centaine
+             * d'octets sur chacune des milliers de lignes d'un métré pour redire la même chose.
+             * La ligne porte déjà `supplier_order_id`, qui est tout ce qui varie.
+             */
+            'filemakerLink' => FileMakerClientTarget::toArray(),
 
             // The lots a line may be assigned to: this project's, and only this project's - the
             // same constraint UpdateMetreLineRequest enforces on the way in.

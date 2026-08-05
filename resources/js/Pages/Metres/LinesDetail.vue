@@ -9,6 +9,7 @@ import ReferenceCatalogueModal from '@/Components/ReferenceCatalogueModal.vue';
 import Icon from '@/Components/Icon.vue';
 import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
 import { fold, highlightParts, matches } from '@/searchMatch';
+import { supplierOrderUrl } from '@/fileMakerLink';
 
 /**
  * Les quatre vues monétaires des lignes d'un métré : « Achats — Ventes — Commandes » et ses trois
@@ -42,6 +43,12 @@ const props = defineProps({
     lines: { type: Array, required: true },
     units: { type: Array, required: true },
     lots: { type: Array, required: true },
+    /**
+     * L'hôte et le fichier ShakeDesign, pour les liens `fmp://` qui ouvrent un enregistrement
+     * dans le client FileMaker. Une propriété de l'installation, envoyée une fois pour la page :
+     * ce qui varie d'une ligne à l'autre est son `supplier_order_id`.
+     */
+    filemakerLink: { type: Object, default: null },
 });
 
 const page = usePage();
@@ -273,6 +280,30 @@ const toneInk = (row, fallback) => {
     }
 
     return row.is_option_b ? 'text-info-700' : fallback;
+};
+
+/**
+ * La cellule « Commande fourn. » : un lien vers la commande dans le client FileMaker quand on
+ * peut en fabriquer un, le même intitulé non cliquable sinon.
+ *
+ * Rendre `<span>` plutôt qu'un `<a>` mort quand l'installation n'est pas configurée est
+ * délibéré : un lien qui ne mène nulle part se signale par une boîte de dialogue FileMaker
+ * incompréhensible, alors qu'un texte simple ne promet rien. La source masquait déjà son bouton
+ * sur `IsEmpty ( zkf_SOR )` ; ici l'intitulé reste, puisqu'il porte une information.
+ */
+const sorLink = (row) => {
+    const href = supplierOrderUrl(props.filemakerLink, row.supplier_order_id);
+
+    return {
+        is: href ? 'a' : 'span',
+        href,
+        class: href
+            ? 'text-sand-800 underline decoration-sand-300 underline-offset-2 hover:text-sand-950 hover:decoration-sand-800'
+            : 'text-sand-700',
+        title: href
+            ? `Ouvrir « ${row.sor_title_ref} » dans ShakeDesign (FileMaker Pro)`
+            : row.sor_title_ref,
+    };
 };
 
 /** Les morceaux d'un libellé, marqués ou non, pour le terme courant. */
@@ -1798,14 +1829,19 @@ const breadcrumbs = computed(() => [
                         />
                     </template>
 
-                    <!-- Linked ShakeDesign supplier order. Displayed only: opening it in the
-                         FileMaker client needs a confirmed fmp:// target - see the page note. -->
+                    <!-- La commande fournisseur ShakeDesign de la ligne. Cliquer l'ouvre dans le
+                         client FileMaker (fmp:// → ShakeDesign :: SOR_GoTo), comme le bouton
+                         SOR_GoTo de la source. Sans commande, ou sans cible configurée, le
+                         libellé reste mais ne mène nulle part - voir sorLink(). -->
                     <div class="min-w-0 truncate px-1.5 py-1 text-xs">
-                        <span
+                        <!-- `is` doit être lié explicitement : le compilateur de Vue le cherche
+                             sur l'élément et ne va pas le prendre dans un v-bind étalé - sans
+                             cela le lien se rendait en <span>, sans rien signaler. -->
+                        <component
+                            :is="sorLink(row).is"
                             v-if="row.sor_title_ref"
-                            class="text-sand-700"
-                            :title="`${row.sor_title_ref} — l'ouverture dans FileMaker n'est pas encore branchée`"
-                        ><template v-for="(part, i) in parts(row.sor_title_ref)" :key="i"><mark v-if="part.hit" class="search-hit">{{ part.text }}</mark><template v-else>{{ part.text }}</template></template></span>
+                            v-bind="sorLink(row)"
+                        ><template v-for="(part, i) in parts(row.sor_title_ref)" :key="i"><mark v-if="part.hit" class="search-hit">{{ part.text }}</mark><template v-else>{{ part.text }}</template></template></component>
                         <span v-else class="text-sand-300">—</span>
                     </div>
                 </div>
