@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ShakeMetre**, a quantity-survey/metré module originally built in FileMaker (`ShakeMetre.fmp12`), rebuilt here as a Laravel 13 / Inertia / Vue 3 application. It is coupled to **ShakeDesign**, which stays in FileMaker for the whole migration and is reached over the FileMaker Data API.
 
-The migration is well underway — this is **not** a skeleton. Already built and covered by **576 PHP tests and 64 Vitest tests**:
+The migration is well underway — this is **not** a skeleton. Already built and covered by **613 PHP tests and 64 Vitest tests**:
 
 - All 13 domain tables migrated, with UUID primary keys preserved from FileMaker.
 - Eloquent models per source table; `MetreLineObserver` / `MetreLineComponentObserver` driving `RecalculateMetreTotals` and `RecalculateMetreLineQuantitiesFromComponents`.
@@ -26,6 +26,7 @@ Run `git log --oneline` first — the commit messages carry the reasoning behind
 - `ShakeMetre_Analyse_et_Plan_Migration_Laravel.md` — architecture analysis and phased plan (French): the 17 source tables, FileMaker naming conventions (`zkp`, `zkf_`, `zg_`, `_Stored`, `_ae`, …), the target Eloquent mapping, the UUID strategy, the `_Stored` → Observer/queued-job pattern.
 - `ShakeMetre_data_dictionary.json` — all 17 tables, every field with its real calculation formula, 91 relationships, table occurrences, 274 scripts, 128 layouts, 92 custom functions, value lists.
 - `ShakeDesign_boundary_tables.json` — the 7 ShakeDesign tables ShakeMetre is coupled to.
+- `API_MIGRATION_layouts.md` — **the data migration's shopping list**: the seven layouts to create in the hosted ShakeMetre and the exact field to place on each, one per table to import. Written from the dictionary (a field name's case matters) and cross-checked against this database's columns. **The layouts now exist and carry every field of their table, not just these lists** — so this file is a record of what the import needs, not of what is there. See "Importing the live data" at the bottom of this file.
 
 **Critical constraint:** `OFF_Offers.zkf_MET` and `SOR_SupplierOrders.zkf_MET` in ShakeDesign store **hard references** to `MET_Metre.zkp`. `MET_Metre`, `METL_MetreLines`, `LOT_Lot`, `REF_Reference` and `METC_MetreLineComponent` must keep their existing UUIDs verbatim, or those foreign keys break silently. `MAT`, `CAT`, `CATS`, `CART`, `JCARTMAT` and `TAG` are on numeric legacy keys and free to be redesigned. `REFS` and `REFSL` are **not**, whatever the export says: their live records carry UUIDs like every other table (checked on the server — see below), and this project keeps them.
 
@@ -39,10 +40,12 @@ with a dedicated account. Credentials live in `.env` under `SHAKEMETRE_FM_*` and
 
 **Never use it from `app/`.** ShakeMetre becomes purely web: its data lives in this project's
 database, and nothing the application does at runtime may depend on the thing it replaces. The
-access exists for one purpose — establishing how the FileMaker application behaves, so the web
-version reproduces it instead of guessing. Throwaway scripts only. Both the config block and the
-environment variables get deleted when the migration is done, which is also why they are absent
-from `.env.example`.
+access exists for two purposes and no others — establishing how the FileMaker application behaves,
+so the web version reproduces it instead of guessing, and **importing the live data once**, which
+is the current thread. Throwaway scripts, or a console command that exists for the import and goes
+with it. Nothing under `app/` that a request can reach. Both the config block and the environment
+variables get deleted when the migration is done, which is also why they are absent from
+`.env.example`.
 
 What it answers, and what it does not:
 
@@ -67,7 +70,7 @@ Hard-won and worth knowing before trusting it:
 - The 250-character calc truncation **has been fixed** by a re-export (commit `3fb3a66`). Older comments referring to truncated formulas are historical.
 - `isTenderLine_b`, `Omit_b` and `TENDER_Id` are referenced by no formula at all.
 - **REFS and REFSL zkp are UUIDs, not numbers.** The export types them `Number`; the live records are UUIDs at all three levels, so the migration plan's "numeric legacy keys" no longer holds for them. `REF_Reference.Code`, on the other hand, really is text in places — the first section's code is the string `"00"`, which this project's `integer` column flattens to 0.
-- **A métré line does not point at the reference catalogue.** `zkf_REF` / `zkf_REFS` / `zkf_REFSL` are EMPTY on all 57 809 lines of the live file; the section lives on the line as copied values. See the settled decision below.
+- **A métré line does not point at the reference catalogue.** `zkf_REF` / `zkf_REFS` / `zkf_REFSL` are EMPTY on every line of the live file (57 816 as of 05/08/2026); the section lives on the line as copied values. See the settled decision below.
 - **The line's title is `REFSL_Title`, not `Description`.** Filled on 57 079 lines against 29 for `Description`, which holds a free note when it is used at all ("1374,07 € selon offre Collignon"). Both web grids currently edit `description` as the line title — see the settled decision below.
 - **The export lists what the tables contain. It does not tell you what the API layouts expose.** Those are two different things, and the difference has caused real bugs. Probe the live layout metadata (`GET /fmi/data/vLatest/databases/{db}/layouts/{layout}`) before relying on a field being reachable.
 
@@ -261,10 +264,289 @@ Any migration/seeder touching `MET_Metre`, `METL_MetreLines`, `LOT_Lot`, `REF_Re
 
 - **The ShakeDesign API account cannot delete.** Removing a test supplier order needed the full-access account (`Record access is denied`, code 200). Nothing needs it today - nothing here deletes over there - but cancelling an order from the web would.
 
-- **`metre_lines.lot_name_stored` is written by nobody.** The column exists, and `METL_Lot_AssignToSelection` maintains its FileMaker counterpart with a second `Replace Field Contents`: `Case ( MET::Language = "FR" ; LOT::Title_FR ; = "NL" ; Title_NL ; Title_EN )`. This application does not write it — neither the single-line PATCH nor the bulk assignment — because the displayed name is derived from the lot at read time (`title_custom ?: title_fr ?: title_en ?: title_nl`), which is strictly better: renaming a lot updates every line at once. Filling the column in one write path only would put the two in disagreement, and the derivation rule is not the source's rule either (it ignores `title_custom` and follows the métré's language). To settle: does anything outside this application — a printout, a ShakeDesign screen — read `LOT_Name_Stored`? If so it needs maintaining on both paths, with one agreed rule.
+- **`metre_lines.lot_name_stored` is written by nobody *in the application* — but the import fills it.** `shakemetre:import` copies `METL::LOT_Name_Stored` verbatim, because it is source data and dropping it would lose information the source holds. So after the import the column is populated for imported lines and stays untouched afterwards, which makes the disagreement below concrete rather than hypothetical: an imported line carries FileMaker's name, a line assigned a lot on the web carries nothing, and both display the name derived from the lot. Nothing reads the column, so nothing is wrong today. The question below is what settles it. The rest of the original note: the column exists, and `METL_Lot_AssignToSelection` maintains its FileMaker counterpart with a second `Replace Field Contents`: `Case ( MET::Language = "FR" ; LOT::Title_FR ; = "NL" ; Title_NL ; Title_EN )`. This application does not write it — neither the single-line PATCH nor the bulk assignment — because the displayed name is derived from the lot at read time (`title_custom ?: title_fr ?: title_en ?: title_nl`), which is strictly better: renaming a lot updates every line at once. Filling the column in one write path only would put the two in disagreement, and the derivation rule is not the source's rule either (it ignores `title_custom` and follows the métré's language). To settle: does anything outside this application — a printout, a ShakeDesign screen — read `LOT_Name_Stored`? If so it needs maintaining on both paths, with one agreed rule.
 - **Supplier company filtering** in the picker is limited to `isSupplier_b` + `isActive_b`. No company in ShakeDesign currently has `isActive_b = 0`, so that half of the filter has never been exercised against real data.
 - **The profile and password screens are still in Breeze's English** ("Profile Information", "Save", "Delete Account"). They now carry the DA but not the language of the rest of the application. `Welcome.vue`, Breeze's landing page on `/`, is untouched beyond the ramp remap.
 - **Three things the FileMaker line list does and this one does not yet.** Drag-and-drop reordering inside a sub-section (`zg_DRAG_N_DROP` + `Order`, which `METL_Reorder` renumbers 1..n); selection of a whole section or sub-section (`METL_Select_REF` / `_REFS`, which keep tri-state group flags in `MET::zkm_REF_Selection_g`); and pushing a line's unit price back into the catalogue (`METL_Update_REFSL_Price`, confirmation dialog included — it writes `REFSL::Price`, the direction one would not guess). Bulk **tagging** (`METL_Tag_AssignToSelection`) is not built either, though the bulk lot endpoint is the pattern to copy. The tag levels of the sort (`MET::Sort_OrderTags`, `TAG_Choice1_cU` / `TAG_Choice2_cU`) are deliberately deferred by the user.
 - **`REF_Reference.Code` is text in the source and an integer here.** The live catalogue's first section is the string `"00"`, which this project's column flattens to `0` — the line codes it feeds are numeric anyway (`0.0.1`), but the catalogue screen shows `0` where FileMaker shows `00`.
-- **The 57 809 métré lines are not imported yet.** The mapping is settled now, which was what it waited on: `REFSL_Title` → `refsl_title`, `Description` → `description`, the four section columns copied as they stand, `Order` → `ref_order`. The catalogue itself (19/118/507) can be re-read from the server whenever needed.
+- **The live data IS imported** — `php artisan shakemetre:import` has run against the hosted file and the database holds the real 877 métrés and 57 803 lines, audited against the source. See "Importing the live data" at the bottom of this file before re-running anything.
 - **The breadcrumb on the Achats/Ventes/Commandes view stops at the métré.** The project's *name* lives in ShakeDesign, and fetching it over the Data API for a single label would put a remote call on the heaviest screen of the application. `metre.project_id` is in the payload if that trade-off is ever revisited.
+
+## Importing the live data — where this stands
+
+**This is the current thread. The import has run against the live file, and the local database now
+holds the real data** — 877 métrés, 57 803 lines, 3 717 components, the 852 lots and the whole
+catalogue, audited métré by métré against the source (see "Checking what actually landed" below).
+Read this section before touching it; the command stays re-runnable and idempotent.
+
+    php artisan shakemetre:import --dry-run     # read and check everything, write nothing
+    php artisan shakemetre:import --fresh       # start from an empty database
+    php artisan shakemetre:import               # top up / correct without wiping
+    php artisan shakemetre:import --only=METL,METC   # replay one phase
+    php artisan shakemetre:import --audit       # compare both sides métré by métré, write nothing
+    php artisan shakemetre:import --repair      # re-read the métrés the audit found incomplete
+
+`app/Console/Commands/ImportLegacyShakeMetre.php` plus `app/Console/Commands/LegacyImport/`
+(the Data API reader and the field map). All three are **temporary and go with the migration**,
+which is why they sit together — the folder is deletable in one move. Covered by
+`tests/Feature/ImportLegacyShakeMetreTest.php`, 18 tests over a fake Data API.
+
+A full run takes **35–45 minutes**, almost all of it METL. Measured on a real dry run.
+
+### What there is to move, measured on the server (05/08/2026)
+
+| Source | Rows | Note |
+|---|---|---|
+| `METL` metre lines | **57 816** | the bulk of it; paged reads |
+| `METC` components | 3 717 | |
+| `MET` metres | 877 | |
+| `LOT` lots | 852 | |
+| `REFSL` / `REFS` / `REF` | 507 / 118 / 19 | the catalogue |
+| `CART`, `CAT`, `CATS`, `JCARTMAT`, `MAT`, `SUP`, `TAG` | **0** | empty, nothing to move |
+
+Seven tables are empty: the cart, the material catalogue, suppliers and the per-métré tags were
+never used. Their web tables stay empty, and that removes a large slice of the assumed work.
+`PRJ` (677) is a local mirror of ShakeDesign's projects and is **not** migrated — a métré's
+`project_id` is a ShakeDesign zkp and is read live.
+
+### The layouts exist, and they carry every field of their table
+
+**A Data API read only sees the fields placed on the layout it targets** — the reason the seven
+`API_MIGRATION_*` layouts had to be built at all, `DEV/Raw/*` being made for inspection and
+missing `IndProject`, `Language`, `isAccepted_b` and every total. They now exist in the hosted
+ShakeMetre, and the user put **all** of each table's fields on them rather than only the list in
+`docs/filemaker-reference/API_MIGRATION_layouts.md`. Probed and confirmed: 124 / 235 / 35 / 107 /
+40 / 35 / 43 fields, row counts matching the table above exactly.
+
+`preflight()` re-checks this on every run and **refuses to import** if a mapped field is absent,
+because a missing field does not fail a read: the column simply arrives null, silently, on money.
+
+Two consequences of "all the fields", both real:
+
+- **`zsm_zkf_VAT_List` on `API_MIGRATION_METL` weighs 2 138 821 bytes per record.** It is a
+  Summary "list of" field, so it returns the newline-joined list of **all 57 816 VAT keys on every
+  single row** — everything else on that layout totals 929 bytes. Read whole, the table is ~124 GB.
+  A summary is computed over the *found set*, so the fix is to read **per métré**: the found set
+  drops to one métré (470 lines at the largest), the field to 17 kB, the total to ~370 MB. That is
+  why `importMetreLines()` loops on métrés instead of paging the table, and it is not a
+  micro-optimisation — the naive read does not finish.
+
+  **Per-métré is necessary but not sufficient, and only a full run showed it.** At 17 kB a line, the
+  470-line métré answers 11,6 MB, and Laravel keeps the raw body *and* the decoded array alive at
+  once (`Response::body()` memoises, `json()` decodes on top of it). The first complete dry run died
+  at **13 % of the lines phase** on "Allowed memory size of 134217728 bytes exhausted", inside
+  Guzzle's `fwrite`. So each métré is **also** paged, 100 records a request (`findPages()`), which
+  bounds a response at ~1,8 MB — the summary field does not shrink with the page, since it is
+  computed over the whole métré, so it is the *record count per response* that bounds the peak. Plus
+  `allowRoomForTheBiggestMetre()`, 512 MB, the same guard `MetreDocumentController` already uses for
+  dompdf: response size depends on a summary field in the other application, so the margin cannot be
+  computed here.
+
+  Both paging levels are pinned by tests, and the second one only exists because breaking the
+  offset of `pages()` on purpose made **nothing** fail — every fixture fitted in one page, so that
+  path had no coverage at all. `--page=1` now forces the six whole-layout phases to paginate over
+  tiny fixtures.
+
+  **The METL read strategy is detected, not configured.** `preflight()` looks for `zsm_*` fields on
+  `API_MIGRATION_METL`: while any is present the lines are read per métré to shrink the found set
+  (~733 MB, ~1 500 requests, 27 min — all measured); with none, the table is read straight through in
+  pages of 500 (~51 MB, ~100 requests). Detected rather than flagged because the layout is editable
+  by someone else, and an option to tick would drift from reality the first time it was forgotten.
+  The chosen strategy is announced at startup, and both paths are tested to produce the same rows —
+  a speedup that changed the data would be no speedup. Note the fixtures deliberately carry
+  `zsm_zkf_VAT_List` so the default tests exercise the path production actually takes; adding the
+  fast path without that made all 26 tests silently switch to it.
+- **`_offset` is 1-based.** `_offset=0` answers 960 "Parameter is invalid", which reads like a
+  missing layout.
+
+Removing `zsm_zkf_VAT_List` from the layout would take the METL read from ~370 MB to ~50 MB. The
+command prints a note saying so and works either way; it is an optimisation, not a prerequisite.
+
+### Settled, so do not re-litigate
+
+- **UUIDs are preserved verbatim** for MET, METL, LOT, REF, REFS, REFSL and METC. The whole point:
+  `OFF_Offers.zkf_MET` and `SOR_SupplierOrders.zkf_MET` in ShakeDesign are hard references.
+  `tests/Feature/ZkpPreservationTest.php` is the guard.
+- **`metre_number_sequences` must be seeded** per project at the maximum imported `IndProject`.
+  Skip it and the "a métré number is never handed out twice" rule is false for the first métré
+  created afterwards.
+- **The file is live** — 57 816 lines where an earlier note said 57 809. The user will run the
+  import at night, on a quiet file, so a freeze is not needed; the script simply has to be
+  re-runnable and idempotent.
+- **A métré pointing at a project deleted in ShakeDesign** shows no project name. Accepted: such a
+  métré should not be reachable anyway.
+- **Line images are out of scope for the first pass.** `METL::Image_500x500` is a container: the
+  Data API returns a temporary URL to download file by file, and this project has no file storage.
+  It is deliberately absent from the layout lists. Consequence: the "budget client — complet"
+  document loses the thumbnails the source prints.
+- **Authorship does not survive.** FileMaker records an account *name* (`zlg_creaUserName`);
+  `created_by` / `updated_by` are `char(36)` expecting a user UUID. The fields are on the lists so
+  a mapping stays possible later. Creation and modification *timestamps* do carry over.
+- **`sort_order`, `sequence_number`, `lot_names_cache`, `offer_id`** have no source and need none —
+  web-side conveniences. Ordering comes from `ref_order`. **One exception, and the layout list was
+  wrong about it: `METC::z_Order` IS the source for `metre_line_components.sort_order`.** Read off
+  the export, not guessed — a stored `Number` whose auto-enter is `metc_METC__Ordering_s::z_Order + 1`
+  (next rank, taken through a self-join sorted descending), which the `$$DRAG.ORDER` / `$$DROP.ORDER`
+  variables read for drag-and-drop and which every portal sorts ascending on. It is a component's
+  rank inside its line; dropping it would lose the display order.
+- **The phase order is the foreign keys, and nothing else.** REF → REFS → REFSL → MET → LOT → METL
+  → METC. MET and LOT have no local parent (`project_id` is a ShakeDesign zkp, deliberately
+  unconstrained here). Wiping runs the reverse. A test asserts the order by the *sequence of Data
+  API calls*, not by the result: an import that succeeds by luck on a fixture can still fail on the
+  real file.
+- **The import writes through `DB::table()`, never Eloquent, and that is load-bearing.** Speed is
+  the lesser half. The sharp half is the observers: `MetreLineObserver` rewrites a line's section
+  snapshot from `reference_id` — which is empty in the source — so it would **erase the copy the
+  line carries, the only true one**; and it dispatches `RecalculateMetreTotals` on every save,
+  which would queue 57 816 jobs to recompute 877 métrés. `HasUuids` staying out of the way is what
+  lets the source zkp through verbatim. Pinned by a test.
+- **The `_Stored` totals are imported verbatim, and `--recalculate` is deliberately opt-in.** They
+  are the figures FileMaker was showing; an import that recomputes them is not migrating data, it
+  is manufacturing it. And the four `Total_*_METL_Stored` are written by `RecalculateMetreTotals`
+  on a stated assumption the export does not confirm — one more reason the recompute is a separate,
+  conscious act rather than a side effect of importing.
+- **What the real data actually contains**, all counted on the server (05/08/2026) and all handled:
+  - `zkf_MAT`, `zkf_JCARTMAT`, `zkf_REF`, `zkf_REFS`, `zkf_REFSL` are empty on **all** 57 816
+    lines. So the empty `materials` / `cart_materials` tables are no obstacle, and a line's link to
+    the catalogue really is provenance-only.
+  - `zkf_LOT` on 13 379 lines, `zkf_SOR` on 3 598, `zkf_CPY` and `TENDER_Id` on 1 569,
+    `zkf_VAT_ae` on 57 806, `zkf_AccountingCode_ae` on **1**.
+  - **13 lines are unreachable**: 3 have an empty `zkf_MET`, ~10 point at a métré that no longer
+    exists (`Tot_Count_METL` sums to 57 803 against 57 816 rows). `metre_lines.metre_id` is NOT
+    NULL with a foreign key, so they cannot exist here. The per-métré read skips them structurally;
+    the command reports the gap rather than letting it pass unmentioned.
+  - **2 `REFS` rows have no parent**, no code and no title — blank records, no children. Skipped.
+  - **No duplicate `(zkf_PRJ, IndProject)`** among the 877 métrés, so the unique index is safe.
+  - Métré languages: **EN 728, FR 132, NL 17**. `Title_NL` is empty on all 507 catalogue articles.
+  - Largest métré: **470 lines**; none over 500.
+- **A missing *required* parent skips the record; a dangling *optional* key is nulled and the record
+  kept.** A line whose lot was deleted is still a real line with a real price — dropping it would
+  lose money to preserve a reference that is already worthless. A sub-reference without a reference
+  cannot exist at all. Both cases are tested.
+- **Dates come back `MM/DD/YYYY`**, timestamps `MM/DD/YYYY HH:MM:SS`. Parsed by hand, not with
+  `Carbon::createFromFormat`, which **rolls out-of-range components over instead of failing** — a
+  13th month becomes January of the next year in silence. On a file set to day/month that would
+  shift agreement dates by months without a word, so the import checks `checkdate()` and names the
+  day/month case explicitly.
+- **Three `Tot_*_TotalFees_Stored` are NOT imported, and their `_Stored` name is a lie.** The
+  dictionary gives their formulas: `Tot_Sum_TotalFees_Stored` = `zsm_SumTotalSales_Stored -
+  zsm_SumTotalOrdered_Stored`, `Tot_Percentage_TotalFees_Stored` = `(Tot_Sum_TotalFees_Stored /
+  zsm_SumTotalSales_Stored) * 100`, `Tot_Ratio_TotalFees_Stored` = `zsm_SumTotalSales_Stored /
+  zsm_SumTotalOrdered_Stored`. They are **Calculated fields over Summary fields**, so they total the
+  *found set*, not the métré — the same argument that already kept `zsm_*` out of `metres` applies to
+  the calculations that read them. Observed, not deduced: on a real read `Tot_Sum_TotalFees_Stored`
+  was 6 494 969,76 and `Tot_Ratio_TotalFees_Stored` 1,5450183058739, **identical on every métré**,
+  and one came back as 3,5275847787813E+17. The columns stay null, which reads as "not computed yet"
+  where a found-set aggregate would read as "wrong"; `RecalculateMetreTotals` fills them per record,
+  which is what `--recalculate` is for. The four `PROG_*_Valid_Stored_c` are Calculated too and *are*
+  imported — their formulas are `PROG_..._Stored * isAccepted_b` / `* IsStatus_Site_b`, per-record
+  throughout. **A full audit of every mapped field against the dictionary found no other case**, so
+  this is settled rather than sampled.
+- **FileMaker has no numeric bounds; these columns do.** `decimal(15,4)` is 11 digits before the
+  point, and an out-of-range value made MySQL reject the whole `upsert` — the métré phase died on
+  **record 1 of 877** with "Numeric value out of range". `LegacyFieldMap::withinRange()` now nulls and
+  reports anything a column cannot hold. Never clamped: rounding 3,5e17 down to 99 999 999 999,9999
+  would invent a figure, and on money that is worse than admitting there isn't one.
+- **A row the database refuses costs only itself.** Batches carry ~159 records, so one refusal used
+  to fail the other 158 and abort the phase — 27 minutes of reading lost for one line, on a job that
+  runs overnight. `salvage()` replays a refused batch record by record, skipping and naming the
+  offender. Its test forces the refusal with a **SQL trigger**, deliberately: the coercion and
+  key-validation layers already pre-empt everything SQLite can enforce, and the first attempt (a
+  300-character `unit`) proved nothing because SQLite does not check varchar length. What `salvage()`
+  is for is the refusal nobody predicted.
+- **A FileMaker Number field accepts text and still reads it as a number**, so the import does the
+  same instead of refusing it. `TENDER_Supp3_Quantity` is **`"59²"`** on 6 lines — a superscript
+  typed into a quantity — and FileMaker holds that as 59, confirmed by querying the server with a
+  numeric comparison, which returns those very rows. Nulling it would drop a tender quantity the
+  source uses in its own arithmetic, so `LegacyFieldMap::number()` extracts the numeric part the way
+  `GetAsNumber` does and **reports every reinterpretation**; text with no number in it stays null.
+  Found only because the full run reported it — no test would have invented that value.
+- **`"?"` is how FileMaker renders a calculation error in a stored field**, typically a division by
+  zero. It is the value of `PROG_ProgressSuppTotal_Percent_Stored` on 519 of the 877 métrés and of
+  the client twin on 226 — the ones whose total is zero. **null is the correct reading**, so it is
+  reported under its own label rather than as an unreadable number: an anomaly list with 1 490
+  expected entries teaches the reader to ignore the anomaly list.
+- **`REFS.zkp` and `REFSL.zkp` are UUIDs, and so are `LOT.zkf_TENDER_Supp1..5`**, all typed
+  `Number` by FileMaker. Re-confirmed on live records. The declared type proves nothing, so every
+  key is shape-checked and a non-UUID becomes null and is reported — writing `12` into a `char(36)`
+  of UUIDs would pass the database and break the first join.
+- **The HTTP timeout is 300 s, not the config's 30.** A batch read is not a web request: merely
+  *counting* `API_MIGRATION_METL` pulls 2,1 MB and blew through 30 s on the first real run.
+  `--timeout=` overrides.
+- **`--fresh` wipes the 13 domain tables plus `metre_number_sequences`, and never `users`.**
+  Emptying the site's database does not mean logging yourself out. It asks for confirmation
+  (`--force` to skip), lists what it is about to delete, and **declining aborts the whole import**
+  rather than importing on top — `--fresh` without the wipe would produce a mixture.
+- **Everything is `upsert` on the primary key, so the command is re-runnable**, which is the whole
+  recovery story for a network drop or a dead Data API session mid-run: relaunch without `--fresh`
+  and what landed is rewritten identically while the rest arrives. Chunk size is *computed*
+  (`15000 / column count`), not chosen: MySQL caps a statement at 65 535 placeholders and
+  `metre_lines` has ~90 columns, so a fixed 500-row chunk would work on six tables and blow up on
+  the only one with 57 816 rows.
+
+### Checking what actually landed — `--audit` / `--repair`
+
+**The gap is closed, and the cause was a column of ours, not a defect of the source.** The live
+import left the database 414 lines short (57 402 against 57 816, 13 structurally out of reach).
+`--audit` named 54 métrés and 401 missing lines; re-reading them showed **401 lines whose
+`METL::REFSL_Title` exceeds 255 characters** — 681 at the longest — against a `varchar(255)`
+column, which MySQL in strict mode **refused one by one**. The correspondence is exact, and no
+other `varchar` overflows: every refused row lives in a gap métré, and all 7 264 lines of those 54
+métrés were re-read and measured field by field. `2026_08_10_000001_widen_metre_line_title_to_text`
+makes `refsl_title` a `text` (like `description` and the two comments, which are the same kind of
+free text — `comment_supplier` reaches 1 128 characters in the real data and never failed,
+precisely because it was already `text`), `UpdateMetreLineRequest` follows at `max:65535` so an
+imported long title stays saveable, and `--repair` brought the 401 lines in. Truncating was never
+an option: a title cut at 255 still reads as a title while describing something other than what
+the client ordered — the same argument as `withinRange()` for numbers.
+
+The reason the trouble could not be read off the import's own report is settled too, and fixed:
+
+- **A refusal repeated 401 times printed 401 lines.** `salvage()` put the record's zkp *inside* the
+  note, so the deduplication never took and the report scrolled past as noise. The message now
+  carries the reason alone, the count is in front of it and a few zkp follow — one line saying
+  `METL — 401 × Data too long for column 'refsl_title' → enregistrement écarté. (dont …)`. Pinned
+  by a test that refuses 250 rows through a SQL trigger and asserts the report holds **one** line.
+- **`$inserted` counted the rows handed to `upsert`, not the rows that landed.** An `upsert` on a
+  duplicate primary key overwrites in silence, so a zkp the source carries twice cost a row while
+  the report kept announcing the source's total. The report now carries `Source | Lus | Écartés |
+  Doublons | En base | Écart` per phase and warns when `lus − écartés − doublons ≠ en base` (only
+  on `--fresh`; without it the table already holds rows this pass did not write). Duplicate zkps
+  are counted and named — a duplicate is a **source** defect, re-running changes nothing.
+- **`php artisan shakemetre:import --audit`** counts both sides métré by métré — `foundCount` on
+  `zkf_MET`, one record fetched per métré, ~877 requests — and prints the métrés in disagreement
+  with their delta. It separates *hors de portée* (`zkf_MET` empty or pointing at a deleted métré:
+  nothing to do) from *missing* (relisible). A total against a total would only say "414 short";
+  per métré it says which ones to read again.
+- **`--repair`** re-reads exactly those métrés through `readLinesOf()` — the same code path as the
+  import, so a repair that succeeded by reading differently would prove nothing — then recounts.
+  What survives the re-read has a cause the re-read does not treat (duplicate zkp, a row the
+  database refuses, a métré deleted at the source) and the pass's notes name it.
+
+Run `--audit` first; it writes nothing. It is also the right reflex after any schema change that
+widens a column: what MySQL refused once, it accepts now, and only a count on both sides says so.
+Do **not** reach for `--fresh` to close a gap — it would discard verified rows to re-run a read
+whose failure mode is not yet understood, where `--repair` re-reads only what is missing.
+
+**The three deltas the audit still shows are each accounted for, and none is a defect to fix:**
+
+- **`REFS` 118 → 116.** The two blank sub-references of the source, with no code, no title, no
+  parent and no children. Skipped by design (`sub_references.reference_id` is NOT NULL).
+- **`LOT` 852 → 853.** One lot *more* here: a lot created **on the web** (UUIDv7 key, no title, no
+  line, a supplier company set), not something the import produced. The audit compares totals, so
+  anything created here after the import reads as a surplus — the sign is what tells the two apart.
+- **`METC` 3 717 → 3 716.** The one component whose line is among the 13 unreachable ones: its
+  `zkf_METL` names a real line of the source, but that line's `zkf_MET` points at a métré that no
+  longer exists, so the line cannot exist here and neither can its component. Structural, verified
+  on the server rather than assumed — replaying `--only=METC` changes nothing.
+
+**FileMaker error 802 is not an authentication failure.** It means the file will not open — closed
+on the server, in backup, or offline — and it arrives with perfectly valid credentials. If
+ShakeDesign answers 802 too, it is the server and not this file. The reader now says so instead of
+pointing at the `fmrest` privilege, which is what the message used to suggest.
+
+### Owed by ShakeDesign, after the import
+
+When a project is deleted there, ShakeDesign must call this application to delete the métrés and
+their lines. Nothing does that today, so a deleted project would leave orphans no screen can
+reach. Agreed with the user, deliberately postponed until the import is done.
