@@ -107,7 +107,11 @@ class UpdateMetreLineRequest extends FormRequest
         $rules = [
             'reference_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('metre_references', 'id')],
             'sub_reference_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('sub_references', 'id')],
-            'refsl_title' => ['sometimes', 'nullable', 'string', 'max:255'],
+            // 65535 comme `description` : la colonne est un `text` depuis que l'import a montré
+            // que 401 titres de la source dépassent 255 caractères. Garder la règle à 255 aurait
+            // rendu ces lignes-là non enregistrables — modifier autre chose sur la ligne renvoie
+            // le titre tel quel et se serait fait refuser.
+            'refsl_title' => ['sometimes', 'nullable', 'string', 'max:65535'],
             'description' => ['sometimes', 'nullable', 'string', 'max:65535'],
             'quantity' => ['sometimes', 'nullable', 'numeric', 'between:-99999999.9999,99999999.9999'],
             'quantity_ordered' => ['sometimes', 'nullable', 'numeric', 'between:-99999999.9999,99999999.9999'],
