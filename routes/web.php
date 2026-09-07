@@ -15,14 +15,15 @@ use App\Http\Controllers\ProjectSearchController;
 use App\Http\Controllers\ReferenceCatalogueController;
 use App\Http\Controllers\ShakeDesignLookupController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-    ]);
-})->name('home');
+/*
+| La racine mène au tableau de bord, et donc à la page de connexion pour qui n'est pas connecté.
+| La même intention est portée par RedirectRootToDashboard, un middleware global : lui seul agit
+| quand l'application est montée sous un sous-chemin, où cette route n'est pas atteignable (voir
+| la classe). Celle-ci est ce qu'on lit dans le fichier des routes, et ce qui reste vrai si le
+| middleware disparaît.
+*/
+Route::redirect('/', '/dashboard')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

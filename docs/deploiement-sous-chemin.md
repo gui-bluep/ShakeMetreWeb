@@ -1,160 +1,126 @@
-# Déployer ShakeMetre sous `https://fms99.mycloud.fm/metre`
+# ShakeMetre en production — `https://fms99.mycloud.fm/metre`
 
-La racine du domaine est prise par FileMaker Server, qui sert ShakeDesign et sa console. L'appli-
-cation web est donc montée sous le préfixe `/metre`. Ce document est ce qu'il faut transmettre à
-qui administre le serveur.
+Écrit **après** la mise en service, contre la machine réelle : ce qui suit est constaté, pas
+projeté. La racine du domaine appartient à FileMaker Server, d'où le sous-chemin.
 
-## Ce qu'il ne faut surtout pas faire
+## Ce que la machine est
 
-`composer run dev` est un script de développement. `php artisan serve` n'écoute que sur
-`127.0.0.1:8000` et est mono-processus (un PDF de 12 pages bloque tout le monde) ; `npm run dev`
-écrit `http://localhost:5173` dans le HTML envoyé au navigateur, donc la page arrive chez le
-visiteur sans CSS ni JS ; `pail` écrit dans un terminal qui n'existe pas ; et `--kill-others` fait
-tomber les quatre dès que l'un s'arrête.
+| | |
+|---|---|
+| OS | Ubuntu 24.04, l'application dans `/home/mycloud/ShakeMetreWeb` |
+| Serveur web | nginx de la distribution (`/usr/sbin/nginx`) **lancé par FileMaker Server** avec sa propre configuration ; workers en `fmserver` |
+| PHP | **Homebrew**, 8.5.10, dans `/home/linuxbrew/.linuxbrew` |
+| php-fpm | brew également, service **utilisateur** systemd, écoute `127.0.0.1:9000` |
+| MySQL | brew, service utilisateur, base `shakemetre` |
+| Worker de queue | `shakemetre-queue`, service utilisateur |
 
-## nginx
+Trois conséquences qui expliquent presque tous les pièges de cette installation :
 
-Le préfixe doit arriver à PHP dans `SCRIPT_NAME` : c'est de là que Laravel déduit sa base d'URL,
-et c'est ce qui fait que `url()`, `route()`, `asset()` et les redirections portent `/metre` sans
-qu'une ligne de PHP change.
+- **La chaîne d'outils vient de `brew shellenv`, appelé dans `~/.bashrc`.** Or le `.bashrc`
+  d'Ubuntu sort immédiatement pour un shell non interactif, donc `php`, `node`, `composer` et
+  `mysql` sont **introuvables** depuis `ssh machine 'commande'`, depuis cron et depuis systemd.
+  Tout script doit charger l'environnement lui-même — c'est la première ligne de `deploy.sh`.
+- **Les workers php-fpm tournent en `mycloud`, pas en `www-data`.** La directive `user` du pool
+  est ignorée parce que le maître n'est pas root. C'est une bonne nouvelle : PHP a déjà tous les
+  droits sur le projet, `storage/` compris, et aucun `sudo` n'est nécessaire côté application.
+- **Ce sont des services *utilisateur*.** Ils ne démarreraient pas au boot sans
+  `loginctl enable-linger mycloud`, qui est appliqué (`Linger=yes`). Sans lui, un redémarrage
+  laisse l'application inaccessible jusqu'à ce que quelqu'un ouvre une session SSH. Corollaire :
+  un `systemctl --user stop` malencontreux emporte aussi la base de données.
 
-`alias` + `try_files` est un piège connu de nginx. On passe donc par un lien symbolique dont le
-dernier segment **est** le préfixe, ce qui permet un `root` ordinaire :
+## Le raccordement à nginx
 
-```bash
-mkdir -p /srv/shakemetre
-ln -s /home/mycloud/ShakeMetreWeb/public /srv/shakemetre/metre
-```
+Une seule ligne dans la configuration de FileMaker Server, dans son bloc `server { listen 443 }` :
 
-```nginx
-# À insérer dans le server { } qui sert déjà https://fms99.mycloud.fm
-location ^~ /metre {
-    root /srv/shakemetre;                 # /srv/shakemetre/metre -> .../ShakeMetreWeb/public
-    index index.php;
+    include "/home/mycloud/ShakeMetreWeb/deploy/nginx-metre.conf";
 
-    try_files $uri $uri/ /metre/index.php?$query_string;
+Le contenu vit dans le dépôt (`deploy/nginx-metre.conf`) : versionné avec le code qu'il sert, et
+modifiable **sans sudo**. Seule cette ligne d'`include` demande les droits, et elle n'est à
+poser qu'une fois.
 
-    location ~ ^/metre/.*\.php$ {
-        root /srv/shakemetre;
+Deux prérequis, tous deux faits :
 
-        include fastcgi_params;
-        fastcgi_pass unix:/run/php/php8.4-fpm.sock;      # adapter à la version installée
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        fastcgi_param SCRIPT_NAME $fastcgi_script_name;  # => /metre/index.php
+- `chmod o+x /home/mycloud` — le worker nginx tourne en `fmserver` et devait pouvoir traverser
+  le home pour lire `public/`. Traversée seule, pas de listage.
+- `~/webroot/metre` → `ShakeMetreWeb/public`, un lien symbolique dont le dernier segment **est**
+  le préfixe. C'est ce qui permet un `root` ordinaire là où un `alias` casserait `try_files`, et
+  ce qui fait arriver `SCRIPT_NAME=/metre/index.php` à PHP — la valeur dont Laravel déduit sa
+  base d'URL. C'est tout ce dont le côté serveur a besoin : `url()`, `route()`, `asset()` et les
+  redirections portent le préfixe d'eux-mêmes.
 
-        # Les sept documents imprimés passent par dompdf : plusieurs secondes sur un gros métré.
-        fastcgi_read_timeout 120s;
-    }
+### Recharger nginx — et ce qui ne marche pas
 
-    # Les assets compilés sont immuables (nom haché par Vite).
-    location ~ ^/metre/build/ {
-        root /srv/shakemetre;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-        access_log off;
-    }
-}
-```
+`sudo /usr/sbin/nginx -s reload -c <conf>` puis `sudo kill -HUP $(cat /run/nginx.pid)` ont tous
+deux été **sans effet** : les workers gardaient leur heure de démarrage et aucun `emerg`
+n'apparaissait au journal, alors que `nginx -t` validait la configuration et que le fichier pid
+désignait bien le maître. **Un redémarrage de la machine, lui, a fonctionné.** La cause du refus
+n'est pas établie ; le reboot est le recours qui marche.
 
-Deux points d'attention :
+Un reboot est ici peu risqué, et c'est un fait à connaître : le FileMaker Server de `fms99`
+n'héberge que le fichier `Sample`. **ShakeDesign et l'ancien ShakeMetre sont tous les deux sur
+`fms23`.** Redémarrer cette machine n'interrompt donc ni ShakeDesign, ni la source de l'import.
 
-- **PHP-FPM doit pouvoir lire le projet.** S'il tourne en `www-data` alors que le code est dans
-  `/home/mycloud`, il faut soit `chmod o+x /home/mycloud`, soit — mieux — un pool FPM tournant
-  sous l'utilisateur `mycloud`.
-- **`memory_limit` ne doit pas être verrouillé** dans le pool (`php_admin_value`) :
-  `MetreDocumentController::allowRoomForDompdf()` le monte à 512 Mo par `ini_set` le temps d'une
-  génération de PDF, mesurée à 128 Mo de pic sur un métré de 357 lignes.
+**À vérifier après chaque redémarrage ou mise à jour de FMS :**
 
-Si la configuration nginx est celle de FileMaker Server, elle peut être réécrite à chaque mise à
-jour de FMS : garder ce fichier et le réappliquer, ou demander à l'hébergeur un `include` vers un
-fichier à nous.
+    grep -n "nginx-metre" "/opt/FileMaker/FileMaker Server/NginxServer/conf/fms_nginx.conf"
 
-## `.env` de production
+`NginxServer/.conf/fms_nginx.conf` est un **gabarit** (`[FM_CERT_PEM_NAME]`, `[FM_HTTP_INCLUDE]`) :
+FMS compose sa configuration à partir de là et peut donc la réécrire. Elle l'a été une fois
+(14 h 37) sans intervention humaine. La ligne a survécu au premier reboot, mais si elle disparaît
+un jour, il faut la reposer — et le remède durable serait un petit service systemd qui la remet
+et recharge nginx après le démarrage de FMS.
 
-```dotenv
-APP_ENV=production
-APP_DEBUG=false                       # en true, une trace affiche les identifiants FileMaker
-APP_URL=https://fms99.mycloud.fm/metre
-LOG_LEVEL=info
+## Déployer
 
-SESSION_PATH=/metre                   # le cookie ne part pas chez l'application voisine
-SESSION_SECURE_COOKIE=true
+    ~/ShakeMetreWeb/deploy/deploy.sh
 
-DB_DATABASE=…  DB_USERNAME=…  DB_PASSWORD=…
-SHAKEDESIGN_HOST=https://fms23.mycloud.fm
-SHAKEDESIGN_DATABASE=ShakeDesign
-SHAKEDESIGN_USERNAME=…  SHAKEDESIGN_PASSWORD=…
-```
+Le cycle : commit et push, puis ce script sur le serveur. Aucun `sudo`, et nginx n'a **pas** à
+être rechargé pour un déploiement ordinaire — seulement si `deploy/nginx-metre.conf` change.
 
-`APP_KEY` se génère **une fois** (`php artisan key:generate`) et ne se regénère jamais : il
-chiffre les sessions et les cookies.
+Il encode trois pièges : le PATH de brew ; le fait que `artisan optimize` **gèle** les valeurs du
+`.env`, donc qu'une variable ajoutée ensuite ne serait jamais lue ; et le worker de queue qui
+garde le code en mémoire tant qu'on ne le redémarre pas. La remise en ligne est sous `trap … EXIT`,
+donc une migration refusée ou un build cassé ne laisse pas le site éteint.
 
-`SHAKEDESIGN_FMP_HOST` ne se renseigne que si l'hôte qui marche depuis le poste de la personne
-qui clique un lien `fmp://` diffère de celui que le serveur web utilise pour le Data API.
+## Le `.env` de production
 
-Les variables `SHAKEMETRE_FM_*` (l'import de l'ancienne base) n'ont rien à faire là en
-permanence : on les met le temps d'un import, on les retire après.
+    APP_ENV=production
+    APP_DEBUG=false                       # sinon une trace expose les identifiants FileMaker
+    APP_URL=https://fms99.mycloud.fm/metre
+    SESSION_PATH=/metre                   # le cookie ne part pas chez l'application voisine
 
-## Déploiement
+`APP_KEY` se génère une fois et ne se regénère jamais : il chiffre les sessions.
 
-```bash
-composer install --no-dev --optimize-autoloader
-npm ci && npm run build
-php artisan migrate --force
-php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan event:cache
-```
+## Les tests
 
-À refaire à chaque déploiement — un `config:cache` périmé sert l'ancien `.env`.
-`storage/` et `bootstrap/cache/` doivent être accessibles en écriture à PHP-FPM.
+**Sur le Mac.** Sur le serveur, `deploy.sh` retire les paquets de développement (`--no-dev`), donc
+il faut `composer install` d'abord, puis restaurer `--no-dev`. Les tests tournent sur du SQLite en
+mémoire : la base de production n'est pas touchée (vérifié après une exécution complète).
 
-## Le worker de queue n'est pas optionnel
+`APP_URL` est **fixé dans `phpunit.xml`** : le client de test préfixe toute URI relative avec
+`config('app.url')`, et l'`APP_URL` de production ferait demander `/metre/login` à un routeur qui
+ne connaît que `/login`. 415 tests sur 616 échouaient ainsi sur le serveur, aucun ailleurs.
 
-`MetreLineObserver` place `RecalculateMetreTotals` en file à chaque écriture de ligne. Sans worker,
-les totaux d'un métré et le « Ratio réel » ne bougent plus après une modification : l'écran a
-l'air cassé et rien ne le signale.
+## L'import des données
 
-```ini
-# /etc/systemd/system/shakemetre-queue.service
-[Unit]
-Description=ShakeMetre — worker de queue
-After=network.target mysql.service
+La base de production ne contient que les comptes ; les 877 métrés sont sur le Mac. Deux
+variables manquent au `.env` du serveur, sans quoi l'import ne peut pas se connecter :
 
-[Service]
-User=mycloud
-WorkingDirectory=/home/mycloud/ShakeMetreWeb
-ExecStart=/usr/bin/php artisan queue:work --tries=3 --timeout=300 --sleep=1
-Restart=always
-RestartSec=5
+    printf 'SHAKEMETRE_FM_HOST=https://fms23.mycloud.fm\nSHAKEMETRE_FM_DATABASE=ShakeMetre\n' >> .env
+    php artisan config:cache                     # sinon la valeur ajoutée n'est jamais lue
+    php artisan shakemetre:import --dry-run      # puis sans --dry-run, puis --audit
 
-[Install]
-WantedBy=multi-user.target
-```
+Le serveur joint bien `fms23` (`productInfo` → 200, vérifié).
 
-```bash
-systemctl enable --now shakemetre-queue
-```
+## Vérifier que tout répond
 
-Après chaque déploiement : `php artisan queue:restart` (le worker garde le code en mémoire).
+    curl -s -o /dev/null -w "%{http_code}\n" https://fms99.mycloud.fm/metre/up          # 200
+    curl -s -L -o /dev/null -w "%{url_effective}\n" https://fms99.mycloud.fm/metre/     # …/metre/login
 
-Aucune tâche planifiée n'existe dans ce projet : pas de cron à installer.
-
-## Vérifier
-
-```bash
-curl -si https://fms99.mycloud.fm/metre/up | head -1                  # 200
-curl -s  https://fms99.mycloud.fm/metre/login | grep -o 'base-path[^>]*'  # content="/metre"
-curl -si https://fms99.mycloud.fm/metre/dashboard | grep -i location  # …/metre/login
-```
-
-Puis, dans un navigateur et connecté : ouvrir un métré, modifier une quantité, **recharger** —
-le chiffre doit avoir tenu. C'est le test qui prouve que les appels `/api` arrivent bien sous le
-préfixe, parce que leur échec est silencieux. L'onglet Réseau ne doit montrer aucune requête vers
-`/api/…` à la racine du domaine.
+Puis, connecté : ouvrir un métré, modifier une quantité, **recharger**. C'est le seul test qui
+prouve que les appels `/api` arrivent sous le préfixe, parce que leur échec est silencieux.
 
 ## Côté ShakeDesign
 
-- Le lien SSO qu'il construit doit viser `https://fms99.mycloud.fm/metre/sso/consume/{token}`.
-- Les jetons Sanctum vivent en base : les émettre **sur le serveur de production**
-  (`php artisan shakedesign:issue-token`), ceux d'un poste de développement ne suivent pas.
-- Le serveur doit pouvoir joindre l'hôte du Data API FileMaker en sortie, sans quoi tous les
-  écrans qui lisent ShakeDesign se dégradent en « n'a pas pu être lu ».
+- Le lien SSO doit viser `https://fms99.mycloud.fm/metre/sso/consume/{token}`.
+- Les jetons Sanctum vivent en base : les émettre **sur le serveur** (`shakedesign:issue-token`).

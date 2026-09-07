@@ -19,6 +19,13 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <!-- Fixé, et pas hérité du .env : le client de test préfixe toute URI relative
+             avec config('app.url'), donc une installation montée sous un sous-chemin
+             (production : https://fms99.mycloud.fm/metre) ferait demander /metre/login
+             à un routeur qui ne connaît que /login - le préfixe vient de SCRIPT_NAME,
+             que le client de test ne fabrique pas. 415 tests échouaient ainsi sur le
+             serveur et aucun sur un poste de développement. -->
+        <env name="APP_URL" value="http://localhost"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

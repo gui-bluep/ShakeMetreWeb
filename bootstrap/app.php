@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureUserCanWrite;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RedirectRootToDashboard;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,6 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Global, et `prepend` : il doit s'exécuter avant le routage, qui est justement ce qui
+        // échoue sur la racine d'une installation en sous-chemin. Voir la classe.
+        $middleware->prepend(RedirectRootToDashboard::class);
+
         $middleware->alias([
             // Sanctum ships these but registers no alias of its own.
             'abilities' => CheckAbilities::class,
