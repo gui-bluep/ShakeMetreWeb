@@ -4,6 +4,7 @@ import Icon from '@/Components/Icon.vue';
 import Modal from '@/Components/Modal.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import { fold, matches as matchesTerm } from '@/searchMatch';
+import { u } from '@/basePath';
 
 /**
  * « Depuis le catalogue » — le sélecteur d'articles du référentiel, repris du navigateur à trois
@@ -60,7 +61,7 @@ async function load() {
     error.value = null;
 
     try {
-        const response = await fetch('/api/references/catalogue', {
+        const response = await fetch(u('/api/references/catalogue'), {
             credentials: 'same-origin',
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         });

@@ -11,6 +11,7 @@ import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
 import { fold, highlightParts, matches } from '@/searchMatch';
 import { supplierOrderUrl } from '@/fileMakerLink';
 import { apiRequest as request, csrfToken } from '@/apiRequest';
+import { u } from '@/basePath';
 
 /**
  * Les quatre vues monétaires des lignes d'un métré : « Achats — Ventes — Commandes » et ses trois
@@ -1089,7 +1090,7 @@ const viewLabel = computed(() => VIEW_LABELS[props.view] ?? 'Lignes du métré')
  */
 const breadcrumbs = computed(() => [
     { label: 'Projets', href: route('dashboard') },
-    { label: props.metre.name || 'Métré', href: `/metres/${props.metre.id}` },
+    { label: props.metre.name || 'Métré', href: u(`/metres/${props.metre.id}`) },
     { label: viewLabel.value },
 ]);
 </script>
@@ -1113,7 +1114,7 @@ const breadcrumbs = computed(() => [
                 <span v-if="lotFilter.code !== null" class="code-chip mx-1">{{ lotFilter.code }}</span>
                 <span style="font-variation-settings: 'wght' 600">{{ lotFilter.name || 'sans nom' }}</span>
             </span>
-            <Link :href="`/metres/${metre.id}/lines/${view}`" class="btn btn-ghost btn-sm ml-auto shrink-0">
+            <Link :href="u(`/metres/${metre.id}/lines/${view}`)" class="btn btn-ghost btn-sm ml-auto shrink-0">
                 Voir tout le métré
             </Link>
         </div>
@@ -1125,7 +1126,7 @@ const breadcrumbs = computed(() => [
                  ce bouton la reporte - une navigation quelconque n'a pas à ressusciter un choix
                  d'écran. -->
             <Link
-                :href="lotFilter ? `/metres/${metre.id}?lot=${lotFilter.id}` : `/metres/${metre.id}`"
+                :href="lotFilter ? u(`/metres/${metre.id}?lot=${lotFilter.id}`) : u(`/metres/${metre.id}`)"
                 class="btn btn-ghost btn-sm"
             >
                 <Icon name="arrow-left" :size="3.5" />

@@ -12,6 +12,7 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import StatTile from '@/Components/StatTile.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { u } from '@/basePath';
 
 const props = defineProps({
     project: { type: Object, required: true },
@@ -53,7 +54,7 @@ function closeMetreModal() {
 }
 
 function submitMetre() {
-    metreForm.post(`/projects/${props.project.id}/metres`, {
+    metreForm.post(u(`/projects/${props.project.id}/metres`), {
         preserveScroll: true,
         onSuccess: () => closeMetreModal(),
     });
@@ -212,7 +213,7 @@ const tiles = computed(() => [
                                         <!-- The métré's own page, not straight to the line grid: the
                                              grid is one of the views reachable from there. -->
                                         <Link
-                                            :href="`/metres/${metre.id}`"
+                                            :href="u(`/metres/${metre.id}`)"
                                             class="group inline-flex items-center gap-1.5 text-sand-900 hover:text-sand-950"
                                             style="font-variation-settings: 'wght' 550"
                                         >

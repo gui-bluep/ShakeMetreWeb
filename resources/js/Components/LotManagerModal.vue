@@ -5,6 +5,7 @@ import Modal from './Modal.vue';
 import SecondaryButton from './SecondaryButton.vue';
 import ShakeDesignPickerModal from './ShakeDesignPickerModal.vue';
 import { useDebouncedRowSave } from '../composables/useDebouncedRowSave';
+import { u } from '@/basePath';
 
 /**
  * "Gérer les lots" - create, edit and delete a project's lots, one row per lot.
@@ -272,7 +273,7 @@ async function confirmDelete() {
 // --- transport --------------------------------------------------------------------------
 
 async function request(url, method, payload = null) {
-    const response = await fetch(url, {
+    const response = await fetch(u(url), {
         method,
         credentials: 'same-origin',
         headers: {

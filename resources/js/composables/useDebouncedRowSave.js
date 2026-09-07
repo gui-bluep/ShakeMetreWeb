@@ -1,4 +1,5 @@
 import { reactive } from 'vue';
+import { u } from '../basePath';
 
 /**
  * Batches cell edits per row and flushes them once the row has been quiet for `delay` ms.
@@ -89,7 +90,7 @@ export function useDebouncedRowSave({ endpoint, delay = 500, onError }) {
  * baked into the initial document (the grid is long-lived and the token can rotate).
  */
 async function patch(url, payload) {
-    const response = await fetch(url, {
+    const response = await fetch(u(url), {
         method: 'PATCH',
         credentials: 'same-origin',
         headers: {

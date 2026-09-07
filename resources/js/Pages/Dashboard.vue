@@ -3,6 +3,7 @@ import { ref, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Icon from '@/Components/Icon.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
+import { u } from '@/basePath';
 
 /**
  * The home screen: a project search, empty until the user actually searches. Projects live
@@ -44,7 +45,7 @@ async function search(term) {
     error.value = null;
 
     try {
-        const response = await fetch(`/api/projects/search?q=${encodeURIComponent(term)}`, {
+        const response = await fetch(u(`/api/projects/search?q=${encodeURIComponent(term)}`), {
             credentials: 'same-origin',
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         });
@@ -112,7 +113,7 @@ function onKeydown(event) {
 
         if (project) {
             event.preventDefault();
-            router.visit(`/projects/${project.id}`);
+            router.visit(u(`/projects/${project.id}`));
         }
     }
 }
@@ -206,7 +207,7 @@ function onKeydown(event) {
                     <li v-for="(project, index) in projects" :key="project.id">
                         <Link
                             :ref="(el) => keepRow(el, index)"
-                            :href="`/projects/${project.id}`"
+                            :href="u(`/projects/${project.id}`)"
                             class="group flex items-center gap-3 px-4 py-2.5 transition-colors"
                             :class="highlighted === index ? 'bg-accent-100' : 'hover:bg-sand-50'"
                             @mouseenter="highlighted = index"

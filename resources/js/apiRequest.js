@@ -10,6 +10,8 @@
  * `X-Requested-With` n'est pas décoratif : c'est en partie ce qui fait rendre les échecs de
  * validation en JSON plutôt qu'en redirection.
  */
+import { u } from './basePath';
+
 export function csrfToken() {
     const cookie = document.cookie.split('; ').find((entry) => entry.startsWith('XSRF-TOKEN='));
 
@@ -26,7 +28,7 @@ export function csrfToken() {
  * @throws {Error} avec le message du serveur - la première erreur de validation s'il y en a une
  */
 export async function apiRequest(url, method, payload = null) {
-    const response = await fetch(url, {
+    const response = await fetch(u(url), {
         method,
         credentials: 'same-origin',
         headers: {

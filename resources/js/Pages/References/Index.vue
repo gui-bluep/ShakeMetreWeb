@@ -7,6 +7,7 @@ import Icon from '@/Components/Icon.vue';
 import Modal from '@/Components/Modal.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
+import { u } from '@/basePath';
 
 /**
  * Le référentiel de postes : sections, sous-sections, articles.
@@ -243,7 +244,7 @@ async function post(url) {
 }
 
 async function request(url, method) {
-    const response = await fetch(url, {
+    const response = await fetch(u(url), {
         method,
         credentials: 'same-origin',
         headers: {

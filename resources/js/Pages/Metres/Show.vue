@@ -13,6 +13,7 @@ import { useDebouncedRowSave } from '@/composables/useDebouncedRowSave';
 import { localToday } from '@/localDate';
 import { offerUrl } from '@/fileMakerLink';
 import { apiRequest as request, csrfToken } from '@/apiRequest';
+import { u } from '@/basePath';
 
 /**
  * One métré's own page. Header fields save as they are edited, through the same debounced
@@ -156,7 +157,7 @@ async function duplicate() {
     // on screen rather than the last saved state.
     await flush(props.metre.id);
 
-    router.post(`/metres/${props.metre.id}/duplicate`, {}, {
+    router.post(u(`/metres/${props.metre.id}/duplicate`), {}, {
         onFinish: () => { busy.value = false; },
     });
 }
@@ -177,7 +178,7 @@ async function setLocked(locked) {
     await flush(props.metre.id);
 
     try {
-        const response = await fetch(`/api/metres/${props.metre.id}/lock`, {
+        const response = await fetch(u(`/api/metres/${props.metre.id}/lock`), {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
@@ -446,7 +447,7 @@ async function createOffer() {
     await flush(props.metre.id);
 
     try {
-        const response = await fetch(`/api/metres/${props.metre.id}/offer`, {
+        const response = await fetch(u(`/api/metres/${props.metre.id}/offer`), {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
@@ -478,7 +479,7 @@ const lockError = ref(null);
 
 function destroy() {
     busy.value = true;
-    router.delete(`/metres/${props.metre.id}`, {
+    router.delete(u(`/metres/${props.metre.id}`), {
         onFinish: () => { busy.value = false; confirmingDelete.value = false; },
     });
 }
@@ -515,7 +516,7 @@ const documents = computed(() =>
     DOCUMENTS.map(([slug, label]) => ({
         slug,
         label,
-        url: `/metres/${props.metre.id}/documents/${slug}`,
+        url: u(`/metres/${props.metre.id}/documents/${slug}`),
     }))
 );
 
@@ -543,10 +544,10 @@ function openDocument(document) {
  * affiche elle-même dans son fil d'Ariane et son titre d'onglet.
  */
 const VIEWS = [
-    { label: 'Achats — Ventes', href: `/metres/${props.metre.id}/lines/achats-ventes` },
-    { label: 'Achats — Commandes', href: `/metres/${props.metre.id}/lines/achats-commandes` },
-    { label: 'Achats — Ventes — Commandes', href: `/metres/${props.metre.id}/lines/achats-ventes-commandes` },
-    { label: 'Ventes', href: `/metres/${props.metre.id}/lines/ventes` },
+    { label: 'Achats — Ventes', href: u(`/metres/${props.metre.id}/lines/achats-ventes`) },
+    { label: 'Achats — Commandes', href: u(`/metres/${props.metre.id}/lines/achats-commandes`) },
+    { label: 'Achats — Ventes — Commandes', href: u(`/metres/${props.metre.id}/lines/achats-ventes-commandes`) },
+    { label: 'Ventes', href: u(`/metres/${props.metre.id}/lines/ventes`) },
 ];
 
 // --- display ------------------------------------------------------------------------------
@@ -601,7 +602,7 @@ function statusClasses(active) {
         :title="form.name || 'Métré sans nom'"
         :breadcrumbs="[
             { label: 'Projets', href: route('dashboard') },
-            { label: project.name || 'Projet sans nom', href: project.id ? `/projects/${project.id}` : null },
+            { label: project.name || 'Projet sans nom', href: project.id ? u(`/projects/${project.id}`) : null },
             { label: form.name || 'Métré sans nom' },
         ]"
     >
@@ -616,7 +617,7 @@ function statusClasses(active) {
         </template>
 
         <template #actions>
-            <Link v-if="project.id" :href="`/projects/${project.id}`" class="btn btn-secondary">
+            <Link v-if="project.id" :href="u(`/projects/${project.id}`)" class="btn btn-secondary">
                 <Icon name="arrow-left" :size="4" />
                 Retour au projet
             </Link>
@@ -1003,7 +1004,7 @@ function statusClasses(active) {
                                      le piège documenté du lien vers la commande fournisseur. -->
                                 <component
                                     :is="chosenLot ? Link : 'span'"
-                                    :href="chosenLot ? `/metres/${metre.id}/lines/achats-ventes-commandes?lot=${chosenLot.id}` : null"
+                                    :href="chosenLot ? u(`/metres/${metre.id}/lines/achats-ventes-commandes?lot=${chosenLot.id}`) : null"
                                     class="btn btn-secondary shrink-0"
                                     title="Voir les lignes de ce lot"
                                 >
@@ -1023,7 +1024,7 @@ function statusClasses(active) {
                                 </button>
                                 <component
                                     :is="chosenLot ? Link : 'span'"
-                                    :href="chosenLot ? `/lots/${chosenLot.id}/tender-comparison?metre=${metre.id}` : null"
+                                    :href="chosenLot ? u(`/lots/${chosenLot.id}/tender-comparison?metre=${metre.id}`) : null"
                                     class="btn btn-secondary"
                                 >
                                     Appel d'offres

@@ -1,6 +1,7 @@
 <script setup>
 import BrandMark from '@/Components/BrandMark.vue';
 import { Link } from '@inertiajs/vue3';
+import { u } from '@/basePath';
 
 /**
  * Les écrans hors session (connexion, mot de passe oublié).
@@ -12,7 +13,7 @@ import { Link } from '@inertiajs/vue3';
 
 <template>
     <div class="flex min-h-screen flex-col items-center justify-center gap-6 bg-sand-100 px-4 py-10">
-        <Link href="/" class="rounded transition-opacity hover:opacity-80">
+        <Link :href="u('/')" class="rounded transition-opacity hover:opacity-80">
             <BrandMark tone="light" size="hero" />
         </Link>
 

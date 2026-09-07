@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { useDebouncedRowSave } from '../composables/useDebouncedRowSave';
+import { u } from '@/basePath';
 
 /**
  * The components of one metre line - FileMaker's METC portal, as a side panel.
@@ -229,7 +230,7 @@ async function onDrop() {
 // --- transport --------------------------------------------------------------------------
 
 async function request(url, method = 'GET', payload = null) {
-    const response = await fetch(url, {
+    const response = await fetch(u(url), {
         method,
         credentials: 'same-origin',
         headers: {

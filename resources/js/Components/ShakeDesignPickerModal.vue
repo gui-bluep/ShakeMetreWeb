@@ -3,6 +3,7 @@ import { ref, watch } from 'vue';
 import Modal from './Modal.vue';
 import SecondaryButton from './SecondaryButton.vue';
 import { fold, matches } from '@/searchMatch';
+import { u } from '@/basePath';
 
 /**
  * A FileMaker-style value picker over a ShakeDesign list: search at the top, a scrollable
@@ -79,7 +80,7 @@ async function load(term) {
 
     try {
         const url = term === '' ? props.endpoint : `${props.endpoint}?q=${encodeURIComponent(term)}`;
-        const response = await fetch(url, {
+        const response = await fetch(u(url), {
             credentials: 'same-origin',
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         });

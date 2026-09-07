@@ -7,6 +7,7 @@ import ComponentsPanel from '../../Components/ComponentsPanel.vue';
 import GridToasts from '../../Components/GridToasts.vue';
 import { useDebouncedRowSave } from '../../composables/useDebouncedRowSave';
 import { useGridKeyboardNav } from '../../composables/useGridKeyboardNav';
+import { u } from '@/basePath';
 
 const props = defineProps({
     metre: { type: Object, required: true },
@@ -304,7 +305,7 @@ function money(value) {
       <AppTopBar
           :breadcrumbs="[
               { label: 'Projets', href: route('dashboard') },
-              { label: metre.name || 'Métré', href: `/metres/${metre.id}` },
+              { label: metre.name || 'Métré', href: u(`/metres/${metre.id}`) },
               { label: 'Lignes du métré' },
           ]"
       />

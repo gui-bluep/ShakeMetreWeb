@@ -4,6 +4,7 @@ import { Head, Link, usePage } from '@inertiajs/vue3';
 import AppTopBar from '../../Components/AppTopBar.vue';
 import Icon from '../../Components/Icon.vue';
 import { useDebouncedRowSave } from '../../composables/useDebouncedRowSave';
+import { u } from '@/basePath';
 
 /**
  * Supplier tender comparison for one lot.
@@ -343,7 +344,7 @@ async function award(supplier) {
 // --- transport --------------------------------------------------------------------------
 
 async function request(url, method = 'GET', payload = null) {
-    const response = await fetch(url, {
+    const response = await fetch(u(url), {
         method,
         credentials: 'same-origin',
         headers: {
@@ -413,7 +414,7 @@ function shortId(id) {
             :breadcrumbs="metre
                 ? [
                     { label: 'Projets', href: route('dashboard') },
-                    { label: metre.name ?? `Métré ${metre.ind_project}`, href: `/metres/${metre.id}` },
+                    { label: metre.name ?? `Métré ${metre.ind_project}`, href: u(`/metres/${metre.id}`) },
                     { label: `Appel d'offres — ${lot.title ?? 'Lot ' + lot.code}` },
                 ]
                 : [
@@ -437,7 +438,7 @@ function shortId(id) {
             </div>
 
             <!-- Avec le lot, pour la même raison que le bouton « Métré » des vues de lignes. -->
-            <Link v-if="metre" :href="`/metres/${metre.id}?lot=${lot.id}`" class="btn btn-secondary shrink-0">
+            <Link v-if="metre" :href="u(`/metres/${metre.id}?lot=${lot.id}`)" class="btn btn-secondary shrink-0">
                 <Icon name="arrow-left" :size="4" />
                 Retour au métré
             </Link>
