@@ -240,10 +240,42 @@ const searchTerm = computed(() => fold(search.value.trim()));
  * mot à l'écran.
  */
 const SEARCHED_FIELDS = [
-    'refsl_title', 'description', 'unit', 'lot_name', 'sor_title_ref',
+    'refsl_title', 'description', 'unit', 'sor_title_ref',
     // Le groupe, copié sur la ligne : c'est ce qui fait qu'une section se cherche par son nom.
     'ref_title', 'refs_title',
+    // Les deux colonnes que le sélecteur Lots/Tags échange. Elles sont cherchées toutes les
+    // quatre quel que soit le côté affiché : « quelles lignes portent ce tag » est une question
+    // qu'on se pose sans avoir d'abord basculé l'affichage, et une recherche qui dépendrait de la
+    // vue courante donnerait deux résultats différents pour le même mot.
+    'lot_name', 'tag1', 'tag2',
 ];
+
+/** Les deux champs que le sélecteur cache, selon le côté affiché — l'autre moitié du couple. */
+const HIDDEN_SEARCHED_FIELDS = { lots: ['tag1', 'tag2'], tags: ['lot_name'] };
+
+/**
+ * Combien de lignes affichées portent le mot cherché dans la colonne que le sélecteur cache.
+ *
+ * C'est la contrepartie de la règle « toute trouvaille est marquée » : une ligne ramenée par son
+ * tag alors que la colonne Lot est à l'écran est là sans que rien ne le dise, et une ligne sans
+ * raison visible se lit comme un défaut de la recherche. Le compte se pose sur le bouton de
+ * l'autre côté du sélecteur, qui devient la réponse : basculer, et les marques sont là.
+ *
+ * Compté sur les lignes affichées et non sur tout le métré — c'est un repère sur ce qu'on voit —
+ * et sans chercher à savoir si la ligne était trouvable autrement : « elle porte le mot dans son
+ * tag » est vrai qu'elle le porte aussi ailleurs ou non.
+ */
+const hiddenColumnHits = computed(() => {
+    const term = searchTerm.value;
+
+    if (term === '') {
+        return 0;
+    }
+
+    const hidden = HIDDEN_SEARCHED_FIELDS[grouping.value] ?? [];
+
+    return visibleRows.value.filter((row) => hidden.some((field) => matches(row[field], term))).length;
+});
 
 const visibleRows = computed(() => {
     const term = searchTerm.value;
@@ -649,11 +681,12 @@ const busy = ref(false);
 /**
  * Une ligne, éventuellement classée d'emblée — METL_NewFromREF.
  *
- * Sans section, c'est l'ancien bouton « Ligne ». Avec, deux cas, exactement les deux branches du
- * script source : une ligne de plus dans un groupe existant (on répète ses quatre valeurs), ou une
- * sous-section définie sur le champ, code et titre saisis, qui n'existe dans aucun catalogue.
+ * Toujours classée, désormais : le bouton « Ligne » de la barre a été retiré, une ligne posée hors
+ * de toute section n'ayant servi à personne. Restent les deux branches du script source : une ligne
+ * de plus dans un groupe existant (on répète ses quatre valeurs), ou une sous-section définie sur le
+ * champ, code et titre saisis, qui n'existe dans aucun catalogue.
  */
-async function addLine(section = null) {
+async function addLine(section) {
     if (readOnly.value || busy.value) {
         return;
     }
@@ -1101,20 +1134,29 @@ const breadcrumbs = computed(() => [
 
             <span class="h-5 w-px bg-sand-200" aria-hidden="true" />
 
-            <!-- Tags / Lots switch -->
+            <!-- Tags / Lots switch. Le côté masqué porte le nombre de lignes que la recherche y a
+                 trouvées : c'est la seule trouvaille qui ne peut pas être marquée là où elle est,
+                 la colonne n'étant pas à l'écran, et le bouton qui la montrerait est aussi celui
+                 qui l'annonce. -->
             <div class="flex shrink-0 rounded-md border border-sand-300 bg-white p-0.5 text-xs">
                 <button
                     v-for="mode in [{ key: 'lots', label: 'Lots' }, { key: 'tags', label: 'Tags' }]"
                     :key="mode.key"
                     type="button"
-                    class="rounded px-2.5 py-1 transition-colors"
+                    class="flex items-center gap-1.5 rounded px-2.5 py-1 transition-colors"
                     :class="grouping === mode.key
                         ? 'bg-accent-400 text-sand-950'
                         : 'text-sand-600 hover:bg-sand-100 hover:text-sand-900'"
                     style="font-variation-settings: 'wght' 550"
+                    :title="grouping !== mode.key && hiddenColumnHits > 0
+                        ? `${hiddenColumnHits} ligne${hiddenColumnHits === 1 ? '' : 's'} trouvée${hiddenColumnHits === 1 ? '' : 's'} par ${mode.key === 'tags' ? 'leur tag' : 'leur lot'} — basculer pour voir le mot marqué`
+                        : undefined"
                     @click="grouping = mode.key"
                 >
                     {{ mode.label }}
+                    <span v-if="grouping !== mode.key && hiddenColumnHits > 0" class="badge badge-accent">
+                        {{ hiddenColumnHits }}
+                    </span>
                 </button>
             </div>
 
@@ -1188,16 +1230,9 @@ const breadcrumbs = computed(() => [
                 Catalogue
             </button>
 
-            <button
-                v-if="!readOnly"
-                type="button"
-                class="btn btn-accent btn-sm"
-                :disabled="busy"
-                @click="addLine"
-            >
-                <Icon name="plus" :size="3.5" />
-                Ligne
-            </button>
+            <!-- Pas de « + Ligne » ici : une ligne posée hors de toute section n'a servi à
+                 personne. Elles arrivent du catalogue, ou du menu d'une sous-section qui les
+                 range là où elles doivent l'être (addLineInSubSection). -->
 
             <span v-if="readOnly" class="badge badge-warning shrink-0">
                 <Icon name="lock" :size="3" />
@@ -1804,26 +1839,26 @@ const breadcrumbs = computed(() => [
                          autres lignes du métré. Une liste par champ, partagée par toutes les
                          lignes, définie une fois en bas de page. -->
                     <template v-else>
-                        <input
-                            type="text"
-                            :value="row.tag1"
-                            :disabled="readOnly"
-                            list="tag1-options"
-                            class="cell-input focus:bg-white"
-                            title="METL::TAG1"
-                            @input="editText(row, 'tag1', $event.target.value)"
-                            @blur="flushRow(row)"
-                        />
-                        <input
-                            type="text"
-                            :value="row.tag2"
-                            :disabled="readOnly"
-                            list="tag2-options"
-                            class="cell-input focus:bg-white"
-                            title="METL::TAG2"
-                            @input="editText(row, 'tag2', $event.target.value)"
-                            @blur="flushRow(row)"
-                        />
+                        <!-- Marqués comme le titre : la doublure par-dessus le champ, qui
+                             s'efface au focus. Un tag est cherché comme le reste, il se voit
+                             donc trouvé comme le reste. -->
+                        <div v-for="tag in [{ field: 'tag1', list: 'tag1-options' }, { field: 'tag2', list: 'tag2-options' }]" :key="tag.field" class="relative min-w-0">
+                            <input
+                                type="text"
+                                :value="row[tag.field]"
+                                :disabled="readOnly"
+                                :list="tag.list"
+                                class="cell-input peer focus:bg-white"
+                                :class="hasHit(row[tag.field]) ? 'text-transparent focus:text-sand-900' : ''"
+                                :title="`METL::${tag.field.toUpperCase()}`"
+                                @input="editText(row, tag.field, $event.target.value)"
+                                @blur="flushRow(row)"
+                            />
+                            <div
+                                v-if="hasHit(row[tag.field])"
+                                class="pointer-events-none absolute inset-0 truncate px-1.5 py-1 text-xs text-sand-900 peer-focus:hidden"
+                            ><template v-for="(part, i) in parts(row[tag.field])" :key="i"><mark v-if="part.hit" class="search-hit">{{ part.text }}</mark><template v-else>{{ part.text }}</template></template></div>
+                        </div>
                     </template>
 
                     <!-- La commande fournisseur ShakeDesign de la ligne. Cliquer l'ouvre dans le
@@ -1877,15 +1912,18 @@ const breadcrumbs = computed(() => [
                     <p class="text-[13px] text-sand-700">
                         {{ rows.length === 0 ? "Ce métré n'a aucune ligne." : 'Aucune ligne ne correspond à la recherche.' }}
                     </p>
+                    <!-- Un métré vide n'a aucune section, donc aucun menu de sous-section d'où
+                         partir : le catalogue est le seul chemin, et c'est celui que ce bouton
+                         ouvre depuis que « + Ligne » a été retiré. -->
                     <button
                         v-if="rows.length === 0 && !readOnly"
                         type="button"
                         class="btn btn-secondary btn-sm mt-1"
                         :disabled="busy"
-                        @click="addLine"
+                        @click="showCatalogue = true"
                     >
-                        <Icon name="plus" :size="3.5" />
-                        Ajouter une ligne
+                        <Icon name="table" :size="3.5" />
+                        Ouvrir le catalogue
                     </button>
                 </div>
             </div>

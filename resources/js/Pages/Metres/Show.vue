@@ -888,51 +888,6 @@ function statusClasses(active) {
                     </ul>
                 </AppCard>
 
-                <!-- Fournisseur - deliberately empty for now. -->
-                <!-- Offres client déjà rattachées à ce métré (OFF_Offers.zkf_MET). Le montant
-                     affiché est hors TVA : c'est celui qui se compare au total des ventes du
-                     métré, qui ne porte pas de TVA non plus. -->
-                <AppCard title="Offres client" class="lg:col-span-12">
-                    <p v-if="offers === null" class="banner banner-warning">
-                        <Icon name="alert" :size="4" class="mt-px" />
-                        <span>ShakeDesign n'a pas répondu : les offres de ce métré n'ont pas pu être lues.</span>
-                    </p>
-
-                    <div v-else-if="offers.length === 0" class="flex flex-col items-center gap-1.5 py-6 text-center">
-                        <Icon name="document" :size="6" class="text-sand-300" />
-                        <p class="text-[13px] text-sand-600">Aucune offre client pour ce métré.</p>
-                    </div>
-
-                    <table v-else class="data-table">
-                        <thead>
-                            <tr>
-                                <th class="text-left">Titre</th>
-                                <th class="text-left">Date</th>
-                                <th class="text-left">Catégorie</th>
-                                <th class="text-left">Langue</th>
-                                <th class="text-right">Total HTVA</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="offer in offers" :key="offer.zkp">
-                                <!-- `is` explicitement lié : le compilateur de Vue ne le prend
-                                     pas dans un v-bind étalé, et le lien se rendrait en <span>
-                                     sans rien signaler. Même piège que sur les vues de lignes. -->
-                                <td>
-                                    <component :is="offerLink(offer).is" v-bind="offerLink(offer)">{{ offer.title || 'Offre sans titre' }}</component>
-                                </td>
-                                <td class="num">{{ offer.date || '—' }}</td>
-                                <td>{{ offer.category || '—' }}</td>
-                                <td>{{ offer.language || '—' }}</td>
-                                <td class="num text-right">
-                                    {{ offer.total_no_tax === null ? '—' : money(offer.total_no_tax) }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                </AppCard>
-
                 <!-- Fournisseurs : le portail des lots de MET_Form. Les lots du projet qui ne
                      portent aucun montant dans ce métré sont omis - la carte est étroite, et un lot
                      à zéro n'apprend rien ici (la page du projet, elle, les liste tous). -->
@@ -1010,7 +965,21 @@ function statusClasses(active) {
                             </button>
                         </div>
 
-                        <template v-if="chosenLot">
+                        <!--
+                            Les totaux du lot et les deux actions. La source ne les dessine qu'une
+                            fois un lot choisi, et c'est ce qu'un `v-if` faisait ici - mais leur
+                            apparition allongeait la carte au moment du clic : la carte Documents,
+                            sur la même rangée de la grille, s'étirait avec elle et tout ce qui
+                            suit (Offres client, Commentaires) descendait d'un cran. Le bloc est
+                            donc TOUJOURS rendu et seulement rendu invisible : la place est
+                            réservée d'avance, rien n'est montré, et `visibility: hidden` sort
+                            aussi ses commandes du tab order et des clics - elles restent aussi
+                            inatteignables qu'absentes, ce qu'un grisage ne donnerait pas.
+                            Les deux liens redeviennent des `<span>` faute de lot à désigner :
+                            inventer une URL vaudrait moins qu'un lien qui n'en est pas un. Les
+                            montants se lisent donc en `chosenLot?.`, `money( null )` rendant « — ».
+                        -->
+                        <div class="flex flex-col gap-3" :class="chosenLot ? '' : 'invisible'">
                             <!-- Les trois totaux DU LOT dans ce métré, et le bouton qui mène à ses
                                  lignes - MET_LOT_ShowOrder_METL, qui restreint le jeu trouvé à
                                  `zkf_LOT AND zkf_MET`. -->
@@ -1018,51 +987,99 @@ function statusClasses(active) {
                                 <dl class="grid flex-1 grid-cols-3 gap-2 text-center">
                                     <div class="rounded-md bg-clay-50/70 px-2 py-1.5">
                                         <dt class="eyebrow">Achats</dt>
-                                        <dd class="num text-[13px] text-sand-900">{{ money(chosenLot.buy) }}</dd>
+                                        <dd class="num text-[13px] text-sand-900">{{ money(chosenLot?.buy) }}</dd>
                                     </div>
                                     <div class="rounded-md bg-olive-50/70 px-2 py-1.5">
                                         <dt class="eyebrow">Ventes</dt>
-                                        <dd class="num text-[13px] text-sand-900">{{ money(chosenLot.sales) }}</dd>
+                                        <dd class="num text-[13px] text-sand-900">{{ money(chosenLot?.sales) }}</dd>
                                     </div>
                                     <div class="rounded-md bg-mallow-50/70 px-2 py-1.5">
                                         <dt class="eyebrow">Commandé</dt>
-                                        <dd class="num text-[13px] text-sand-900">{{ money(chosenLot.ordered) }}</dd>
+                                        <dd class="num text-[13px] text-sand-900">{{ money(chosenLot?.ordered) }}</dd>
                                     </div>
                                 </dl>
 
-                                <Link
-                                    :href="`/metres/${metre.id}/lines/achats-ventes-commandes?lot=${chosenLot.id}`"
+                                <!-- `is` explicitement lié, jamais pris dans un v-bind étalé -
+                                     le piège documenté du lien vers la commande fournisseur. -->
+                                <component
+                                    :is="chosenLot ? Link : 'span'"
+                                    :href="chosenLot ? `/metres/${metre.id}/lines/achats-ventes-commandes?lot=${chosenLot.id}` : null"
                                     class="btn btn-secondary shrink-0"
                                     title="Voir les lignes de ce lot"
                                 >
                                     <Icon name="chevron-right" :size="4" />
-                                </Link>
+                                </component>
                             </div>
 
                             <div class="flex flex-wrap gap-2">
                                 <button
                                     type="button"
                                     class="btn btn-accent"
-                                    :disabled="readOnly || busy"
+                                    :disabled="!chosenLot || readOnly || busy"
                                     :title="orderButtonTitle"
                                     @click="openSupplierOrder"
                                 >
                                     Création d'une commande fournisseur
                                 </button>
-                                <Link
-                                    :href="`/lots/${chosenLot.id}/tender-comparison?metre=${metre.id}`"
+                                <component
+                                    :is="chosenLot ? Link : 'span'"
+                                    :href="chosenLot ? `/lots/${chosenLot.id}/tender-comparison?metre=${metre.id}` : null"
                                     class="btn btn-secondary"
                                 >
                                     Appel d'offres
-                                </Link>
+                                </component>
                             </div>
-                        </template>
+                        </div>
                     </div>
 
                     <div v-else class="flex flex-col items-center gap-1.5 py-6 text-center">
                         <Icon name="user" :size="6" class="text-sand-300" />
                         <p class="text-[13px] text-sand-600">Aucun fournisseur lié à ce métré.</p>
                     </div>
+                </AppCard>
+
+                <!-- Offres client déjà rattachées à ce métré (OFF_Offers.zkf_MET). Le montant
+                     affiché est hors TVA : c'est celui qui se compare au total des ventes du
+                     métré, qui ne porte pas de TVA non plus. -->
+                <AppCard title="Offres client" class="lg:col-span-12">
+                    <p v-if="offers === null" class="banner banner-warning">
+                        <Icon name="alert" :size="4" class="mt-px" />
+                        <span>ShakeDesign n'a pas répondu : les offres de ce métré n'ont pas pu être lues.</span>
+                    </p>
+
+                    <div v-else-if="offers.length === 0" class="flex flex-col items-center gap-1.5 py-6 text-center">
+                        <Icon name="document" :size="6" class="text-sand-300" />
+                        <p class="text-[13px] text-sand-600">Aucune offre client pour ce métré.</p>
+                    </div>
+
+                    <table v-else class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="text-left">Titre</th>
+                                <th class="text-left">Date</th>
+                                <th class="text-left">Catégorie</th>
+                                <th class="text-left">Langue</th>
+                                <th class="text-right">Total HTVA</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="offer in offers" :key="offer.zkp">
+                                <!-- `is` explicitement lié : le compilateur de Vue ne le prend
+                                     pas dans un v-bind étalé, et le lien se rendrait en <span>
+                                     sans rien signaler. Même piège que sur les vues de lignes. -->
+                                <td>
+                                    <component :is="offerLink(offer).is" v-bind="offerLink(offer)">{{ offer.title || 'Offre sans titre' }}</component>
+                                </td>
+                                <td class="num">{{ offer.date || '—' }}</td>
+                                <td>{{ offer.category || '—' }}</td>
+                                <td>{{ offer.language || '—' }}</td>
+                                <td class="num text-right">
+                                    {{ offer.total_no_tax === null ? '—' : money(offer.total_no_tax) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
                 </AppCard>
 
                 <!-- Commentaires : rassemblés dans une carte plutôt que posés nus sur le fond,

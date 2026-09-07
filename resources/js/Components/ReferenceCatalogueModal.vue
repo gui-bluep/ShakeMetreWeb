@@ -18,8 +18,11 @@ import { fold, matches as matchesTerm } from '@/searchMatch';
  * liste de zkp et crée une ligne par article. L'ordre de cochage est conservé, parce que c'est
  * l'ordre dans lequel on s'attend à voir les lignes arriver.
  *
- * Le même article peut être coché deux fois — deux portes identiques à deux étages sont deux
- * lignes — donc le compteur compte les occurrences, pas les articles distincts.
+ * **Un article, une ligne.** Le même article pouvait être coché plusieurs fois pour en créer
+ * plusieurs exemplaires ; c'est retiré, par décision : deux portes identiques se disent par une
+ * quantité de 2 dans l'estimation d'achat, pas par deux lignes qu'il faudra ensuite modifier
+ * ensemble. La liste reste une liste ordonnée plutôt qu'un Set, l'ordre de cochage étant l'ordre
+ * d'arrivée des lignes, mais elle ne porte plus de doublons.
  */
 const props = defineProps({
     show: { type: Boolean, default: false },
@@ -110,8 +113,8 @@ const results = computed(() => {
     return matches;
 });
 
-function countPicked(id) {
-    return picked.value.filter((candidate) => candidate === id).length;
+function isPicked(id) {
+    return picked.value.includes(id);
 }
 
 function toggle(id) {
@@ -119,16 +122,9 @@ function toggle(id) {
         return;
     }
 
-    picked.value = countPicked(id) > 0
+    picked.value = isPicked(id)
         ? picked.value.filter((candidate) => candidate !== id)
         : [...picked.value, id];
-}
-
-/** Un deuxième exemplaire du même article, pour les lignes qui se répètent. */
-function addAgain(id) {
-    if (! props.readOnly) {
-        picked.value = [...picked.value, id];
-    }
 }
 
 function insert() {
@@ -138,10 +134,24 @@ function insert() {
 }
 
 function close() {
-    picked.value = [];
-    search.value = '';
     emit('close');
 }
+
+/**
+ * La remise à zéro est attachée à la FERMETURE, pas au bouton qui ferme.
+ *
+ * Le parent ferme la modale lui-même quand l'insertion a réussi (`showCatalogue = false`), sans
+ * passer par « Annuler » : la sélection restait donc cochée et se rajoutait à la suivante, ce qui
+ * recréait les mêmes lignes. Un `watch` sur `show` couvre les cinq sorties — valider, annuler,
+ * Échap, le voile, une navigation — et la seule qui doit *conserver* la sélection est l'insertion
+ * qui échoue, où le parent laisse justement la modale ouverte.
+ */
+watch(() => props.show, (show) => {
+    if (! show) {
+        picked.value = [];
+        search.value = '';
+    }
+});
 
 const currency = new Intl.NumberFormat('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -232,34 +242,35 @@ function money(value) {
                         <span v-if="search.trim() !== ''" class="text-sand-500">— résultats de la recherche</span>
                     </p>
                     <ul class="max-h-80 overflow-y-auto rounded-md border border-sand-200">
+                        <!-- Toute la ligne coche : c'est un `<label>` qui l'englobe, donc le clic
+                             porte sur le libellé, l'unité et le prix aussi, sans que la case ait
+                             à être visée. Un label plutôt qu'un `@click` sur la `<li>` — le
+                             navigateur s'occupe alors du basculement, du clavier et du double
+                             comptage quand c'est la case elle-même qui est cliquée. -->
                         <li
                             v-for="line in results"
                             :key="line.id"
-                            class="flex items-center gap-2 border-b border-sand-100 px-2 py-1.5 last:border-b-0"
-                            :class="countPicked(line.id) > 0 ? 'bg-accent-100/60' : ''"
+                            class="border-b border-sand-100 last:border-b-0"
+                            :class="isPicked(line.id) ? 'bg-accent-100/60' : ''"
                         >
-                            <input
-                                type="checkbox"
-                                class="size-3.5 shrink-0"
-                                :checked="countPicked(line.id) > 0"
-                                :disabled="readOnly"
-                                @change="toggle(line.id)"
-                            />
-                            <span class="min-w-0 flex-1">
-                                <span class="block truncate text-xs text-sand-900">{{ line.title || '—' }}</span>
-                                <span v-if="line.path" class="block truncate text-[10px] text-sand-500">{{ line.path }}</span>
-                            </span>
-                            <span class="shrink-0 text-[11px] text-sand-600">{{ line.unit || '—' }}</span>
-                            <span class="num shrink-0 text-[11px] text-sand-700">{{ money(line.price) }}</span>
-                            <button
-                                v-if="countPicked(line.id) > 0"
-                                type="button"
-                                class="btn btn-ghost shrink-0 rounded px-1 py-0.5 text-[10px]"
-                                title="Ajouter un exemplaire de plus de cet article"
-                                @click="addAgain(line.id)"
+                            <label
+                                class="flex items-center gap-2 px-2 py-1.5"
+                                :class="readOnly ? '' : 'cursor-pointer hover:bg-sand-50'"
                             >
-                                ×{{ countPicked(line.id) }} +
-                            </button>
+                                <input
+                                    type="checkbox"
+                                    class="size-3.5 shrink-0"
+                                    :checked="isPicked(line.id)"
+                                    :disabled="readOnly"
+                                    @change="toggle(line.id)"
+                                />
+                                <span class="min-w-0 flex-1">
+                                    <span class="block truncate text-xs text-sand-900">{{ line.title || '—' }}</span>
+                                    <span v-if="line.path" class="block truncate text-[10px] text-sand-500">{{ line.path }}</span>
+                                </span>
+                                <span class="shrink-0 text-[11px] text-sand-600">{{ line.unit || '—' }}</span>
+                                <span class="num shrink-0 text-[11px] text-sand-700">{{ money(line.price) }}</span>
+                            </label>
                         </li>
                         <li v-if="results.length === 0" class="px-2 py-6 text-center text-xs text-sand-600">
                             {{ search.trim() === ''

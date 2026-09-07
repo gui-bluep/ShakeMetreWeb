@@ -7,8 +7,9 @@ import { installNumberInputWheelGuard } from './numberInputWheelGuard';
 
 const appName = import.meta.env.VITE_APP_NAME || 'ShakeMetre';
 
-// One document listener, outside the Inertia app so it survives every navigation. See the module:
-// a focused number input would otherwise spend the wheel tick editing money instead of scrolling.
+// Installed on the document, outside the Inertia app so it survives every navigation. See the
+// module: a focused number input would otherwise spend the wheel tick editing money, and the list
+// under the cursor would not scroll at all.
 installNumberInputWheelGuard();
 
 createInertiaApp({
